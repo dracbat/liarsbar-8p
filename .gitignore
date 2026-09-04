@@ -1,0 +1,19 @@
+# --- Never publish: copyrighted game binaries ---
+# These are copies of Liar's Bar itself, kept locally as a restore point.
+# Publishing them would redistribute the game.
+backup/
+
+# --- Decompilation artifacts ---
+# Full class/method dumps derived from the game's proprietary code.
+# The findings that matter are summarised in NOTES.md instead.
+recon/
+
+# --- Redistributed third-party loader + build output ---
+tools/bepinex-staging/
+tools/*.zip
+dist/
+
+# --- .NET build output ---
+[Bb]in/
+[Oo]bj/
+*.user

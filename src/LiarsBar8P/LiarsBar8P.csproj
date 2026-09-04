@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>LiarsBar8P</AssemblyName>
+    <Version>0.1.0</Version>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoWarn>$(NoWarn);CS0649;CS0169;CS8632</NoWarn>
+    <GameDir>C:\Program Files (x86)\Steam\steamapps\common\Liar's Bar</GameDir>
+    <Interop>$(GameDir)\BepInEx\interop</Interop>
+    <Core>$(GameDir)\BepInEx\core</Core>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- BepInEx / Harmony / Il2CppInterop -->
+    <Reference Include="BepInEx.Core"><HintPath>$(Core)\BepInEx.Core.dll</HintPath></Reference>
+    <Reference Include="BepInEx.Unity.IL2CPP"><HintPath>$(Core)\BepInEx.Unity.IL2CPP.dll</HintPath></Reference>
+    <Reference Include="0Harmony"><HintPath>$(Core)\0Harmony.dll</HintPath></Reference>
+    <Reference Include="Il2CppInterop.Runtime"><HintPath>$(Core)\Il2CppInterop.Runtime.dll</HintPath></Reference>
+    <Reference Include="Il2CppInterop.Common"><HintPath>$(Core)\Il2CppInterop.Common.dll</HintPath></Reference>
+
+    <!-- Game + engine -->
+    <Reference Include="Il2Cppmscorlib"><HintPath>$(Interop)\Il2Cppmscorlib.dll</HintPath></Reference>
+    <Reference Include="Assembly-CSharp"><HintPath>$(Interop)\Assembly-CSharp.dll</HintPath></Reference>
+    <Reference Include="Mirror"><HintPath>$(Interop)\Mirror.dll</HintPath></Reference>
+    <Reference Include="com.rlabrecque.steamworks.net"><HintPath>$(Interop)\com.rlabrecque.steamworks.net.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(Interop)\UnityEngine.CoreModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(Interop)\UnityEngine.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.TextRenderingModule"><HintPath>$(Interop)\UnityEngine.TextRenderingModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.UI"><HintPath>$(Interop)\UnityEngine.UI.dll</HintPath></Reference>
+    <Reference Include="Unity.TextMeshPro"><HintPath>$(Interop)\Unity.TextMeshPro.dll</HintPath></Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Update="@(Reference)"><Private>false</Private></Reference>
+  </ItemGroup>
+
+</Project>
