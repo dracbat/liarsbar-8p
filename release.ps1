@@ -1,4 +1,4 @@
-﻿<#
+<#
   One command to ship a release.
 
       .\release.ps1
@@ -41,6 +41,19 @@ function Invoke-Gh {
     $ErrorActionPreference = 'Continue'
     try {
         $lines = & $script:GhExe @GhArgs 2>&1 | ForEach-Object { $_.ToString() }
+        [pscustomobject]@{ Code = $LASTEXITCODE; Out = ($lines -join "`n") }
+    }
+    finally { $ErrorActionPreference = $old }
+}
+
+# git warns on stderr for harmless things (line endings, for one). Same hazard as
+# above, so mutating git calls run through here and are judged by exit code.
+function Invoke-Git {
+    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$GitArgs)
+    $old = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $lines = & git @GitArgs 2>&1 | ForEach-Object { $_.ToString() }
         [pscustomobject]@{ Code = $LASTEXITCODE; Out = ($lines -join "`n") }
     }
     finally { $ErrorActionPreference = $old }
@@ -134,8 +147,10 @@ $dirty = git status --porcelain
 if ($dirty) {
     Info "uncommitted changes:"
     $dirty | ForEach-Object { Info "  $_" }
-    git add -A
-    git commit -q -m "Release $Tag"
+    $r = Invoke-Git add -A
+    if ($r.Code -ne 0) { Bad "git add failed"; Info $r.Out; exit 1 }
+    $r = Invoke-Git commit -q -m "Release $Tag"
+    if ($r.Code -ne 0) { Bad "git commit failed"; Info $r.Out; exit 1 }
     Good "committed as 'Release $Tag'"
 } else {
     Info "working tree already clean"
@@ -143,11 +158,9 @@ if ($dirty) {
 
 $ahead = (git log origin/main..HEAD --oneline | Measure-Object).Count
 if ($ahead -gt 0) {
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    git push origin main 2>&1 | ForEach-Object { Info $_.ToString() }
-    $rc = $LASTEXITCODE
-    $ErrorActionPreference = $old
-    if ($rc -ne 0) { Bad "push failed"; exit 1 }
+    $r = Invoke-Git push origin main
+    if ($r.Code -ne 0) { Bad "push failed"; Info $r.Out; exit 1 }
+    if ($r.Out) { $r.Out -split "`n" | ForEach-Object { Info $_ } }
     Good "pushed $ahead commit(s)"
 } else {
     Info "nothing to push"
