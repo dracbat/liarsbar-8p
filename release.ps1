@@ -1,4 +1,4 @@
-<#
+﻿<#
   One command to ship a release.
 
       .\release.ps1
@@ -7,10 +7,9 @@
   makes sure the repo is public (release assets follow repo visibility), then
   creates or updates the GitHub release with both assets attached.
 
-  Safe to re-run: an existing release for the tag has its assets replaced rather
-  than erroring out.
+  Safe to re-run: an existing release for the tag has its assets replaced.
 
-  First time only, you need to sign in once:
+  First time only, sign in once:
       gh auth login
 #>
 param(
@@ -33,33 +32,57 @@ $Repo = 'dracbat/liarsbar-8p'
 $Zip  = "$PSScriptRoot\dist\LiarsBar-8P.zip"
 $Bat  = "$PSScriptRoot\installer\Install-LiarsBar8P.bat"
 
-# --------------------------------------------------------------- preflight
+# Native tools write to stderr routinely. Under $ErrorActionPreference = 'Stop',
+# PowerShell 5.1 turns that into a terminating error, so every gh call goes through
+# this helper: output is captured as plain text and success is judged by exit code.
+function Invoke-Gh {
+    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$GhArgs)
+    $old = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $lines = & $script:GhExe @GhArgs 2>&1 | ForEach-Object { $_.ToString() }
+        [pscustomobject]@{ Code = $LASTEXITCODE; Out = ($lines -join "`n") }
+    }
+    finally { $ErrorActionPreference = $old }
+}
+
+# ------------------------------------------------------------------ preflight
 Step "Checking tools"
 
-$gh = Get-Command gh -ErrorAction SilentlyContinue
-if (-not $gh) {
-    # winget puts it here but the PATH in this shell may be stale
-    $guess = "$env:ProgramFiles\GitHub CLI\gh.exe"
-    if (Test-Path $guess) { $gh = $guess } else {
-        Bad "GitHub CLI (gh) not found."
-        Info "Install it with:  winget install --id GitHub.cli -e"
-        Info "then open a NEW terminal and run this script again."
-        exit 1
+$GhExe = $null
+$cmd = Get-Command gh -ErrorAction SilentlyContinue
+if ($cmd) { $GhExe = $cmd.Source }
+else {
+    foreach ($guess in @("$env:ProgramFiles\GitHub CLI\gh.exe",
+                         "${env:ProgramFiles(x86)}\GitHub CLI\gh.exe",
+                         "$env:LOCALAPPDATA\Microsoft\WinGet\Links\gh.exe")) {
+        if (Test-Path $guess) { $GhExe = $guess; break }
     }
-} else { $gh = $gh.Source }
-Good "gh: $gh"
-
-& $gh auth status 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    Bad "You are not signed in to GitHub."
-    Info "Run this once, then re-run this script:"
-    Info "    gh auth login"
-    Info "(choose GitHub.com -> HTTPS -> login with a web browser)"
+}
+if (-not $GhExe) {
+    Bad "GitHub CLI (gh) not found."
+    Info "Install it:  winget install --id GitHub.cli -e"
+    Info "Then open a NEW terminal and run this again."
     exit 1
 }
-Good "signed in to GitHub"
+Good "gh: $GhExe"
 
-# ------------------------------------------------------------ never publish
+$auth = Invoke-Gh auth status
+if ($auth.Code -ne 0) {
+    Bad "Not signed in to GitHub."
+    Info ""
+    Info "Run this once (a browser will open):"
+    Info "    `"$GhExe`" auth login"
+    Info ""
+    Info "Choose:  GitHub.com  ->  HTTPS  ->  Login with a web browser"
+    Info "Then run this script again."
+    exit 1
+}
+Good "signed in"
+$who = Invoke-Gh api user --jq .login
+if ($who.Code -eq 0) { Info "account: $($who.Out)" }
+
+# ------------------------------------------------------------- never publish
 Step "Checking nothing sensitive would be published"
 $bad = git ls-files | Select-String -Pattern 'GameAssembly|global-metadata|\.exe$|members\.txt|^backup/|^recon/'
 if ($bad) {
@@ -69,7 +92,7 @@ if ($bad) {
 }
 Good "no game binaries or decompilation dumps tracked"
 
-# ------------------------------------------------------------------ version
+# --------------------------------------------------------------------- version
 if (-not $Tag) {
     $csproj = Get-Content "$PSScriptRoot\src\LiarsBar8P\LiarsBar8P.csproj" -Raw
     $m = [regex]::Match($csproj, '<Version>([^<]+)</Version>')
@@ -77,7 +100,7 @@ if (-not $Tag) {
 }
 Info "release tag: $Tag"
 
-# -------------------------------------------------------------------- build
+# ----------------------------------------------------------------------- build
 if (-not $SkipBuild) {
     Step "Building plugin"
     if (Get-Process -Name "Liar's Bar" -ErrorAction SilentlyContinue) {
@@ -85,9 +108,12 @@ if (-not $SkipBuild) {
         exit 1
     }
     Push-Location "$PSScriptRoot\src\LiarsBar8P"
-    dotnet build -c Release --nologo -v quiet
-    if ($LASTEXITCODE -ne 0) { Pop-Location; Bad "build failed"; exit 1 }
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    dotnet build -c Release --nologo -v quiet | Out-Null
+    $rc = $LASTEXITCODE
+    $ErrorActionPreference = $old
     Pop-Location
+    if ($rc -ne 0) { Bad "build failed"; exit 1 }
     Good "plugin built"
 
     Step "Packaging zip"
@@ -95,14 +121,14 @@ if (-not $SkipBuild) {
     Good "packaged"
 }
 
-foreach ($f in @($Zip, $Bat)) {
-    if (-not (Test-Path $f)) { Bad "missing asset: $f"; exit 1 }
+foreach ($a in @($Zip, $Bat)) {
+    if (-not (Test-Path $a)) { Bad "missing asset: $a"; exit 1 }
 }
 Good "assets ready"
 Info "$([IO.Path]::GetFileName($Zip))  $([math]::Round((Get-Item $Zip).Length/1MB,1)) MB"
 Info "$([IO.Path]::GetFileName($Bat))  $([math]::Round((Get-Item $Bat).Length/1KB,1)) KB"
 
-# ------------------------------------------------------------ commit + push
+# ------------------------------------------------------------- commit + push
 Step "Committing and pushing"
 $dirty = git status --porcelain
 if ($dirty) {
@@ -117,31 +143,34 @@ if ($dirty) {
 
 $ahead = (git log origin/main..HEAD --oneline | Measure-Object).Count
 if ($ahead -gt 0) {
-    git push origin main
-    if ($LASTEXITCODE -ne 0) { Bad "push failed"; exit 1 }
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    git push origin main 2>&1 | ForEach-Object { Info $_.ToString() }
+    $rc = $LASTEXITCODE
+    $ErrorActionPreference = $old
+    if ($rc -ne 0) { Bad "push failed"; exit 1 }
     Good "pushed $ahead commit(s)"
 } else {
     Info "nothing to push"
 }
 
-# -------------------------------------------------------------- visibility
+# --------------------------------------------------------------- visibility
 if (-not $KeepPrivate) {
     Step "Making sure the repo is public"
     Info "release assets are only downloadable if the repo is public"
-    $vis = (& $gh repo view $Repo --json visibility --jq .visibility) 2>$null
-    if ($vis -eq 'public') {
+    $vis = Invoke-Gh repo view $Repo --json visibility --jq .visibility
+    if ($vis.Code -eq 0 -and $vis.Out.Trim() -eq 'public') {
         Good "already public"
     } else {
-        & $gh repo edit $Repo --visibility public --accept-visibility-change-consequences
-        if ($LASTEXITCODE -ne 0) { Bad "could not change visibility"; exit 1 }
+        $r = Invoke-Gh repo edit $Repo --visibility public --accept-visibility-change-consequences
+        if ($r.Code -ne 0) { Bad "could not change visibility"; Info $r.Out; exit 1 }
         Good "repo is now public"
     }
 } else {
     Warn "leaving visibility alone (-KeepPrivate)"
-    Warn "the online installer will NOT be able to download while private"
+    Warn "the online installer cannot download while the repo is private"
 }
 
-# ----------------------------------------------------------------- release
+# ------------------------------------------------------------------ release
 Step "Publishing release $Tag"
 
 if (-not $Notes) {
@@ -153,19 +182,19 @@ Raises Liar's Bar from 4 players to 8.
 Download **Install-LiarsBar8P.bat** below and run it. It finds the game through
 Steam automatically, downloads the mod and installs it.
 
-Prefer to do it by hand? Download ``LiarsBar-8P.zip``, extract it, run ``install.bat``.
+Prefer to do it by hand? Download the zip, extract it, run ``install.bat``.
 
 The first game launch after installing is slow (a few minutes) while BepInEx sets
 up. That happens once.
 
 ## Status
 
-Working and verified:
-- 8 player Steam lobby (confirmed by Steam's own member limit)
+Verified working:
+- 8 player Steam lobby, confirmed by Steam's own reported member limit
 - Mirror connection cap raised 4 -> 8
 
 Implemented but **not yet tested in a real match**:
-- Lobby podium slots for more than 4
+- Lobby podium slots beyond 4
 - Proportional Liar's Deck scaling
 
 Not done yet: in-game seats and nameplates beyond 4, Liar's Dice, other modes.
@@ -176,35 +205,34 @@ will not yet.
 "@
 }
 
-$exists = $false
-& $gh release view $Tag --repo $Repo 2>&1 | Out-Null
-if ($LASTEXITCODE -eq 0) { $exists = $true }
-
+$exists = (Invoke-Gh release view $Tag --repo $Repo).Code -eq 0
 if ($exists) {
-    Info "release $Tag already exists - replacing its assets"
-    & $gh release upload $Tag $Zip $Bat --repo $Repo --clobber
-    if ($LASTEXITCODE -ne 0) { Bad "asset upload failed"; exit 1 }
+    Info "release $Tag exists - replacing its assets"
+    $r = Invoke-Gh release upload $Tag $Zip $Bat --repo $Repo --clobber
+    if ($r.Code -ne 0) { Bad "asset upload failed"; Info $r.Out; exit 1 }
     Good "assets updated"
 } else {
-    & $gh release create $Tag $Zip $Bat --repo $Repo --title "Liar's Bar 8 Player Mod $Tag" --notes $Notes
-    if ($LASTEXITCODE -ne 0) { Bad "release creation failed"; exit 1 }
+    $notesFile = Join-Path $env:TEMP "lb8p-notes-$([guid]::NewGuid().ToString('N').Substring(0,6)).md"
+    Set-Content $notesFile $Notes -Encoding utf8
+    $r = Invoke-Gh release create $Tag $Zip $Bat --repo $Repo --title "Liar's Bar 8 Player Mod $Tag" --notes-file $notesFile
+    if ($r.Code -ne 0) { Bad "release creation failed"; Info $r.Out; exit 1 }
     Good "release created"
 }
 
-# ------------------------------------------------------------------ verify
-Step "Verifying it is actually downloadable"
+# ------------------------------------------------------------------- verify
+Step "Verifying it is actually downloadable by other people"
 try {
     $api = Invoke-RestMethod "https://api.github.com/repos/$Repo/releases/latest" -Headers @{ 'User-Agent' = 'release-script' }
-    Good "public API sees release $($api.tag_name)"
+    Good "anonymous API sees release $($api.tag_name)"
     foreach ($a in $api.assets) { Info "$($a.name)  $([math]::Round($a.size/1MB,2)) MB" }
     if (-not ($api.assets | Where-Object { $_.name -like '*.zip' })) {
         Warn "no .zip asset visible - the online installer needs one"
     }
 } catch {
     Warn "could not confirm anonymously: $($_.Exception.Message)"
-    Warn "if the repo is private, the installer will not work for others"
+    Warn "if the repo is still private, the installer will not work for anyone else"
 }
 
 Write-Host "`nDone." -ForegroundColor Green
 Write-Host "  Release : https://github.com/$Repo/releases/tag/$Tag" -ForegroundColor Green
-Write-Host "  Share   : the Install-LiarsBar8P.bat link from that page" -ForegroundColor Green
+Write-Host "  Share   : the Install-LiarsBar8P.bat link on that page" -ForegroundColor Green
