@@ -10,7 +10,7 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "josh.liarsbar.eightplayers";
-    public const string Version = "0.9.0";
+    public const string Version = "1.0.0";
 
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
@@ -58,7 +58,30 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(DiagAutoHost),   "self test: auto host");
         Apply(harmony, typeof(DiagSoloStart),  "self test: solo start");
 
+        SpawnHud();
+
         Log.LogInfo("=== Liar's Bar 8P loaded ===");
+    }
+
+    /// <summary>
+    /// Inject the HUD type into IL2CPP and attach it to a persistent object so the
+    /// version is visible on every scene.
+    /// </summary>
+    private static void SpawnHud()
+    {
+        try
+        {
+            Il2CppInterop.Runtime.Injection.ClassInjector.RegisterTypeInIl2Cpp<VersionHud>();
+            var go = new UnityEngine.GameObject("LiarsBar8P_VersionHud");
+            UnityEngine.Object.DontDestroyOnLoad(go);
+            go.hideFlags = UnityEngine.HideFlags.HideAndDontSave;
+            go.AddComponent<VersionHud>();
+            Log.LogInfo("  version HUD attached (bottom left)");
+        }
+        catch (System.Exception e)
+        {
+            Log.LogError($"  version HUD failed: {e.Message}");
+        }
     }
 
     private static void Apply(Harmony harmony, System.Type patchClass, string label)
@@ -74,6 +97,7 @@ public class Plugin : BasePlugin
         }
     }
 }
+
 
 
 
