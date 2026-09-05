@@ -38,6 +38,7 @@ internal static class SeatRing
     }
 
     [HarmonyPrefix]
+    [HarmonyPriority(Priority.Last)]    // after the roster is corrected and seats compacted
     [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.ResetRound))]
     private static void Space(DeckGamePlayManager __instance, bool first)
     {
