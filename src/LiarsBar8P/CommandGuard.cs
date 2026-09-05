@@ -29,9 +29,6 @@ internal static class CommandGuard
             var lc = LobbyController.Instance;
             if (lc == null) return "LobbyController.Instance == NULL";
 
-            string n(Il2CppSystem.Collections.Generic.List<UnityEngine.GameObject> l)
-                => l == null ? "null" : l.Count.ToString();
-
             return $"SpawnSlots={(lc.SpawnSlots == null ? "null" : lc.SpawnSlots.Count.ToString())} " +
                    $"Bars={(lc.Bars == null ? "null" : lc.Bars.Count.ToString())} " +
                    $"Sayilar={(lc.Sayilar == null ? "null" : lc.Sayilar.Count.ToString())} " +

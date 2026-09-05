@@ -1,4 +1,4 @@
-using BepInEx;
+﻿using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP;
@@ -10,7 +10,7 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "josh.liarsbar.eightplayers";
-    public const string Version = "0.5.0";
+    public const string Version = "0.6.0";
 
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
@@ -48,6 +48,7 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(JoinFix),        "join limits");
         Apply(harmony, typeof(CommandGuard),   "command guards");
         Apply(harmony, typeof(LobbyExpansion), "lobby slot expansion");
+        Apply(harmony, typeof(SeatExpansion),  "table seat expansion");
         Apply(harmony, typeof(DeckScaling),    "deck scaling");
         Apply(harmony, typeof(DiagPatches),    "diagnostics");
         Apply(harmony, typeof(DiagAutoHost),   "self test: auto host");
@@ -69,3 +70,4 @@ public class Plugin : BasePlugin
         }
     }
 }
+

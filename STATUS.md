@@ -1,56 +1,74 @@
 # Status
 
-Target: 8 players (configurable 2–16). Modes prioritised: Liar's Deck, then Liar's Dice,
-then the rest.
+Target: 8 players. Modes prioritised: Liar's Deck, then Liar's Dice.
 
 ## Verified working
 
 | Item | Evidence |
 |---|---|
-| BepInEx 6 IL2CPP loads | plugin logs on every boot, host and clients |
 | Steam lobby member limit 4 → 8 | Steam API `GetLobbyMemberLimit` returns 8 |
-| Clients reach the lobby | 5th player's log showed the host's exact lobby ID |
-| **`NetworkServer.Listen(4)` → 8** | **the real fix — see below** |
-| Lobby podium slots 4 → 8, arc-fitted | 21.8°/seat, positions match an independent simulation |
+| **`NetworkServer.Listen(4)` → 8** | the real join blocker — see below |
+| 5 players connect and stay connected | live: `connections=5`, `numPlayers=5`, no disconnect |
+| No Mirror scene corruption | no `already spawned`, no duplicate NetworkManager |
+| All patch sets apply cleanly | zero errors on a full boot |
 
-### The 5-player bug (fixed in 0.2.0)
+### The join bug (fixed in 0.2.0)
 
-Mirror keeps **two** connection limits:
+Mirror keeps **two** connection limits: the serialized
+`NetworkManager.maxConnections`, and the static `NetworkServer.maxConnections` that
+`NetworkServer.Listen(int)` installs — and only the second is checked when a client
+connects. The game calls `Listen(4)` regardless, so Steam admitted a 5th player and
+Mirror dropped them straight back to the menu.
 
-- `NetworkManager.maxConnections` — a serialized inspector field
-- `NetworkServer.maxConnections` — a static, installed by `NetworkServer.Listen(int)`,
-  and the one actually checked when a client connects
+### The disconnect bug (fixed in 0.3.0 — self-inflicted)
 
-Raising only the first is not enough. The game calls `Listen` with **4** regardless, so
-Steam admitted a 5th player to the lobby and Mirror dropped them straight back to the
-menu. Confirmed live:
+The mod cloned `LobbyController.SpawnSlots` entries to add podiums. Those are Mirror
+**scene objects**; duplicating them corrupted spawn handling and disconnected every
+client. The `NullReferenceException` in `PlayerObjectController.CmdSetPlayer` blamed on
+the game was a downstream symptom of this.
 
-```
-[join] NetworkServer.Listen(4) -> 8
-[join] incoming connId=0 | server.max=8 manager.max=4
-```
+## The structural limit
 
-Note `manager.max=4` at connect time: the manager that hosts is a *different instance*
-from the one patched at startup, which is why patching only the manager silently failed.
-Intercepting `Listen` fixes the value Mirror enforces, whichever instance is hosting.
+`SpawnSlots` is a `List<LobbySlot>`, and `LobbySlot` is a **NetworkBehaviour** —
+SyncVars (`Dolu`/occupied, `PlayerName`, `Ready`), UI references, a Kick RPC. It is a
+scene object, not a positional marker.
 
-## Implemented, not yet proven in a real match
+**Extra lobby panels cannot be added by a runtime mod.** Mirror identifies
+runtime-spawned networked objects by an `assetId` registered in `spawnPrefabs` at build
+time; scene objects carry only a `sceneId`. Three approaches were tried and all failed
+for this reason:
 
-| Item | Why unproven |
+| Approach | Outcome |
 |---|---|
-| 5+ players actually staying connected | needs a retest with real clients |
-| Proportional Liar's Deck scaling | only runs once a match starts |
+| Clone the slot | duplicate scene identity → corrupted spawns → clients disconnected |
+| Clone inactive, strip networking | destroyed the very component the list stores → NRE |
+| Create a plain GameObject | wrong type — the list needs `LobbySlot` |
 
-## Not yet started
+Consequence: with more than 4 players, `CmdSetPlayer` throws
+`InvalidOperationException: Sequence contains no elements` from a LINQ `First()` over
+free panels. The command guard swallows it so the player is **not** disconnected — they
+are registered (`GamePlayers`, `numPlayers`) but have no lobby panel.
 
-- In-game seat ring (`Manager.Slots`) expansion beyond 4
-- Per-mode seated character objects (8 separate lists)
-- Nameplate UI (`Manager.NameTexts`)
-- Turn order / win condition / revolver assignment review for >4
-- Liar's Dice scaling
-- Remaining modes: Chaos, Poker, Texas, Spin, Arena, Velvet
+## Implemented, unproven in a real match
 
-## Known gaps in diagnostics
+- **In-game seat ring 4 → 8.** `Manager.Slots` is `List<Transform>` — plain markers,
+  safely expandable. Geometry captured live: exact circle, centre
+  (0.353, 0.111, -8.909), radius 1.330, 90° apart, each facing centre
+  (`yaw = atan2(-cos θ, -sin θ)`, verified against all four original seats).
+- **Nameplates 4 → 8** (`List<TMPro.Examples.WarpTextExample>`). Non-fatal if it fails.
+- **Proportional Liar's Deck scaling** — has still never executed.
 
-Join and disconnect events are now logged (`[join]`). Before 0.2.0 they were not, which
-is why the original 5-player failure produced a completely silent host log.
+## The open question
+
+The 5th player is registered but has no lobby panel. **Can the host start a match when
+that player cannot ready up?**
+
+- Yes → the seat expansion takes over and a 5+ game is plausible.
+- No → 8 players requires patching the game's own files, not a Harmony mod.
+
+Everything else is blocked behind that answer.
+
+## Not started
+
+In-game UI beyond nameplates, turn order / win conditions above 4, Liar's Dice scaling,
+and the remaining modes (Chaos, Poker, Texas, Spin, Arena, Velvet).
