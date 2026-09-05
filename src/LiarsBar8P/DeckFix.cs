@@ -1,32 +1,42 @@
 using System;
+using System.Collections.Generic;
 using HarmonyLib;
 using UnityEngine;
-using Il2CppList = Il2CppSystem.Collections.Generic.List<UnityEngine.GameObject>;
+using Il2CppGoList = Il2CppSystem.Collections.Generic.List<UnityEngine.GameObject>;
 
 namespace LiarsBar8P;
 
 /// <summary>
-/// Dealing runs off the end of several collections above four players:
+/// Above four players the deal runs off the end of several collections:
 ///
 ///   ArgumentOutOfRangeException at DeckGamePlayManager.DealBasicOrDevil()
 ///
-/// Measured live with five players:
-///   MasaCards=20  ResetCards=20  OpenCards=4  ExtraCards=2
+/// Two different shapes are involved. The card pools (MasaCards, ResetCards) hold the
+/// deck itself; the rest hold one entry per player.
 ///
-/// Two different shapes are short. The card pools (MasaCards, ResetCards) are sized for
-/// the deck - four players times five cards - and need players*5. OpenCards holds one
-/// entry per player and needs one per seat.
+/// With more than four players the deck is simply **doubled** - two full decks. That
+/// keeps the vanilla ratios exactly (6/6/6/2 becomes 12/12/12/4) and 40 cards covers
+/// every size up to eight players at five cards each, so the composition never has to be
+/// reasoned about per player count.
 ///
-/// Cards are grown from ExtraCards first, since those are spare objects the game already
-/// owns. Cloning is the fallback and only runs after confirming at runtime that the card
-/// carries no NetworkIdentity: duplicating networked scene objects is what corrupted
-/// spawn handling and disconnected everyone earlier. A live run confirmed cards are
-/// plain objects, so the clone path is safe here - unlike the lobby panels.
+/// Spare objects from ExtraCards are used before anything is created. Cloning is the
+/// fallback and only runs after confirming at runtime that the card carries no
+/// NetworkIdentity - duplicating networked scene objects is what corrupted spawn
+/// handling and disconnected everyone in earlier builds. A live run confirmed cards are
+/// plain objects, unlike the lobby panels.
 /// </summary>
 internal static class DeckFix
 {
-    private const int CardsPerPlayer = 5;
     private static bool _networkedWarned;
+
+    /// <summary>Sizes seen before any growth, so "double" always means double vanilla.</summary>
+    private static readonly Dictionary<string, int> _vanilla = new();
+
+    private static int Vanilla(string label, int current)
+    {
+        if (!_vanilla.TryGetValue(label, out int v)) { v = current; _vanilla[label] = v; }
+        return v;
+    }
 
     private static int PlayerCount()
     {
@@ -52,66 +62,54 @@ internal static class DeckFix
         catch { return false; }
     }
 
-    /// <summary>
-    /// Grows one list to <paramref name="need"/>, spares first and cloning second.
-    /// Returns how many entries were added.
-    /// </summary>
-    private static int Grow(Il2CppList list, Il2CppList spares, int need, string label)
+    private static void Grow(Il2CppGoList list, Il2CppGoList spares, int need, string label)
     {
-        if (list == null) { Plugin.Log.LogWarning($"[deckfix] {label} is null"); return 0; }
-        if (list.Count >= need) return 0;
-
-        int start = list.Count;
-
-        while (list.Count < need && spares != null && spares.Count > 0)
+        try
         {
-            var spare = spares[0];
-            spares.RemoveAt(0);
-            if (spare == null) continue;
-            spare.SetActive(true);
-            list.Add(spare);
-        }
+            if (list == null || list.Count >= need) return;
+            int start = list.Count;
 
-        if (list.Count < need)
-        {
-            var sample = list.Count > 0 ? list[0] : null;
-            if (!IsSafeToClone(sample))
+            while (list.Count < need && spares != null && spares.Count > 0)
             {
-                if (!_networkedWarned)
+                var spare = spares[0];
+                spares.RemoveAt(0);
+                if (spare == null) continue;
+                spare.SetActive(true);
+                list.Add(spare);
+            }
+
+            if (list.Count < need)
+            {
+                if (!IsSafeToClone(list.Count > 0 ? list[0] : null))
                 {
-                    _networkedWarned = true;
-                    Plugin.Log.LogError(
-                        $"[deckfix] {label} carries a NetworkIdentity - refusing to duplicate it");
+                    if (!_networkedWarned)
+                    {
+                        _networkedWarned = true;
+                        Plugin.Log.LogError($"[deckfix] {label} is networked - refusing to duplicate");
+                    }
+                    return;
                 }
-                return list.Count - start;
+
+                int guard = 0;
+                while (list.Count < need && guard++ < 128)
+                {
+                    var src = list[list.Count % Mathf.Max(1, start)];
+                    if (src == null) break;
+                    bool wasActive = src.activeSelf;
+                    src.SetActive(false);
+                    var clone = UnityEngine.Object.Instantiate(src, src.transform.parent);
+                    src.SetActive(wasActive);
+                    clone.name = $"{src.name}_8P";
+                    clone.SetActive(wasActive);
+                    list.Add(clone);
+                }
             }
 
-            int guard = 0;
-            while (list.Count < need && guard++ < 64)
-            {
-                var src = list[list.Count % Mathf.Max(1, start)];
-                if (src == null) break;
-
-                bool wasActive = src.activeSelf;
-                src.SetActive(false);
-                var clone = UnityEngine.Object.Instantiate(src, src.transform.parent);
-                src.SetActive(wasActive);
-
-                clone.name = $"{src.name}_8P";
-                clone.SetActive(wasActive);
-                list.Add(clone);
-            }
+            if (list.Count != start) Plugin.Log.LogInfo($"[deckfix]   {label}: {start} -> {list.Count}");
         }
-
-        int added = list.Count - start;
-        if (added > 0) Plugin.Log.LogInfo($"[deckfix]   {label}: {start} -> {list.Count}");
-        return added;
+        catch (Exception e) { Plugin.Log.LogWarning($"[deckfix] {label} skipped: {e.Message}"); }
     }
 
-    /// <summary>
-    /// Sprite lists hold shared asset references, so a short one is padded by repeating
-    /// an existing entry. Nothing is instantiated.
-    /// </summary>
     private static void GrowSprites(Il2CppSystem.Collections.Generic.List<Sprite> list, int need, string label)
     {
         try
@@ -121,10 +119,9 @@ internal static class DeckFix
             while (list.Count < need) list.Add(list[list.Count % start]);
             Plugin.Log.LogInfo($"[deckfix]   {label}: {start} -> {list.Count}");
         }
-        catch (Exception e) { Plugin.Log.LogWarning($"[deckfix] {label} grow skipped: {e.Message}"); }
+        catch (Exception e) { Plugin.Log.LogWarning($"[deckfix] {label} skipped: {e.Message}"); }
     }
 
-    /// <summary>Per-player synced state; pad with zero so an index per seat exists.</summary>
     private static void GrowSyncInts(Mirror.SyncList<int> list, int need, string label)
     {
         try
@@ -134,7 +131,7 @@ internal static class DeckFix
             while (list.Count < need) list.Add(0);
             Plugin.Log.LogInfo($"[deckfix]   {label}: {start} -> {list.Count}");
         }
-        catch (Exception e) { Plugin.Log.LogWarning($"[deckfix] {label} grow skipped: {e.Message}"); }
+        catch (Exception e) { Plugin.Log.LogWarning($"[deckfix] {label} skipped: {e.Message}"); }
     }
 
     [HarmonyPrefix]
@@ -146,23 +143,23 @@ internal static class DeckFix
             int players = PlayerCount();
             if (players <= 4) return;
 
-            int need = players * CardsPerPlayer;
             var spares = __instance.ExtraCards;
 
+            int masaV = Vanilla("MasaCards", __instance.MasaCards?.Count ?? 0);
+            int resetV = Vanilla("ResetCards", __instance.ResetCards?.Count ?? 0);
+
+            // more than four players: two full decks
+            int deckTarget = Mathf.Max(masaV, resetV) * 2;
+
             Plugin.Log.LogInfo(
-                $"[deckfix] players={players} need={need} " +
-                $"MasaCards={(__instance.MasaCards == null ? -1 : __instance.MasaCards.Count)} " +
-                $"ResetCards={(__instance.ResetCards == null ? -1 : __instance.ResetCards.Count)} " +
-                $"OpenCards={(__instance.OpenCards == null ? -1 : __instance.OpenCards.Count)} " +
-                $"ExtraCards={(spares == null ? -1 : spares.Count)}");
+                $"[deckfix] {players} players -> doubling the deck to {deckTarget} cards " +
+                $"(vanilla {Mathf.Max(masaV, resetV)})");
 
-            // card pools: one card per dealt card
-            Grow(__instance.ResetCards, spares, need, "ResetCards");
-            Grow(__instance.MasaCards, spares, need, "MasaCards");
+            Grow(__instance.ResetCards, spares, deckTarget, "ResetCards");
+            Grow(__instance.MasaCards, spares, deckTarget, "MasaCards");
 
-            // per-player: one entry per seat
+            // one entry per player
             Grow(__instance.OpenCards, spares, players, "OpenCards");
-
             GrowSprites(__instance.OrderSprtes, players, "OrderSprtes");
             GrowSyncInts(__instance.LastRound, players, "LastRound");
             GrowSyncInts(__instance.LastRoundSpotOn, players, "LastRoundSpotOn");
