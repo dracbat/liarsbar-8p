@@ -44,6 +44,7 @@ public class Plugin : BasePlugin
 
         // Patch each area independently so one broken hook cannot disable the rest.
         Apply(harmony, typeof(CapPatches),     "player caps");
+        Apply(harmony, typeof(JoinFix),        "join limits");
         Apply(harmony, typeof(LobbyExpansion), "lobby slot expansion");
         Apply(harmony, typeof(DeckScaling),    "deck scaling");
         Apply(harmony, typeof(DiagPatches),    "diagnostics");

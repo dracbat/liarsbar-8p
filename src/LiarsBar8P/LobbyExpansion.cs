@@ -26,7 +26,6 @@ internal static class LobbyExpansion
             int have = slots.Count;
             Plugin.Log.LogInfo($"[lobby] expanding spawn slots {have} -> {want}");
 
-            // --- gather existing points ---
             var pts = new Vector2[have];
             var yaws = new float[have];
             float y = 0f;
@@ -39,31 +38,68 @@ internal static class LobbyExpansion
             }
             y /= have;
 
-            // --- least-squares circle fit (Kasa) ---
             FitCircle(pts, out Vector2 c, out float r);
             Plugin.Log.LogInfo($"[lobby] arc fit: centre=({c.x:F3}, {c.y:F3}) radius={r:F3}");
 
-            // --- order existing slots along the arc ---
+            // Order the seats along the arc. Atan2 returns -180..180, so a seat ring
+            // that straddles that boundary sorts into nonsense if compared numerically.
+            // Normalise to 0..360, then start the sequence after the largest angular
+            // gap (the open side of the arc) and unwrap so angles rise monotonically.
+            var idx = new int[have];
             var ang = new float[have];
             for (int i = 0; i < have; i++)
-                ang[i] = Mathf.Atan2(pts[i].y - c.y, pts[i].x - c.x) * Mathf.Rad2Deg;
+            {
+                idx[i] = i;
+                float a = Mathf.Atan2(pts[i].y - c.y, pts[i].x - c.x) * Mathf.Rad2Deg;
+                ang[i] = (a % 360f + 360f) % 360f;
+            }
+            System.Array.Sort(idx, (a, b) => ang[a].CompareTo(ang[b]));
 
-            var order = new int[have];
-            for (int i = 0; i < have; i++) order[i] = i;
-            System.Array.Sort(order, (a, b) => ang[a].CompareTo(ang[b]));
+            int gapAt = 0;
+            float widest = -1f;
+            for (int i = 0; i < have; i++)
+            {
+                int j = (i + 1) % have;
+                float gap = ang[idx[j]] - ang[idx[i]];
+                if (gap < 0f) gap += 360f;
+                if (gap > widest) { widest = gap; gapAt = j; }
+            }
 
-            float first = ang[order[0]];
-            float last = ang[order[have - 1]];
+            var ring = new int[have];
+            var unwrapped = new float[have];
+            for (int i = 0; i < have; i++) ring[i] = idx[(gapAt + i) % have];
+            unwrapped[0] = ang[ring[0]];
+            for (int i = 1; i < have; i++)
+            {
+                float a = ang[ring[i]];
+                while (a < unwrapped[i - 1]) a += 360f;
+                unwrapped[i] = a;
+            }
+
+            float first = unwrapped[0];
+            float last = unwrapped[have - 1];
             float step = (last - first) / (have - 1);
             if (Mathf.Abs(step) < 0.01f) step = 25f;
 
-            // yaw follows the arc; derive the yaw-per-degree relationship from the
-            // real slots rather than assuming the model faces along the tangent
-            float yawFirst = yaws[order[0]];
-            float yawLast = yaws[order[have - 1]];
+            Plugin.Log.LogInfo(
+                $"[lobby] arc spans {first:F1}deg -> {last:F1}deg, step {step:F1}deg per seat");
+
+            // Refuse to place seats if continuing the arc would wrap back onto the
+            // existing ones; better to leave the lobby vanilla than stack players.
+            float sweep = Mathf.Abs(step) * (want - 1);
+            if (sweep >= 360f)
+            {
+                Plugin.Log.LogWarning(
+                    $"[lobby] {want} seats at {step:F1}deg would wrap the circle ({sweep:F0}deg) - " +
+                    "leaving lobby slots untouched");
+                return;
+            }
+
+            float yawFirst = yaws[ring[0]];
+            float yawLast = yaws[ring[have - 1]];
             float yawStep = Mathf.DeltaAngle(yawFirst, yawLast) / (have - 1);
 
-            var template = slots[order[have - 1]];
+            var template = slots[ring[have - 1]];
 
             for (int k = 1; k <= want - have; k++)
             {
@@ -117,7 +153,6 @@ internal static class LobbyExpansion
 
         if (System.Math.Abs(det) < 1e-8)
         {
-            // degenerate: treat as centroid + mean radius
             centre = new Vector2((float)(sx / n), (float)(sy / n));
             float rr = 0f;
             foreach (var q in p) rr += Vector2.Distance(q, centre);
