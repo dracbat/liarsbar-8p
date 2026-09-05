@@ -52,6 +52,7 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(DeckScaling),    "deck scaling");
         Apply(harmony, typeof(DeckFix),        "deck top-up");
         Apply(harmony, typeof(JoinDiag),       "client join + roster");
+        Apply(harmony, typeof(VersionCheck),   "version handshake");
         Apply(harmony, typeof(DeckDiag),       "deck diagnostics");
         Apply(harmony, typeof(DiagPatches),    "diagnostics");
         Apply(harmony, typeof(DiagAutoHost),   "self test: auto host");
