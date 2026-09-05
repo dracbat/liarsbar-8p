@@ -134,6 +134,39 @@ internal static class DeckFix
         catch (Exception e) { Plugin.Log.LogWarning($"[deckfix] {label} skipped: {e.Message}"); }
     }
 
+    /// <summary>
+    /// Every collection on DeckGamePlayManager is now grown and the deal still indexes out
+    /// of range, so the bad index is into something else. The likeliest candidate is a
+    /// player holding a seat seat index beyond the roster: seats are expanded to eight
+    /// while Players only holds the people present.
+    /// </summary>
+    private static void DumpSeats()
+    {
+        try
+        {
+            var m = Manager.Instance;
+            if (m == null || m.Players == null) return;
+
+            var sb = new System.Text.StringBuilder();
+            int worst = -1;
+            for (int i = 0; i < m.Players.Count; i++)
+            {
+                var p = m.Players[i];
+                if (p == null) { sb.Append($"  [{i}]=null"); continue; }
+                sb.Append($"  [{i}] '{p.PlayerName}' slot={p.Slot} dead={p.Dead}");
+                if (p.Slot > worst) worst = p.Slot;
+            }
+
+            Plugin.Log.LogInfo($"[deckfix] roster ({m.Players.Count} players, highest slot {worst}):{sb}");
+
+            if (worst >= m.Players.Count)
+                Plugin.Log.LogWarning(
+                    $"[deckfix] a player holds slot {worst} but only {m.Players.Count} players exist - " +
+                    "anything indexing Players by slot will run off the end");
+        }
+        catch (Exception e) { Plugin.Log.LogError($"[deckfix] roster dump failed: {e.Message}"); }
+    }
+
     [HarmonyPrefix]
     [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.ResetRound))]
     private static void TopUp(DeckGamePlayManager __instance, bool first)
@@ -167,6 +200,8 @@ internal static class DeckFix
             Plugin.Log.LogInfo(
                 $"[deckfix] after: MasaCards={__instance.MasaCards.Count} " +
                 $"ResetCards={__instance.ResetCards.Count} OpenCards={__instance.OpenCards.Count}");
+
+            DumpSeats();
         }
         catch (Exception e)
         {
