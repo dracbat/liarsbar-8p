@@ -108,6 +108,35 @@ internal static class DeckFix
         return added;
     }
 
+    /// <summary>
+    /// Sprite lists hold shared asset references, so a short one is padded by repeating
+    /// an existing entry. Nothing is instantiated.
+    /// </summary>
+    private static void GrowSprites(Il2CppSystem.Collections.Generic.List<Sprite> list, int need, string label)
+    {
+        try
+        {
+            if (list == null || list.Count == 0 || list.Count >= need) return;
+            int start = list.Count;
+            while (list.Count < need) list.Add(list[list.Count % start]);
+            Plugin.Log.LogInfo($"[deckfix]   {label}: {start} -> {list.Count}");
+        }
+        catch (Exception e) { Plugin.Log.LogWarning($"[deckfix] {label} grow skipped: {e.Message}"); }
+    }
+
+    /// <summary>Per-player synced state; pad with zero so an index per seat exists.</summary>
+    private static void GrowSyncInts(Mirror.SyncList<int> list, int need, string label)
+    {
+        try
+        {
+            if (list == null || list.Count >= need) return;
+            int start = list.Count;
+            while (list.Count < need) list.Add(0);
+            Plugin.Log.LogInfo($"[deckfix]   {label}: {start} -> {list.Count}");
+        }
+        catch (Exception e) { Plugin.Log.LogWarning($"[deckfix] {label} grow skipped: {e.Message}"); }
+    }
+
     [HarmonyPrefix]
     [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.ResetRound))]
     private static void TopUp(DeckGamePlayManager __instance, bool first)
@@ -133,6 +162,10 @@ internal static class DeckFix
 
             // per-player: one entry per seat
             Grow(__instance.OpenCards, spares, players, "OpenCards");
+
+            GrowSprites(__instance.OrderSprtes, players, "OrderSprtes");
+            GrowSyncInts(__instance.LastRound, players, "LastRound");
+            GrowSyncInts(__instance.LastRoundSpotOn, players, "LastRoundSpotOn");
 
             Plugin.Log.LogInfo(
                 $"[deckfix] after: MasaCards={__instance.MasaCards.Count} " +
