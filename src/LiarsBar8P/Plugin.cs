@@ -50,6 +50,7 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(SeatAssign),     "seat assignment");
         Apply(harmony, typeof(LobbyExpansion), "lobby slot expansion");
         Apply(harmony, typeof(SeatExpansion),  "table seat expansion");
+        Apply(harmony, typeof(SeatRing),       "seat spacing");
         Apply(harmony, typeof(DeckScaling),    "deck scaling");
         Apply(harmony, typeof(DeckFix),        "deck top-up");
         Apply(harmony, typeof(JoinDiag),       "client join + roster");
@@ -98,6 +99,7 @@ public class Plugin : BasePlugin
         }
     }
 }
+
 
 
 
