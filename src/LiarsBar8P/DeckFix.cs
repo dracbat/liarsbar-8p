@@ -191,11 +191,20 @@ internal static class DeckFix
             Grow(__instance.ResetCards, spares, deckTarget, "ResetCards");
             Grow(__instance.MasaCards, spares, deckTarget, "MasaCards");
 
-            // one entry per player
-            Grow(__instance.OpenCards, spares, players, "OpenCards");
-            GrowSprites(__instance.OrderSprtes, players, "OrderSprtes");
-            GrowSyncInts(__instance.LastRound, players, "LastRound");
-            GrowSyncInts(__instance.LastRoundSpotOn, players, "LastRoundSpotOn");
+            // Per player collections are grown to the configured maximum rather than the
+            // current headcount. The deal still indexed out of range with every list
+            // sized to the exact player count, so the offending index is chosen by some
+            // scheme not yet identified - most likely a seat index, which can exceed the
+            // roster because seats are expanded to the maximum. Over provisioning makes
+            // any index in 0..max-1 valid whichever scheme it turns out to be; the cost
+            // is a few unused entries.
+            int perPlayer = Mathf.Max(players, Plugin.MaxPlayers.Value);
+
+            Grow(__instance.OpenCards, spares, perPlayer, "OpenCards");
+            GrowSprites(__instance.OrderSprtes, perPlayer, "OrderSprtes");
+            GrowSprites(__instance.CardIcons, perPlayer, "CardIcons");
+            GrowSyncInts(__instance.LastRound, perPlayer, "LastRound");
+            GrowSyncInts(__instance.LastRoundSpotOn, perPlayer, "LastRoundSpotOn");
 
             Plugin.Log.LogInfo(
                 $"[deckfix] after: MasaCards={__instance.MasaCards.Count} " +
