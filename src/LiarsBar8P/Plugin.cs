@@ -10,7 +10,7 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "josh.liarsbar.eightplayers";
-    public const string Version = "0.7.0";
+    public const string Version = "0.8.0";
 
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
@@ -51,6 +51,7 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(SeatExpansion),  "table seat expansion");
         Apply(harmony, typeof(DeckScaling),    "deck scaling");
         Apply(harmony, typeof(DeckFix),        "deck top-up");
+        Apply(harmony, typeof(JoinDiag),       "client join + roster");
         Apply(harmony, typeof(DeckDiag),       "deck diagnostics");
         Apply(harmony, typeof(DiagPatches),    "diagnostics");
         Apply(harmony, typeof(DiagAutoHost),   "self test: auto host");
@@ -72,5 +73,6 @@ public class Plugin : BasePlugin
         }
     }
 }
+
 
 

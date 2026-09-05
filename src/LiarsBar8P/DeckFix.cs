@@ -1,28 +1,32 @@
 using System;
 using HarmonyLib;
 using UnityEngine;
+using Il2CppList = Il2CppSystem.Collections.Generic.List<UnityEngine.GameObject>;
 
 namespace LiarsBar8P;
 
 /// <summary>
-/// Dealing runs off the end of the deck above four players:
+/// Dealing runs off the end of several collections above four players:
 ///
 ///   ArgumentOutOfRangeException at DeckGamePlayManager.DealBasicOrDevil()
 ///
-/// Five players need 25 cards from a deck built for 20. The card lists are
-/// List&lt;GameObject&gt; of real card objects, so the deck is topped up before the round
-/// is set up.
+/// Measured live with five players:
+///   MasaCards=20  ResetCards=20  OpenCards=4  ExtraCards=2
 ///
-/// Two sources, safest first:
-///   1. ExtraCards - spare card objects the game already owns. Nothing is created.
-///   2. Cloning an existing card, but ONLY after confirming the card carries no
-///      NetworkIdentity. Duplicating networked scene objects is what corrupted spawn
-///      handling and disconnected everyone earlier; that must never be repeated blindly.
+/// Two different shapes are short. The card pools (MasaCards, ResetCards) are sized for
+/// the deck - four players times five cards - and need players*5. OpenCards holds one
+/// entry per player and needs one per seat.
+///
+/// Cards are grown from ExtraCards first, since those are spare objects the game already
+/// owns. Cloning is the fallback and only runs after confirming at runtime that the card
+/// carries no NetworkIdentity: duplicating networked scene objects is what corrupted
+/// spawn handling and disconnected everyone earlier. A live run confirmed cards are
+/// plain objects, so the clone path is safe here - unlike the lobby panels.
 /// </summary>
 internal static class DeckFix
 {
     private const int CardsPerPlayer = 5;
-    private static bool _networkedCardsWarned;
+    private static bool _networkedWarned;
 
     private static int PlayerCount()
     {
@@ -37,7 +41,6 @@ internal static class DeckFix
         return 0;
     }
 
-    /// <summary>True when the object carries no Mirror identity and is safe to duplicate.</summary>
     private static bool IsSafeToClone(GameObject go)
     {
         try
@@ -49,66 +52,44 @@ internal static class DeckFix
         catch { return false; }
     }
 
-    [HarmonyPrefix]
-    [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.ResetRound))]
-    private static void TopUpDeck(DeckGamePlayManager __instance, bool first)
+    /// <summary>
+    /// Grows one list to <paramref name="need"/>, spares first and cloning second.
+    /// Returns how many entries were added.
+    /// </summary>
+    private static int Grow(Il2CppList list, Il2CppList spares, int need, string label)
     {
-        try
+        if (list == null) { Plugin.Log.LogWarning($"[deckfix] {label} is null"); return 0; }
+        if (list.Count >= need) return 0;
+
+        int start = list.Count;
+
+        while (list.Count < need && spares != null && spares.Count > 0)
         {
-            int players = PlayerCount();
-            if (players <= 0) return;
+            var spare = spares[0];
+            spares.RemoveAt(0);
+            if (spare == null) continue;
+            spare.SetActive(true);
+            list.Add(spare);
+        }
 
-            int need = players * CardsPerPlayer;
-            var deck = __instance.ResetCards;
-            if (deck == null) { Plugin.Log.LogWarning("[deckfix] ResetCards is null"); return; }
-
-            int have = deck.Count;
-            int extras = __instance.ExtraCards != null ? __instance.ExtraCards.Count : 0;
-            Plugin.Log.LogInfo(
-                $"[deckfix] players={players} need={need} ResetCards={have} ExtraCards={extras}");
-
-            if (have >= need) { Plugin.Log.LogInfo("[deckfix] deck already large enough"); return; }
-
-            // --- source 1: spares the game already owns -------------------------------
-            int taken = 0;
-            if (__instance.ExtraCards != null)
-            {
-                while (deck.Count < need && __instance.ExtraCards.Count > 0)
-                {
-                    var spare = __instance.ExtraCards[0];
-                    __instance.ExtraCards.RemoveAt(0);
-                    if (spare == null) continue;
-                    spare.SetActive(true);
-                    deck.Add(spare);
-                    taken++;
-                }
-                if (taken > 0) Plugin.Log.LogInfo($"[deckfix] took {taken} card(s) from ExtraCards");
-            }
-
-            if (deck.Count >= need)
-            {
-                Plugin.Log.LogInfo($"[deckfix] deck now {deck.Count} - satisfied from spares");
-                return;
-            }
-
-            // --- source 2: clone, but only if cards are genuinely not networked --------
-            var sample = deck.Count > 0 ? deck[0] : null;
+        if (list.Count < need)
+        {
+            var sample = list.Count > 0 ? list[0] : null;
             if (!IsSafeToClone(sample))
             {
-                if (!_networkedCardsWarned)
+                if (!_networkedWarned)
                 {
-                    _networkedCardsWarned = true;
+                    _networkedWarned = true;
                     Plugin.Log.LogError(
-                        "[deckfix] cards carry a NetworkIdentity - refusing to duplicate them. " +
-                        $"deck={deck.Count} need={need}. More players than the deck supports.");
+                        $"[deckfix] {label} carries a NetworkIdentity - refusing to duplicate it");
                 }
-                return;
+                return list.Count - start;
             }
 
-            int made = 0;
-            while (deck.Count < need)
+            int guard = 0;
+            while (list.Count < need && guard++ < 64)
             {
-                var src = deck[made % Mathf.Max(1, have)];
+                var src = list[list.Count % Mathf.Max(1, start)];
                 if (src == null) break;
 
                 bool wasActive = src.activeSelf;
@@ -116,18 +97,50 @@ internal static class DeckFix
                 var clone = UnityEngine.Object.Instantiate(src, src.transform.parent);
                 src.SetActive(wasActive);
 
-                clone.name = $"{src.name}_8P{made}";
+                clone.name = $"{src.name}_8P";
                 clone.SetActive(wasActive);
-                deck.Add(clone);
-                made++;
-
-                if (made > 64) break; // never loop away
+                list.Add(clone);
             }
-            Plugin.Log.LogInfo($"[deckfix] cloned {made} card(s); deck now {deck.Count} (need {need})");
+        }
+
+        int added = list.Count - start;
+        if (added > 0) Plugin.Log.LogInfo($"[deckfix]   {label}: {start} -> {list.Count}");
+        return added;
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.ResetRound))]
+    private static void TopUp(DeckGamePlayManager __instance, bool first)
+    {
+        try
+        {
+            int players = PlayerCount();
+            if (players <= 4) return;
+
+            int need = players * CardsPerPlayer;
+            var spares = __instance.ExtraCards;
+
+            Plugin.Log.LogInfo(
+                $"[deckfix] players={players} need={need} " +
+                $"MasaCards={(__instance.MasaCards == null ? -1 : __instance.MasaCards.Count)} " +
+                $"ResetCards={(__instance.ResetCards == null ? -1 : __instance.ResetCards.Count)} " +
+                $"OpenCards={(__instance.OpenCards == null ? -1 : __instance.OpenCards.Count)} " +
+                $"ExtraCards={(spares == null ? -1 : spares.Count)}");
+
+            // card pools: one card per dealt card
+            Grow(__instance.ResetCards, spares, need, "ResetCards");
+            Grow(__instance.MasaCards, spares, need, "MasaCards");
+
+            // per-player: one entry per seat
+            Grow(__instance.OpenCards, spares, players, "OpenCards");
+
+            Plugin.Log.LogInfo(
+                $"[deckfix] after: MasaCards={__instance.MasaCards.Count} " +
+                $"ResetCards={__instance.ResetCards.Count} OpenCards={__instance.OpenCards.Count}");
         }
         catch (Exception e)
         {
-            Plugin.Log.LogError($"[deckfix] failed, deck left untouched: {e}");
+            Plugin.Log.LogError($"[deckfix] failed, lists left untouched: {e}");
         }
     }
 }
