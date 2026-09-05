@@ -40,6 +40,11 @@ internal static class DeckDiag
                 Count("OpenCards", () => __instance.OpenCards.Count) + " " +
                 Count("ExtraCards", () => __instance.ExtraCards.Count) + " " +
                 Count("CardIcons", () => __instance.CardIcons.Count) + " " +
+                Count("CardIcons", () => __instance.CardIcons.Count) + " " +
+                Count("OrderSprtes", () => __instance.OrderSprtes.Count) + " " +
+                Count("LastRound", () => __instance.LastRound.Count) + " " +
+                Count("LastRoundSpotOn", () => __instance.LastRoundSpotOn.Count) + " " +
+                Count("devilsDealEffects", () => __instance.devilsDealEffects.Count) + " " +
                 Count("cardsOnTable", () => __instance.CardsOnTable));
         }
         catch (Exception e) { Plugin.Log.LogError($"[deckdiag] probe failed: {e.Message}"); }
