@@ -17,6 +17,7 @@ public class Plugin : BasePlugin
     public static ConfigEntry<bool> DiagAutoHost;
     public static ConfigEntry<bool> DiagSoloStart;
     public static ConfigEntry<bool> ScaleDeck;
+    public static ConfigEntry<bool> ExpandLobbySlots;
 
     public override void Load()
     {
@@ -32,6 +33,9 @@ public class Plugin : BasePlugin
         ScaleDeck = Config.Bind("Gameplay", "ScaleDeck", true,
             "Scale the Liar's Deck proportionally with player count so everyone still gets five cards.");
 
+        ExpandLobbySlots = Config.Bind("Gameplay", "ExpandLobbySlots", false,
+            "Add extra lobby podiums for players 5+. Purely cosmetic. Off by default: the podiums are Mirror scene objects and duplicating them can disturb networking.");
+
         DiagAutoHost = Config.Bind("Debug", "SelfTestAutoHostLobby", false,
             "Development self test: auto-host a PRIVATE lobby on startup to capture lobby diagnostics.");
 
@@ -45,6 +49,7 @@ public class Plugin : BasePlugin
         // Patch each area independently so one broken hook cannot disable the rest.
         Apply(harmony, typeof(CapPatches),     "player caps");
         Apply(harmony, typeof(JoinFix),        "join limits");
+        Apply(harmony, typeof(CommandGuard),   "command guards");
         Apply(harmony, typeof(LobbyExpansion), "lobby slot expansion");
         Apply(harmony, typeof(DeckScaling),    "deck scaling");
         Apply(harmony, typeof(DiagPatches),    "diagnostics");

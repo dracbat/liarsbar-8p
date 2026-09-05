@@ -19,6 +19,8 @@ internal static class LobbyExpansion
     {
         try
         {
+            if (!Plugin.ExpandLobbySlots.Value) return;
+
             var slots = __instance.SpawnSlots;
             int want = Plugin.MaxPlayers.Value;
             if (slots == null || slots.Count == 0 || slots.Count >= want) return;
@@ -109,6 +111,7 @@ internal static class LobbyExpansion
                 float yaw = yawLast + yawStep * k;
 
                 var clone = Object.Instantiate(template);
+                StripNetworking(clone.gameObject);
                 var ct = clone.transform;
                 ct.position = pos;
                 ct.rotation = Quaternion.Euler(0f, yaw, 0f);
@@ -124,6 +127,29 @@ internal static class LobbyExpansion
         catch (System.Exception e)
         {
             Plugin.Log.LogError($"[lobby] slot expansion failed: {e}");
+        }
+    }
+
+    /// <summary>
+    /// Mirror rejects duplicated scene NetworkIdentities - "Slot4(Clone) has already
+    /// spawned" - and the resulting bad spawn state cascades into clients being
+    /// disconnected by the server. These extra podiums are decoration only, so every
+    /// networking component is removed from the copy before it is ever used.
+    /// </summary>
+    private static void StripNetworking(GameObject go)
+    {
+        if (go == null) return;
+        try
+        {
+            foreach (var nb in go.GetComponentsInChildren<Mirror.NetworkBehaviour>(true))
+                if (nb != null) Object.DestroyImmediate(nb);
+
+            foreach (var ni in go.GetComponentsInChildren<Mirror.NetworkIdentity>(true))
+                if (ni != null) Object.DestroyImmediate(ni);
+        }
+        catch (System.Exception e)
+        {
+            Plugin.Log.LogError($"[lobby] could not strip networking from clone: {e.Message}");
         }
     }
 
