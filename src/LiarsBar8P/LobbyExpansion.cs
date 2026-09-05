@@ -19,8 +19,6 @@ internal static class LobbyExpansion
     {
         try
         {
-            if (!Plugin.ExpandLobbySlots.Value) return;
-
             var slots = __instance.SpawnSlots;
             int want = Plugin.MaxPlayers.Value;
             if (slots == null || slots.Count == 0 || slots.Count >= want) return;
