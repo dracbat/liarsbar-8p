@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>LiarsBar8P</AssemblyName>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -39,5 +39,6 @@
   </ItemGroup>
 
 </Project>
+
 
 

@@ -110,8 +110,20 @@ internal static class LobbyExpansion
                 var pos = new Vector3(c.x + r * Mathf.Cos(rad), y, c.y + r * Mathf.Sin(rad));
                 float yaw = yawLast + yawStep * k;
 
+                // Instantiating an active object runs Awake immediately, which is
+                // where Mirror registers the NetworkIdentity and complains that the
+                // scene object "has already spawned". Cloning while inactive skips
+                // Awake, so the networking components can be removed before the copy
+                // is ever live.
+                bool wasActive = template.gameObject.activeSelf;
+                template.gameObject.SetActive(false);
+
                 var clone = Object.Instantiate(template);
                 StripNetworking(clone.gameObject);
+
+                template.gameObject.SetActive(wasActive);
+                clone.gameObject.SetActive(true);
+
                 var ct = clone.transform;
                 ct.position = pos;
                 ct.rotation = Quaternion.Euler(0f, yaw, 0f);

@@ -33,8 +33,8 @@ public class Plugin : BasePlugin
         ScaleDeck = Config.Bind("Gameplay", "ScaleDeck", true,
             "Scale the Liar's Deck proportionally with player count so everyone still gets five cards.");
 
-        ExpandLobbySlots = Config.Bind("Gameplay", "ExpandLobbySlots", false,
-            "Add extra lobby podiums for players 5+. Purely cosmetic. Off by default: the podiums are Mirror scene objects and duplicating them can disturb networking.");
+        ExpandLobbySlots = Config.Bind("Gameplay", "ExpandLobbySlots", true,
+            "Add lobby podiums for players 5+. REQUIRED above 4 players: the game picks a free podium from this list and throws if none are left. Only disable to rule the feature out while debugging.");
 
         DiagAutoHost = Config.Bind("Debug", "SelfTestAutoHostLobby", false,
             "Development self test: auto-host a PRIVATE lobby on startup to capture lobby diagnostics.");
