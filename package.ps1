@@ -39,10 +39,6 @@ MaxPlayers = $MaxPlayers
 
 [Gameplay]
 
-## Add lobby podiums for players 5+. Required above 4 players.
-# Setting type: Boolean
-# Default value: true
-ExpandLobbySlots = true
 
 ## Scale the Liar's Deck proportionally with player count so everyone still gets five cards.
 # Setting type: Boolean
@@ -113,4 +109,5 @@ if (Test-Path $Zip) { Remove-Item $Zip -Force }
 Compress-Archive -Path "$Staging\*" -DestinationPath $Zip
 Write-Host "Packaged -> $Zip" -ForegroundColor Green
 Get-Item $Zip | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
+
 

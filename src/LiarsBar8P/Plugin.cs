@@ -6,10 +6,11 @@ using HarmonyLib;
 
 namespace LiarsBar8P;
 
-[BepInPlugin(Guid, "Liar's Bar 8 Players", "0.1.0")]
+[BepInPlugin(Guid, "Liar's Bar 8 Players", Version)]
 public class Plugin : BasePlugin
 {
     public const string Guid = "josh.liarsbar.eightplayers";
+    public const string Version = "0.5.0";
 
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
@@ -17,7 +18,6 @@ public class Plugin : BasePlugin
     public static ConfigEntry<bool> DiagAutoHost;
     public static ConfigEntry<bool> DiagSoloStart;
     public static ConfigEntry<bool> ScaleDeck;
-    public static ConfigEntry<bool> ExpandLobbySlots;
 
     public override void Load()
     {
@@ -32,9 +32,6 @@ public class Plugin : BasePlugin
 
         ScaleDeck = Config.Bind("Gameplay", "ScaleDeck", true,
             "Scale the Liar's Deck proportionally with player count so everyone still gets five cards.");
-
-        ExpandLobbySlots = Config.Bind("Gameplay", "ExpandLobbySlots", true,
-            "Add lobby podiums for players 5+. REQUIRED above 4 players: the game picks a free podium from this list and throws if none are left. Only disable to rule the feature out while debugging.");
 
         DiagAutoHost = Config.Bind("Debug", "SelfTestAutoHostLobby", false,
             "Development self test: auto-host a PRIVATE lobby on startup to capture lobby diagnostics.");
