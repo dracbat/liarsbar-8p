@@ -1,3 +1,4 @@
+using System;
 using HarmonyLib;
 using UnityEngine;
 
@@ -83,7 +84,50 @@ internal static class SeatExpansion
                 $"[seats]   + {seat.gameObject.name} pos={pos.ToString("F3")} yaw={yaw:F1} (ring {newAngle:F1}deg)");
         }
 
+        Relayout(slots, c, r, y);
         Plugin.Log.LogInfo($"[seats] table seats now {slots.Count}");
+    }
+
+    /// <summary>
+    /// Lay every seat out evenly around the ring in list order.
+    ///
+    /// New seats are appended to the end of the list but sit physically between the
+    /// original four, so turn order - which follows the list index - jumped across the
+    /// table instead of going around it: the indicator pointed at one seat while a
+    /// player elsewhere acted. Ordering positions by index makes the two agree.
+    ///
+    /// The first seat keeps its original angle, so the table is rotated as little as
+    /// possible from vanilla.
+    /// </summary>
+    private static void Relayout(Il2CppSystem.Collections.Generic.List<UnityEngine.Transform> slots,
+                                 Vector2 c, float r, float y)
+    {
+        try
+        {
+            int n = slots.Count;
+            if (n < 2) return;
+
+            var first = slots[0];
+            float startAngle = Mathf.Atan2(first.position.z - c.y, first.position.x - c.x) * Mathf.Rad2Deg;
+            float step = 360f / n;
+
+            Plugin.Log.LogInfo($"[seats] laying {n} seats out evenly, {step:F1}deg apart, from {startAngle:F1}deg");
+
+            for (int i = 0; i < n; i++)
+            {
+                var t = slots[i];
+                if (t == null) continue;
+                float a = startAngle + step * i;
+                float rad = a * Mathf.Deg2Rad;
+                t.position = new Vector3(c.x + r * Mathf.Cos(rad), y, c.y + r * Mathf.Sin(rad));
+                t.rotation = Quaternion.Euler(0f, Mathf.Atan2(-Mathf.Cos(rad), -Mathf.Sin(rad)) * Mathf.Rad2Deg, 0f);
+                Plugin.Log.LogInfo($"[seats]   seat {i} -> {a:F1}deg {t.position.ToString("F2")}");
+            }
+        }
+        catch (Exception e)
+        {
+            Plugin.Log.LogError($"[seats] relayout failed: {e.Message}");
+        }
     }
 
     /// <summary>Angle bisecting the largest empty arc, so the ring stays even.</summary>
@@ -134,7 +178,7 @@ internal static class SeatExpansion
                 clone.rotation = lastText.transform.rotation;
 
                 var comp = clone.GetComponent<TMPro.Examples.WarpTextExample>();
-                if (comp == null) { Object.Destroy(clone.gameObject); break; }
+                if (comp == null) { UnityEngine.Object.Destroy(clone.gameObject); break; }
                 texts.Add(comp);
                 Plugin.Log.LogInfo($"[seats]   + nameplate for seat {k + 1}");
             }
