@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>LiarsBar8P</AssemblyName>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -29,6 +29,7 @@
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(Interop)\UnityEngine.CoreModule.dll</HintPath></Reference>
     <Reference Include="UnityEngine"><HintPath>$(Interop)\UnityEngine.dll</HintPath></Reference>
     <Reference Include="UnityEngine.TextRenderingModule"><HintPath>$(Interop)\UnityEngine.TextRenderingModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.AudioModule"><HintPath>$(Interop)\UnityEngine.AudioModule.dll</HintPath></Reference>
     <Reference Include="UnityEngine.UI"><HintPath>$(Interop)\UnityEngine.UI.dll</HintPath></Reference>
     <Reference Include="Unity.TextMeshPro"><HintPath>$(Interop)\Unity.TextMeshPro.dll</HintPath></Reference>
   </ItemGroup>
@@ -38,4 +39,5 @@
   </ItemGroup>
 
 </Project>
+
 
