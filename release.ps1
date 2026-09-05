@@ -233,9 +233,24 @@ if ($exists) {
 }
 
 # ------------------------------------------------------------------- verify
+# a release created as a draft is invisible to releases/latest, which is what the
+# installer fetches - publish it before claiming success
+$vw = Invoke-Gh release view $Tag --repo $Repo --json isDraft --jq .isDraft
+if ($vw.Code -eq 0 -and $vw.Out.Trim() -eq "true") {
+    Warn "release $Tag is a DRAFT - publishing it"
+    $pub = Invoke-Gh release edit $Tag --repo $Repo --draft=false
+    if ($pub.Code -ne 0) { Bad "could not publish the draft"; Info $pub.Out; exit 1 }
+    Good "draft published"
+    Start-Sleep -Seconds 4
+}
+
 Step "Verifying it is actually downloadable by other people"
 try {
     $api = Invoke-RestMethod "https://api.github.com/repos/$Repo/releases/latest" -Headers @{ 'User-Agent' = 'release-script' }
+    if ($api.tag_name -ne $Tag) {
+        Bad "releases/latest is $($api.tag_name), not $Tag - the installer would fetch the wrong build"
+        exit 1
+    }
     Good "anonymous API sees release $($api.tag_name)"
     foreach ($a in $api.assets) { Info "$($a.name)  $([math]::Round($a.size/1MB,2)) MB" }
     if (-not ($api.assets | Where-Object { $_.name -like '*.zip' })) {
