@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 using HarmonyLib;
 
 namespace LiarsBar8P;
@@ -30,6 +31,52 @@ internal static class TableFill
     private static readonly HashSet<string> _attempted = new();
 
     /// <summary>
+    /// When <c>Manager.StartGame</c> ran for this match, and the match it ran for.
+    ///
+    /// Nothing here may act before that. A five player game showed why: the match scene
+    /// loads, the lobby roster already holds five, and the table roster is still empty
+    /// because StartGame has not been called yet. Seeing five in the lobby and none at the
+    /// table, this seated all five itself — and then StartGame ran and seated them properly
+    /// on top. Ten bodies, ten roster entries, eight seats, and everybody standing inside
+    /// somebody else. The log shows it plainly: five "StartGame missed" lines *before* the
+    /// line that StartGame's own prefix writes.
+    ///
+    /// So the question this asks is not "is the table short of the lobby" but "is the table
+    /// still short several seconds after the game finished seating people".
+    /// </summary>
+    private static float _startedAt;
+    private static Manager _startedFor;
+    private static int _lastCount = -1;
+    private static float _lastChangedAt;
+
+    /// <summary>How long the table has to stop changing before it is believed.</summary>
+    private const float SettleSeconds = 2f;
+
+    /// <summary>
+    /// Has the game had its own turn at seating everyone, and finished?
+    ///
+    /// Finished is not a fixed wait: the characters StartGame spawns join the roster over
+    /// several frames, so what is watched for is the roster holding still. Two seconds
+    /// without the count changing, and no sooner than two seconds after StartGame itself,
+    /// means the table is what the game intends it to be. Only then is a gap real.
+    /// </summary>
+    private static bool GameHasSeated(Manager m)
+    {
+        if (m == null || !ReferenceEquals(m, _startedFor)) return false;
+        if (_startedAt <= 0f || Time.time - _startedAt < SettleSeconds) return false;
+
+        int count = m.Players != null ? m.Players.Count : 0;
+        if (count != _lastCount)
+        {
+            _lastCount = count;
+            _lastChangedAt = Time.time;
+            return false;
+        }
+
+        return Time.time - _lastChangedAt >= SettleSeconds;
+    }
+
+    /// <summary>
     /// Grow the per-player lists StartGame walks, before it walks them.
     ///
     /// This is the likeliest cause of the exception itself. StartGame sets up each player's
@@ -50,6 +97,9 @@ internal static class TableFill
         try
         {
             _attempted.Clear();          // a new match starts with a clean slate
+            _startedAt = Time.time;      // nothing may seat anybody before this moment
+            _startedFor = __instance;
+            _lastCount = -1;
             int players = ExpectedPlayers(__instance);
             if (players <= Limits.VanillaPlayers) return;
 
@@ -93,8 +143,12 @@ internal static class TableFill
     internal static void Tick()
     {
         var m = Manager.Instance;
-        if (m == null || m.Players == null) return;
+        if (m == null || m.Players == null) { _startedAt = 0f; _startedFor = null; return; }
         if (!Mirror.NetworkServer.active) return;
+
+        // Before the game has had its own turn at seating people, an empty table means
+        // nothing at all - and acting on it seats everybody twice.
+        if (!GameHasSeated(m)) return;
 
         var nm = UnityEngine.Object.FindObjectOfType<CustomNetworkManager>();
         if (nm == null || nm.GamePlayers == null) return;
@@ -137,6 +191,11 @@ internal static class TableFill
 
         var nm = UnityEngine.Object.FindObjectOfType<CustomNetworkManager>();
         if (nm == null || nm.GamePlayers == null) return;
+
+        // Never before the game has seated people itself. Whatever calls this - the tick or
+        // the start of a round - an empty table before StartGame has run is not a table
+        // missing anybody, it is a table that has not been filled in yet.
+        if (!GameHasSeated(m)) return;
 
         // Adopt anyone already standing at the table but missing from the roster.
         //
@@ -221,6 +280,19 @@ internal static class TableFill
         catch { return; }
         if (all == null) return;
 
+        // Who is already in the roster, as people rather than as objects. A person with two
+        // characters at the table must still be one entry: the roster is what the deal, the
+        // turn order and the seat ring are all counted from, and an extra entry there is
+        // what puts two players on one seat.
+        var ids = new HashSet<ulong>();
+        var names = new HashSet<string>();
+        foreach (var seated in m.Players)
+        {
+            if (seated == null) continue;
+            if (seated.Player_Id != 0) ids.Add(seated.Player_Id);
+            if (!string.IsNullOrEmpty(seated.PlayerName)) names.Add(seated.PlayerName);
+        }
+
         foreach (var ps in all)
         {
             if (ps == null) continue;
@@ -228,6 +300,19 @@ internal static class TableFill
             bool known = false;
             foreach (var known_ in m.Players) if (known_ == ps) { known = true; break; }
             if (known) continue;
+
+            bool sameFace = (ps.Player_Id != 0 && ids.Contains(ps.Player_Id))
+                            || (!string.IsNullOrEmpty(ps.PlayerName) && names.Contains(ps.PlayerName));
+            if (sameFace)
+            {
+                Plugin.Log.LogWarning(
+                    $"[tablefill] a second character for '{ps.PlayerName}' is at the table - " +
+                    "left out of the roster so they are only counted once");
+                continue;
+            }
+
+            if (ps.Player_Id != 0) ids.Add(ps.Player_Id);
+            if (!string.IsNullOrEmpty(ps.PlayerName)) names.Add(ps.PlayerName);
 
             m.Players.Add(ps);
             Plugin.Log.LogWarning(
@@ -244,10 +329,27 @@ internal static class TableFill
     private static void Separate(Manager m)
     {
         var taken = new Dictionary<int, PlayerStats>();
+        var twins = new List<PlayerStats>();
+
         foreach (var ps in m.Players)
         {
             if (ps == null) continue;
             if (!taken.ContainsKey(ps.Slot)) { taken[ps.Slot] = ps; continue; }
+
+            // Two entries for the same person is not two players sharing a seat, and giving
+            // the second one a seat of its own is how one player became two at opposite
+            // sides of the table. Drop it instead.
+            var sitting = taken[ps.Slot];
+            bool sameFace = (ps.Player_Id != 0 && ps.Player_Id == sitting.Player_Id)
+                            || (!string.IsNullOrEmpty(ps.PlayerName) && ps.PlayerName == sitting.PlayerName);
+            if (sameFace)
+            {
+                Plugin.Log.LogWarning(
+                    $"[tablefill] '{ps.PlayerName}' is in the roster twice on seat {ps.Slot} - " +
+                    "the second entry is dropped rather than given a seat of its own");
+                twins.Add(ps);
+                continue;
+            }
 
             int seat = 0;
             while (taken.ContainsKey(seat)) seat++;
@@ -258,6 +360,13 @@ internal static class TableFill
                 $"'{taken[ps.Slot].PlayerName}' - moved to seat {seat}");
             ps.NetworkSlot = seat;
             taken[seat] = ps;
+        }
+
+        // Removed after the walk, not during it - the roster is being iterated.
+        foreach (var twin in twins)
+        {
+            try { m.Players.Remove(twin); }
+            catch (Exception e) { Plugin.Log.LogError($"[tablefill] could not drop a duplicate: {e.Message}"); }
         }
     }
 }

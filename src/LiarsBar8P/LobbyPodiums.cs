@@ -57,6 +57,10 @@ internal static class LobbyPodiums
         _podiums.Clear();
         _geometryFailed = false;
         _floorTest = 0;
+        _cam = null;
+        _camHolding = false;
+        _camDone = false;
+        _camTries = 0;
         BuildAll(__instance);
     }
 
@@ -73,8 +77,12 @@ internal static class LobbyPodiums
             {
                 _reported = true;
                 Plugin.Log.LogInfo($"[podium] lobby has {lobby.SpawnSlots.Count} podiums for up to {Limits.Max} players");
-                ReportCamera(lobby);
             }
+
+            // The shot has to take in two rows of podiums now. The camera may not exist on
+            // the frame the lobby starts, so this is tried again from the sweep until it
+            // either settles or gives up.
+            FrameLobby(lobby);
         }
         catch (Exception e)
         {
@@ -356,6 +364,8 @@ internal static class LobbyPodiums
             if (__instance == null) return;
 
             if (_podiums.Count == 0) BuildAll(__instance);
+            if (!_camDone) FrameLobby(__instance);
+            HoldCamera();
             if (_podiums.Count == 0) return;
 
             var nm = UnityEngine.Object.FindObjectOfType<CustomNetworkManager>();
@@ -427,28 +437,115 @@ internal static class LobbyPodiums
 
     // ------------------------------------------------------------------ geometry
 
+    /// <summary>The shipped podium row, measured: where it runs, how it bows, which way it faces.</summary>
+    private sealed class Row
+    {
+        internal Vector2 Centre;
+        internal float Height;
+        internal Vector2 Dir;        // along the row
+        internal Vector2 Back;       // across it, pointing away from the camera
+        internal float[] Along;      // each shipped podium's place along the row, in order
+        internal float Step;         // the spacing between them
+        internal float UA, UB;       // how far the row bows off a straight line
+        internal float YawA, YawB;   // which way a podium faces, as it turns along the row
+        internal bool CheckFloor;
+
+        /// <summary>A spot on the row, optionally set back from it.</summary>
+        internal Vector3 At(float along, float depth)
+        {
+            Vector2 flat = Centre + Dir * along + Back * (UA + UB * along + depth);
+            return new Vector3(flat.x, Height, flat.y);
+        }
+
+        internal Quaternion Facing(float along) => Quaternion.Euler(0f, YawA + YawB * along, 0f);
+    }
+
     /// <summary>
-    /// Continue the row the shipped podiums stand in.
+    /// Put the extra podiums in a second row behind the shipped four.
     ///
-    /// They are a row, not a ring. A circle fitted to them curves back into the room, and
-    /// extending that circle put the extra podiums *behind* the original four — visible in
-    /// a screenshot as half-hidden characters standing at the back with their name plates
-    /// floating loose. So the row is modelled as what it is: a line with a slight bow.
+    /// The four stand in a row, not a ring, and the first attempt at this simply continued
+    /// that row past its ends. Eight podiums then occupied more than twice the width the
+    /// lobby camera frames, and players five to eight were pushed off the side of the shot.
     ///
-    /// The four are projected onto their own principal axis, giving each a position along
-    /// the row. Two straight-line fits against that position carry everything else — how
-    /// far the row bows sideways, and which way a podium faces, which turns steadily along
-    /// the row (about fifteen degrees per unit, consistent to three degrees across all
-    /// four). Extra podiums continue the line at the same spacing, alternating past each
-    /// end so the group stays centred on the camera rather than growing off one side.
+    /// So the row is doubled rather than lengthened: each extra podium stands behind the
+    /// shipped one in the same place along the row, half a space to the side so a back-row
+    /// character is seen in the gap between two front ones rather than hidden behind one.
+    /// The row's own measurements carry over - its slight sideways bow, and the way a
+    /// podium's facing turns steadily along it (about fifteen degrees per unit) - so the
+    /// second row is the first one repeated, not a straight line pasted behind a curve.
+    ///
+    /// If there is no floor behind the row - a wall, a bar, the edge of the room - the old
+    /// behaviour is used for that podium instead, since a character standing off the side
+    /// of the shot is still better than one standing inside a wall.
     /// </summary>
     private static bool RowSeat(List<LobbySlot> vanilla, int index, out Vector3 pos, out Quaternion rot)
     {
         pos = Vector3.zero;
         rot = Quaternion.identity;
         if (vanilla.Count < 2) return false;
+        if (!Measure(vanilla, out Row row)) return false;
 
-        // Centroid, and the direction the row runs in.
+        int extra = index - Limits.VanillaPlayers;
+        float along = row.Along[Mathf.Clamp(extra, 0, row.Along.Length - 1)] + row.Step * 0.5f;
+
+        // Far enough back to stand clear of the front row, close enough to stay in one shot.
+        float depth = Mathf.Clamp(Mathf.Abs(row.Step) * 1.15f, 1.2f, 3f);
+
+        var behind = row.At(along, depth);
+        if (!row.CheckFloor || HasFloor(behind))
+        {
+            pos = behind;
+            rot = row.Facing(along);
+            return true;
+        }
+
+        Plugin.Log.LogInfo($"[podium] no floor behind the row at {behind.ToString("F2")} - " +
+                           "putting this podium at the end of the row instead");
+        return AlongsideRow(row, extra, out pos, out rot);
+    }
+
+    /// <summary>
+    /// The old placement, kept as a fallback: continue the row past its ends, alternating
+    /// so the group stays centred rather than growing off one side.
+    /// </summary>
+    private static bool AlongsideRow(Row row, int extra, out Vector3 pos, out Quaternion rot)
+    {
+        pos = Vector3.zero;
+        rot = Quaternion.identity;
+
+        float first = row.Along[0];
+        float last = row.Along[row.Along.Length - 1];
+        int outward = extra / 2 + 1;
+        bool after = (extra % 2) == 0;
+
+        foreach (float candidate in new[]
+                 {
+                     after ? last + row.Step * outward : first - row.Step * outward,
+                     after ? first - row.Step * outward : last + row.Step * outward,
+                 })
+        {
+            var at = row.At(candidate, 0f);
+            if (row.CheckFloor && !HasFloor(at)) continue;
+            pos = at;
+            rot = row.Facing(candidate);
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Measure the shipped row: the line through it, how it bows, and how its podiums face.
+    ///
+    /// The four are projected onto their own principal axis, giving each a position along
+    /// the row; two straight-line fits against that position carry the rest. Across the row
+    /// is taken to point away from the lobby camera, so "behind" means behind as seen by
+    /// somebody sitting in the lobby.
+    /// </summary>
+    private static bool Measure(List<LobbySlot> vanilla, out Row row)
+    {
+        row = null;
+
         Vector2 centre = Vector2.zero;
         float height = 0f;
         foreach (var s in vanilla)
@@ -472,9 +569,28 @@ internal static class LobbyPodiums
         Vector2 dir = new Vector2(Mathf.Cos(theta), Mathf.Sin(theta));
         if (dir.sqrMagnitude < 1e-6f) return false;
         dir.Normalize();
-        Vector2 perp = new Vector2(-dir.y, dir.x);
+        Vector2 back = new Vector2(-dir.y, dir.x);
 
-        // Where each podium sits along the row, how far it bows off it, and its facing.
+        // Point it away from whoever is watching, so a second row goes behind the first.
+        var cam = LobbyCamera();
+        if (cam != null)
+        {
+            var c = cam.transform.position;
+            if (Vector2.Dot(back, centre - new Vector2(c.x, c.z)) < 0f) back = -back;
+        }
+        else
+        {
+            // No camera to ask: the podiums themselves are turned towards the room, so
+            // behind is the side they have their backs to.
+            Vector2 facing = Vector2.zero;
+            foreach (var s in vanilla)
+            {
+                var f = s.transform.forward;
+                facing += new Vector2(f.x, f.z);
+            }
+            if (Vector2.Dot(back, facing) > 0f) back = -back;
+        }
+
         int n = vanilla.Count;
         var t = new float[n];
         var u = new float[n];
@@ -484,7 +600,7 @@ internal static class LobbyPodiums
             var p = vanilla[i].transform.position;
             Vector2 d = new Vector2(p.x - centre.x, p.z - centre.y);
             t[i] = Vector2.Dot(d, dir);
-            u[i] = Vector2.Dot(d, perp);
+            u[i] = Vector2.Dot(d, back);
             yaw[i] = vanilla[i].transform.eulerAngles.y;
         }
 
@@ -503,76 +619,269 @@ internal static class LobbyPodiums
         if (!Fit(t, u, out float uA, out float uB)) return false;
         if (!Fit(t, yaw, out float yA, out float yB)) return false;
 
-        float first = t[order[0]];
-        float last = t[order[order.Count - 1]];
-        float step = (last - first) / (n - 1);
+        var along = new float[n];
+        for (int k = 0; k < n; k++) along[k] = t[order[k]];
+
+        float step = (along[n - 1] - along[0]) / (n - 1);
         if (Mathf.Abs(step) < 0.05f) return false;
 
-        // Alternate past each end: the first extra goes beyond the last podium, the second
-        // before the first, and so on, so eight occupy the room symmetrically.
-        int extra = index - Limits.VanillaPlayers;
-        int outward = extra / 2 + 1;
-        bool after = (extra % 2) == 0;
-
-        bool checkFloor = FloorTestWorks(PointsOf(vanilla));
-
-        foreach (float candidate in new[]
-                 {
-                     after ? last + step * outward : first - step * outward,
-                     after ? first - step * outward : last + step * outward,
-                 })
+        row = new Row
         {
-            Vector2 flat = centre + dir * candidate + perp * (uA + uB * candidate);
-            var at = new Vector3(flat.x, height, flat.y);
-
-            if (checkFloor && !HasFloor(at))
-            {
-                Plugin.Log.LogInfo($"[podium] no floor at {at} - trying the other end of the row");
-                continue;
-            }
-
-            pos = at;
-            rot = Quaternion.Euler(0f, yA + yB * candidate, 0f);
-            return true;
-        }
-
-        return false;
+            Centre = centre,
+            Height = height,
+            Dir = dir,
+            Back = back,
+            Along = along,
+            Step = step,
+            UA = uA,
+            UB = uB,
+            YawA = yA,
+            YawB = yB,
+            CheckFloor = FloorTestWorks(PointsOf(vanilla)),
+        };
+        return true;
     }
 
-    /// <summary>
-    /// What the lobby camera is and how much of the row it can see.
-    ///
-    /// Eight podiums occupy more than twice the row the shipped four do, so the ones at
-    /// the ends fall outside the shot. Fixing that means knowing what is framing it, and
-    /// nothing so far has said.
-    /// </summary>
-    private static void ReportCamera(LobbyController lobby)
+    // -------------------------------------------------------------------- camera
+
+    /// <summary>How high above a podium a character's head is, near enough for framing.</summary>
+    private const float HeadHeight = 1.8f;
+
+    private static Camera _cam;
+    private static Vector3 _camHome, _camWanted;
+    private static Quaternion _camHomeRot, _camWantedRot;
+    private static float _camHomeFov, _camWantedFov;
+    private static bool _camHolding, _camDone;
+    private static int _camTries;
+
+    private static Camera LobbyCamera()
     {
         try
         {
             var cam = Camera.main;
+            if (cam != null) return cam;
+            foreach (var c in UnityEngine.Object.FindObjectsOfType<Camera>())
+                if (c != null && c.isActiveAndEnabled && c.targetTexture == null) return c;
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>
+    /// Raise the lobby camera until every podium is in shot.
+    ///
+    /// Two rows of characters need more of the room in frame than one, and the back row
+    /// stands behind the front one, so the shot has to look down at them a little. The
+    /// camera is lifted a step at a time and re-aimed at the middle of the group, and only
+    /// widened if lifting alone is not enough; the first setting that holds every podium -
+    /// feet and head - is kept. If the shot already covers them nothing is touched, and if
+    /// no amount of lifting works the camera is left exactly as the game had it, because a
+    /// lobby framed oddly is better than one pointing at the ceiling.
+    /// </summary>
+    private static void FrameLobby(LobbyController lobby)
+    {
+        if (_camDone || lobby == null || lobby.SpawnSlots == null) return;
+
+        try
+        {
+            var cam = LobbyCamera();
             if (cam == null)
             {
-                var all = UnityEngine.Object.FindObjectsOfType<Camera>();
-                if (all != null && all.Length > 0) cam = all[0];
+                // The lobby camera may not exist yet on the frame the lobby starts.
+                if (++_camTries > 20) { _camDone = true; Plugin.Log.LogInfo("[podium] no lobby camera to raise"); }
+                return;
             }
-            if (cam == null) { Plugin.Log.LogInfo("[podium] no lobby camera found"); return; }
 
-            float lo = float.MaxValue, hi = float.MinValue;
+            var marks = new List<Vector3>();
+            var front = new List<Vector3>();
+            var back = new List<Vector3>();
             foreach (var s in lobby.SpawnSlots)
             {
                 if (s == null || s.transform == null) continue;
-                float z = s.transform.position.z;
-                if (z < lo) lo = z;
-                if (z > hi) hi = z;
+                var at = s.transform.position;
+                marks.Add(at + Vector3.up * 0.1f);
+                marks.Add(at + Vector3.up * HeadHeight);
+                if (s.gameObject.name.StartsWith(Prefix)) back.Add(at); else front.Add(at);
+            }
+            if (marks.Count == 0) return;
+
+            var t = cam.transform;
+            _cam = cam;
+            _camHome = t.position;
+            _camHomeRot = t.rotation;
+            _camHomeFov = cam.fieldOfView;
+            _camDone = true;
+
+            Plugin.Log.LogInfo($"[podium] lobby camera '{cam.name}' at {_camHome.ToString("F2")} " +
+                               $"fov={_camHomeFov:F1} ortho={cam.orthographic}");
+
+            if (cam.orthographic)
+            {
+                Plugin.Log.LogInfo("[podium] the lobby camera is orthographic - left alone");
+                return;
             }
 
-            Plugin.Log.LogInfo(
-                $"[podium] camera '{cam.name}' at {cam.transform.position.ToString("F2")} " +
-                $"yaw={cam.transform.eulerAngles.y:F1} fov={cam.fieldOfView:F1} " +
-                $"ortho={cam.orthographic}; the row now spans z {lo:F2}..{hi:F2} ({hi - lo:F2} units)");
+            if (InShot(cam, marks) && Unblocked(cam, back, front))
+            {
+                Plugin.Log.LogInfo($"[podium] all {lobby.SpawnSlots.Count} podiums are already in shot");
+                return;
+            }
+
+            Vector3 focus = Vector3.zero;
+            foreach (var s in lobby.SpawnSlots)
+                if (s != null && s.transform != null) focus += s.transform.position + Vector3.up * (HeadHeight * 0.5f);
+            focus /= lobby.SpawnSlots.Count;
+
+            // Lifting is what was asked for, so try every lift before widening at all.
+            bool haveFallback = false;
+            Vector3 fbPos = Vector3.zero;
+            Quaternion fbRot = Quaternion.identity;
+            float fbFov = 0f, fbLift = 0f, fbWider = 0f;
+
+            for (float wider = 0f; wider <= 12.01f; wider += 4f)
+            {
+                for (float lift = 0.25f; lift <= 4.01f; lift += 0.25f)
+                {
+                    t.position = _camHome + Vector3.up * lift;
+                    t.rotation = Quaternion.LookRotation(focus - t.position, Vector3.up);
+                    cam.fieldOfView = _camHomeFov + wider;
+                    if (!InShot(cam, marks)) continue;
+
+                    // Everyone in frame is worth keeping even if the back row is still
+                    // partly hidden, so the first of those is remembered as a second best.
+                    if (!haveFallback)
+                    {
+                        haveFallback = true;
+                        fbPos = t.position; fbRot = t.rotation; fbFov = cam.fieldOfView;
+                        fbLift = lift; fbWider = wider;
+                    }
+
+                    if (!Unblocked(cam, back, front)) continue;
+
+                    _camWanted = t.position;
+                    _camWantedRot = t.rotation;
+                    _camWantedFov = cam.fieldOfView;
+                    _camHolding = true;
+                    Plugin.Log.LogInfo(
+                        $"[podium] lobby camera raised {lift:F2} units" +
+                        (wider > 0f ? $" and widened {wider:F0} degrees" : "") +
+                        $" - all {lobby.SpawnSlots.Count} podiums in shot and the back row clear " +
+                        "of the front");
+                    return;
+                }
+            }
+
+            if (haveFallback)
+            {
+                t.position = fbPos; t.rotation = fbRot; cam.fieldOfView = fbFov;
+                _camWanted = fbPos; _camWantedRot = fbRot; _camWantedFov = fbFov;
+                _camHolding = true;
+                Plugin.Log.LogInfo(
+                    $"[podium] lobby camera raised {fbLift:F2} units" +
+                    (fbWider > 0f ? $" and widened {fbWider:F0} degrees" : "") +
+                    " - everyone is in shot, though the back row is not fully clear of the front");
+                return;
+            }
+
+            RestoreCamera();
+            Plugin.Log.LogWarning("[podium] could not frame every podium - the lobby camera is left as the game had it");
         }
-        catch (Exception e) { Plugin.Log.LogInfo($"[podium] could not read the camera: {e.Message}"); }
+        catch (Exception e)
+        {
+            Plugin.Log.LogError($"[podium] raising the lobby camera failed: {e.Message}");
+            RestoreCamera();
+            _camDone = true;
+        }
+    }
+
+    private static void RestoreCamera()
+    {
+        try
+        {
+            _camHolding = false;
+            if (_cam == null) return;
+            _cam.transform.position = _camHome;
+            _cam.transform.rotation = _camHomeRot;
+            _cam.fieldOfView = _camHomeFov;
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Keep the raised shot if the game puts the camera back where it started.
+    ///
+    /// Only a camera still standing at its lobby position is moved. If the game has taken
+    /// it somewhere else - a character close-up, a menu - that is a shot of its own and is
+    /// left alone.
+    /// </summary>
+    private static void HoldCamera()
+    {
+        if (!_camHolding || _cam == null) return;
+        try
+        {
+            var t = _cam.transform;
+            if (Vector3.Distance(t.position, _camWanted) < 0.01f) return;
+            if (Vector3.Distance(t.position, _camHome) > 0.05f) return;
+            t.position = _camWanted;
+            t.rotation = _camWantedRot;
+            _cam.fieldOfView = _camWantedFov;
+        }
+        catch { _camHolding = false; }
+    }
+
+    /// <summary>
+    /// Can the camera see the back row over the heads of the front one?
+    ///
+    /// Being inside the picture is not the same as being visible: a character standing
+    /// directly behind another is in frame and entirely hidden. So for each podium in the
+    /// back row, the line from the camera to where that character's chest will be is checked
+    /// against every front-row character standing near it - treating each as a person's
+    /// width and height - and has to pass over their head.
+    /// </summary>
+    private static bool Unblocked(Camera cam, List<Vector3> back, List<Vector3> front)
+    {
+        const float shoulders = 0.55f;   // half a character's width
+        const float stature = 1.85f;     // the top of a character's head
+
+        var eye = cam.transform.position;
+        var eyeFlat = new Vector2(eye.x, eye.z);
+
+        foreach (var b in back)
+        {
+            var chest = b + Vector3.up * 1.2f;
+            var chestFlat = new Vector2(chest.x, chest.z);
+            var run = chestFlat - eyeFlat;
+            float length = run.magnitude;
+            if (length < 0.01f) continue;
+            var along = run / length;
+
+            foreach (var f in front)
+            {
+                var head = new Vector2(f.x, f.z);
+                float u = Vector2.Dot(head - eyeFlat, along) / length;
+                if (u <= 0.05f || u >= 0.98f) continue;                 // not between the two
+                if ((eyeFlat + run * u - head).magnitude > shoulders) continue;   // standing aside
+
+                float height = eye.y + (chest.y - eye.y) * u;
+                if (height < f.y + stature) return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>Is every one of these points inside the picture, with a little room to spare?</summary>
+    private static bool InShot(Camera cam, List<Vector3> points)
+    {
+        const float margin = 0.03f;
+        foreach (var p in points)
+        {
+            var v = cam.WorldToViewportPoint(p);
+            if (v.z <= 0f) return false;
+            if (v.x < margin || v.x > 1f - margin) return false;
+            if (v.y < margin || v.y > 1f - margin) return false;
+        }
+        return true;
     }
 
     /// <summary>Least squares y = a + b*x. False if every x is the same.</summary>
@@ -629,11 +938,5 @@ internal static class LobbyPodiums
             return Mathf.Abs(hit.point.y - pos.y) < 1.5f;
         }
         catch { return false; }
-    }
-
-    private static Vector3 Flat(Vector3 v)
-    {
-        v.y = 0f;
-        return v.sqrMagnitude < 1e-6f ? Vector3.forward : v.normalized;
     }
 }

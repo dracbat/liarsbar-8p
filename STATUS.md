@@ -18,6 +18,10 @@ Confirmed in `BepInEx/LogOutput.log` on a live host, current build:
 | Turn order wrap, all five sites | `[turn] … wraps at seat 3 -> 7` |
 | Deck size constant rewritten | `[decksize] DealBasicOrDevil: deck 20 -> 25` |
 | 8 lobby podiums, each with its own name plate | `[podium] lobby has 8 podiums for up to 8 players` |
+| 8 podiums in two rows, all on screen | seen in a screenshot of an eight player lobby |
+| 8 seated, all dealt five cards | `[dealcards] hands three seconds after the deal` lists all eight |
+| Turn rotates through all eight seats | `active slot -> 4 … 5 … 6 … 7 … 0 … 1` |
+| The table arrow follows the turn | `[dev:arrow] pointing the table arrow at seat 5 … 6 … 7 … 0` |
 | Clean boot | no patch failures, no exceptions from the mod |
 
 ## Verified with other people
@@ -32,10 +36,11 @@ Confirmed in `BepInEx/LogOutput.log` on a live host, current build:
 
 - **A full round with eight people.** Everything above is either verified solo or
   verified at five. Six, seven and eight have never been in one lobby.
-- **Where the extra lobby podiums sit visually.** They continue the arc the shipped four
-  stand on, at the same radius and spacing, alternating past each end so the group stays
-  compact. The lobby has no colliders to test the spots against, so this is geometry, not
-  observation.
+- **That the table arrow lands on the right person.** It is aimed at the seat in play from
+  the seat ring, and the log shows it following every turn, but nobody has yet watched the
+  table and confirmed the arrow is over the right player's cards.
+- **The raised lobby camera.** The second row is confirmed by eye; the lift that is meant to
+  clear the back row over the front has only been reasoned about, not seen.
 - **Liar's Dice, Chaos, Spin and Poker.** They share the turn-order and cap fixes, which
   are mode-independent, but no round has been played in them since.
 
