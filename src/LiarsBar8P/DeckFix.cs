@@ -211,6 +211,7 @@ internal static class DeckFix
             // not expect. At eight players this is 40, exactly the two decks intended.
             int vanillaDeck = Mathf.Max(masaV, resetV);
             int deckTarget = Mathf.Max(vanillaDeck, players * CardsPerPlayer);
+            CardTypeFix.NoteVanillaDeck(vanillaDeck);
 
             Plugin.Log.LogInfo(
                 $"[deckfix] {players} players -> deck of {deckTarget} cards " +
