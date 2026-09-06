@@ -8,6 +8,19 @@ so far is below it. Versions that were once numbered 1.x and 2.x were folded int
 0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
 is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v0.23.3 — the diagnostic was breaking the deal
+
+- **A watcher added to find out why cards were not handed out was itself stopping them.**
+  Harmony could not patch the coroutine it was watching, and a half-applied patch on a
+  `MoveNext` leaves the coroutine unusable — so the routine that hands out the cards and
+  gives the first turn stopped running. The diagnostic was causing the fault it was meant
+  to explain. It found the four-element player array first, which is a real fix and stays.
+- What replaces it patches only the ordinary methods that *create* those coroutines, never
+  their `MoveNext`, which is safe and answers the same question.
+- Bots are shown their hand rather than only recorded as holding one: applying the card
+  state records the cards, showing the hand is a separate step, and it is the one that puts
+  the meshes in a player's hands.
+
 ## v0.23.2 — bots hold cards and carry a loaded gun
 
 - Everything a player physically receives arrives over their own connection: the card

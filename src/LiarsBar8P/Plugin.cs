@@ -10,7 +10,7 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "liarsbar.eightplayers";
-    public const string Version = "0.23.2";
+    public const string Version = "0.23.3";
 
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
@@ -76,7 +76,7 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(DiagAutoHost),   "self test: auto host");
         Apply(harmony, typeof(DiagSoloStart),  "self test: solo start");
         Apply(harmony, typeof(TableFill),      "seat everyone StartGame missed");
-        Apply(harmony, typeof(DealDiag),       "deal routine watch");
+        Apply(harmony, typeof(DealTrace),      "deal trace");
         Apply(harmony, typeof(DevLogging),     "developer logging");
 
         if (DiagDeckPatchTest.Value)
@@ -140,6 +140,7 @@ public class Plugin : BasePlugin
         }
     }
 }
+
 
 
 
