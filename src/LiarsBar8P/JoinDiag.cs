@@ -78,7 +78,10 @@ internal static class JoinDiag
     /// StartPlayerCount stays at 4 with five players because Manager.StartGame throws.
     /// Turn order then skips the extra player. Correct it once the roster is known.
     /// </summary>
+    // Runs before DeckDiag, which clears the exception; passes it along so that
+    // diagnostic still sees it.
     [HarmonyFinalizer]
+    [HarmonyPriority(Priority.First)]
     [HarmonyPatch(typeof(Manager), nameof(Manager.StartGame))]
     private static Exception StartGame_Finalizer(Exception __exception, Manager __instance)
     {
@@ -94,6 +97,6 @@ internal static class JoinDiag
             }
         }
         catch (Exception e) { Plugin.Log.LogError($"[joindiag] {e.Message}"); }
-        return __exception;
+        return __exception;   // DeckDiag reports and clears it
     }
 }

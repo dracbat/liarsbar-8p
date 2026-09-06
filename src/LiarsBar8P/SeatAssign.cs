@@ -50,7 +50,11 @@ internal static class SeatAssign
     /// After CmdSetPlayer, give a seat to anyone who did not get one. Seats are taken
     /// from the lowest index not already claimed, so the ring stays contiguous.
     /// </summary>
+    // Harmony chains finalizers, and one returning null clears the exception for the
+    // rest. This one acts on the failure, so it must run before CommandGuard swallows
+    // it, and it passes the exception along so that guard still reports it.
     [HarmonyFinalizer]
+    [HarmonyPriority(Priority.First)]
     [HarmonyPatch(typeof(PlayerObjectController), nameof(PlayerObjectController.CmdSetPlayer))]
     private static Exception AssignSeat(Exception __exception, PlayerObjectController __instance)
     {
@@ -76,6 +80,6 @@ internal static class SeatAssign
             Report("after manual assignment");
         }
         catch (Exception e) { Plugin.Log.LogError($"[seatassign] {e.Message}"); }
-        return null;
+        return __exception;   // let CommandGuard report and clear it
     }
 }
