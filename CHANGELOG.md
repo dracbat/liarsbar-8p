@@ -8,6 +8,43 @@ so far is below it. Versions that were once numbered 1.x and 2.x were folded int
 0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
 is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v0.22.0 — a way to test eight players without eight people
+
+Everything here is off unless `DeveloperMode` is switched on, and none of it changes an
+ordinary game. It exists because every remaining fault needed eight people in a room to
+see, and that is not a test anybody can run twice.
+
+- **Bots that fill the empty seats.** A bot is the game's own player object, spawned
+  through the networking layer, registered in the same roster, given a lobby podium by the
+  same method and dealt to by the same deal — not a simulation. Eight players now assemble
+  in a lobby on demand, and the four extra podiums added in v0.21.0 have been seen in use
+  for the first time. On its turn a bot waits a second or three and throws one card, which
+  is always a legal move; it is not meant to play well.
+- **A debug panel on F8**, with the same commands on function keys: add or remove a bot,
+  fill the table, print the player list, the seat assignments, the lobby podiums, the deck
+  state or whose turn it is, skip a turn, start the match. It also shows a live count of
+  players, seats, the active slot and the deck size.
+- **A full account in the log** of registration, lobby creation, seat assignment, dealing,
+  turn changes, eliminations, round boundaries and deck size — each tagged so one concern
+  can be read back on its own. It calls out the things that have gone wrong before:
+  a player dealt nothing, two players on one seat, the turn indicator disagreeing with
+  whose turn it is.
+- **`AutoTestFullTable`** runs the whole thing by itself: host, fill, start, report. One
+  launch, one round, no keyboard.
+
+What it found in its first hour, all of it previously invisible:
+
+- **`Manager.StartGame` throws part way through seating.** It seats about four players and
+  then stops, so at eight only five reach the table and the rest are simply lost — in the
+  lobby, in the roster, never at the table. This is the largest remaining limit, and it is
+  now visible in one line rather than costing a session to notice.
+- The game's own `SpawnPlayerwithskin` seats a player without adding them to the roster,
+  so seating anyone outside that sweep does not count them.
+- `OrderSprtes`, a per-player list, ships with **three** entries and was only grown once a
+  round was already being set up — after seating had needed it. It is now grown first.
+- A player with no connection is never told they are holding cards, and the round waits
+  for everyone to be holding cards before the first turn.
+
 ## v0.21.2 — the installer is reusable, and says so
 
 - The installer always asked GitHub for the newest release, so re-running the same file

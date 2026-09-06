@@ -111,6 +111,23 @@ internal static class DeckFix
         catch (Exception e) { Plugin.Log.LogWarning($"[deckfix] {label} skipped: {e.Message}"); }
     }
 
+    /// <summary>
+    /// The per-player lists that are not card objects: turn-order icons, card icons and the
+    /// two synced per-player int lists.
+    ///
+    /// Exposed because they are needed earlier than a round. <c>Manager.StartGame</c> reads
+    /// the turn-order icons while it seats people, and that list ships with three entries,
+    /// so at more than four players it runs off the end before a round ever begins.
+    /// </summary>
+    internal static void GrowPerPlayerLists(DeckGamePlayManager d, int players)
+    {
+        if (d == null || players < 1) return;
+        GrowSprites(d.OrderSprtes, players, "OrderSprtes");
+        GrowSprites(d.CardIcons, players, "CardIcons");
+        GrowSyncInts(d.LastRound, players, "LastRound");
+        GrowSyncInts(d.LastRoundSpotOn, players, "LastRoundSpotOn");
+    }
+
     private static void GrowSprites(Il2CppSystem.Collections.Generic.List<Sprite> list, int need, string label)
     {
         try

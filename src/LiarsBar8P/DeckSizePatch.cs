@@ -47,6 +47,18 @@ internal static class DeckSizePatch
         new Target { Method = "DealDeck2",        VanillaDeck = 28 },
     };
 
+    /// <summary>What the basic deal will actually produce right now, for diagnostics.</summary>
+    internal static int CurrentSize
+    {
+        get
+        {
+            foreach (var t in _targets)
+                if (t.Method == "DealBasicOrDevil")
+                    return t.Current > 0 ? t.Current : t.VanillaDeck;
+            return -1;
+        }
+    }
+
     /// <summary>Native code address of a game method, via its IL2CPP MethodInfo.</summary>
     private static IntPtr CodePointer(string method)
     {

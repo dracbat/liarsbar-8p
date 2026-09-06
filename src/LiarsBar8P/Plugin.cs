@@ -1,4 +1,4 @@
-using BepInEx;
+﻿using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP;
@@ -10,7 +10,7 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "liarsbar.eightplayers";
-    public const string Version = "0.21.2";
+    public const string Version = "0.22.0";
 
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
@@ -18,6 +18,8 @@ public class Plugin : BasePlugin
     public static ConfigEntry<bool> DiagAutoHost;
     public static ConfigEntry<bool> DiagSoloStart;
     public static ConfigEntry<bool> DiagDeckPatchTest;
+    public static ConfigEntry<bool> DeveloperMode;
+    public static ConfigEntry<bool> DevAutoTest;
 
     public override void Load()
     {
@@ -38,6 +40,17 @@ public class Plugin : BasePlugin
 
         DiagDeckPatchTest = Config.Bind("Debug", "SelfTestDeckSizePatch", false,
             "Development self test: at startup, rewrite the deal's hardcoded deck size for a pretend five player table and report whether the write succeeded. Verifies the memory patch without needing other players.");
+
+        DeveloperMode = Config.Bind("Developer", "DeveloperMode", false,
+            "Developer testing tools: bots that fill empty seats, an on-screen panel (F8) and a " +
+            "running account of registration, seating, dealing, turns and eliminations. An eight " +
+            "player round cannot be tested with eight people to hand; this is how it gets tested. " +
+            "Leave it off for normal play.");
+
+        DevAutoTest = Config.Bind("Developer", "AutoTestFullTable", false,
+            "With developer mode on: once a lobby is hosted, fill it with bots and start the " +
+            "match automatically, printing the state at each step. One launch, one whole round, " +
+            "no keyboard.");
 
         Log.LogInfo($"=== Liar's Bar 8P loading (target={MaxPlayers.Value}) ===");
 
@@ -62,6 +75,8 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(DiagPatches),    "diagnostics");
         Apply(harmony, typeof(DiagAutoHost),   "self test: auto host");
         Apply(harmony, typeof(DiagSoloStart),  "self test: solo start");
+        Apply(harmony, typeof(TableFill),      "seat everyone StartGame missed");
+        Apply(harmony, typeof(DevLogging),     "developer logging");
 
         if (DiagDeckPatchTest.Value)
         {
@@ -92,7 +107,17 @@ public class Plugin : BasePlugin
             UnityEngine.Object.DontDestroyOnLoad(go);
             go.hideFlags = UnityEngine.HideFlags.HideAndDontSave;
             go.AddComponent<VersionHud>();
+
+            Il2CppInterop.Runtime.Injection.ClassInjector.RegisterTypeInIl2Cpp<ModTicker>();
+            go.AddComponent<ModTicker>();
             Log.LogInfo("  version HUD attached (top left)");
+
+            if (DeveloperMode.Value)
+            {
+                Il2CppInterop.Runtime.Injection.ClassInjector.RegisterTypeInIl2Cpp<DevHud>();
+                go.AddComponent<DevHud>();
+                Log.LogInfo("  DEVELOPER MODE on - press F8 in game for the debug panel");
+            }
         }
         catch (System.Exception e)
         {
@@ -113,6 +138,7 @@ public class Plugin : BasePlugin
         }
     }
 }
+
 
 
 
