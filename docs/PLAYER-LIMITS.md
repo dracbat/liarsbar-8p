@@ -17,7 +17,7 @@ The mod's own configurable cap lives in exactly one place — `Limits.Max`, back
 | `SteamMatchmaking.CreateLobby(type, maxMembers)` | Steam lobby member limit. The game passes `NetworkManager.maxConnections`, so raising that raises the lobby. | Fixed since v0.1.0 (`CapPatches`) |
 | `NetworkManager.maxConnections` | The serialized inspector field. Feeds both Steam's lobby size and the transport. | Fixed since v0.1.0 (`CapPatches`) |
 | `NetworkServer.Listen(int maxConns)` | Mirror's *actual* connection check. The game always called `Listen(4)` regardless of the field. | Fixed since v0.2.0 (`JoinFix`) |
-| **`Mirror.FizzySteam.NextServer` / `LegacyServer`** | **The Steam transport's own limit, below Mirror.** `OnConnectionStatusChanged` compares `steamConnections.Count` against the server's `maxConnections` and rejects with *"Incoming connection … would exceed max connection count"*. | **This is why the 6th player could not join** — fixed in v2.1.0 (`TransportCap`) |
+| **`Mirror.FizzySteam.NextServer` / `LegacyServer`** | **The Steam transport's own limit, below Mirror.** `OnConnectionStatusChanged` compares `steamConnections.Count` against the server's `maxConnections` and rejects with *"Incoming connection … would exceed max connection count"*. | **This is why the 6th player could not join** — fixed in v0.21.0 (`TransportCap`) |
 
 The transport limit is the one that explains the exact symptom. The host does not open a
 Steam connection to itself, so `steamConnections` holds only the remote players: a limit
@@ -84,7 +84,7 @@ Two things Mirror will not do for a copy:
 
 New podium spots are floor-checked before use, with the check calibrated on the shipped
 podiums so a lobby without colliders disables it rather than failing everything.
-(`LobbyPodiums`, v2.1.0.)
+(`LobbyPodiums`, v0.21.0.)
 
 ## 3. Turn order
 
@@ -128,18 +128,18 @@ in all three directions. This drives aiming and `CheckSlotFull`.
 
 `DeckGamePlayManager.DealBasicOrDevil` and `DealDeck2` build their deck from a constant
 compiled into the game — `Enumerable.Range(1, 20)` and `Enumerable.Range(1, 28)`. No
-amount of adding card objects changes it. Fixed in v2.0.0 (`DeckSizePatch`), with card
+amount of adding card objects changes it. Fixed in v0.20.0 (`DeckSizePatch`), with card
 faces rescaled to match (`CardTypeFix`), since `ToCardTypeBasic` is arithmetic over the
 card index with thresholds sized for twenty cards.
 
 `Manager.StartPlayerCount` lagging at four also dealt to only four people; corrected since
-v1.2.0 (`RosterFix`).
+v0.12.0 (`RosterFix`).
 
 `DeckGamePlayManager.AddCards(List<int>)` is **not** part of dealing — its only callers are
 `DeckGameplay.ServerThrowCards` and the pending-table-cards paths, i.e. a player putting
 cards down. A patch that scaled that list to the player count shipped from v0.1.0 to
-v2.0.2; above four players it would have turned a two-card play into a whole deck. Removed
-in v2.1.0.
+v0.20.2; above four players it would have turned a two-card play into a whole deck. Removed
+in v0.21.0.
 
 ## 5. In-game seats
 
