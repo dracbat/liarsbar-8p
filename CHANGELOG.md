@@ -8,6 +8,16 @@ so far is below it. Versions that were once numbered 1.x and 2.x were folded int
 0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
 is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v0.23.2 — bots hold cards and carry a loaded gun
+
+- Everything a player physically receives arrives over their own connection: the card
+  objects, the flag saying they are holding cards, the revolver being loaded. A bot has no
+  connection, so none of it reached them — dealt a hand that existed only as numbers, sat
+  there empty handed with no gun, and the round waited for everyone to be holding cards
+  before giving out the first turn. The host now runs the receiving end on their behalf,
+  calling the same methods a real client runs on the message rather than sending one.
+  All eight now hold five cards and a loaded revolver.
+
 ## v0.23.1 — the cards reach every seat
 
 - **The deal built a four-element array and indexed it by seat number.** The routine that

@@ -50,6 +50,7 @@ internal static class RosterFix
             if (m == null || m.Players == null) return;
 
             TurnKickstart.RoundStarting();
+            BotBehaviour.RoundStarting();
             TableFill.EnsureEveryoneSeated(m);
 
             // Sized from who is actually at the table, never from who is in the lobby.

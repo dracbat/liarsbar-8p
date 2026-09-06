@@ -83,14 +83,23 @@ internal static class BotBehaviour
         }
     }
 
+    /// <summary>Bots whose hand has already been built this round.</summary>
+    private static readonly HashSet<int> _handBuilt = new();
+
+    internal static void RoundStarting() => _handBuilt.Clear();
+
     /// <summary>
-    /// Tell the table a bot is holding the cards it was dealt.
+    /// Put the cards and the revolver in a bot's hands.
     ///
-    /// The game raises that flag by sending a message to the player's own connection, and
-    /// a bot has no connection for it to arrive at. So a bot is dealt cards and is never
-    /// recorded as holding any — and the round waits for everyone to be holding cards
-    /// before it hands out the first turn, so nothing happens at all. The host sets the
-    /// flag for them instead, which is what the message would have done.
+    /// Everything a player physically receives arrives over their own connection: the card
+    /// objects, the flag saying they are holding cards, the revolver being loaded. A bot
+    /// has no connection, so none of it reaches them — they are dealt a hand that exists
+    /// only as numbers, sit there empty-handed with no gun, and the round waits forever
+    /// for everyone to be holding cards before giving out the first turn.
+    ///
+    /// The host therefore runs the receiving end for them. These are the same methods a
+    /// real client runs when the message arrives, called directly rather than sent, so a
+    /// bot ends up in the state a person would be in.
     /// </summary>
     private static void HoldCards(PlayerStats p)
     {
@@ -99,14 +108,53 @@ internal static class BotBehaviour
             var gp = p.GetComponent<DeckGameplay>();
             if (gp == null || gp.cardTypes == null) return;
 
-            bool shouldHold = gp.cardTypes.Count > 0;
-            if (gp.HaveCards == shouldHold) return;
+            int count = gp.cardTypes.Count;
+            if (count == 0) return;
 
-            gp.NetworkHaveCards = shouldHold;
-            Dev.Log("bot", $"{p.PlayerName} holds {gp.cardTypes.Count} card(s) - " +
-                           "flag set here because a bot has no connection to be told on");
+            int id = p.Slot;
+            if (_handBuilt.Contains(id))
+            {
+                // Already built; just keep the flag true as cards are played.
+                if (!gp.HaveCards) gp.NetworkHaveCards = true;
+                return;
+            }
+            _handBuilt.Add(id);
+
+            // The card values it was dealt, and every one of them face down and active.
+            var types = new Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<int>(count);
+            var active = new Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<int>(count);
+            for (int i = 0; i < count; i++) { types[i] = gp.cardTypes[i]; active[i] = i; }
+
+            gp.ApplyCardState(types, active, true);
+
+            int objects = gp.Cards != null ? gp.Cards.Count : -1;
+            Dev.Log("bot", $"{p.PlayerName} given {count} card(s) in hand ({objects} card objects) - " +
+                           "done here because a bot has no connection to be dealt over");
+
+            LoadRevolver(p, gp);
         }
-        catch { }
+        catch (Exception e)
+        {
+            Dev.Warn("bot", $"{p.PlayerName} could not be given a hand: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Load a bot's revolver. Same reason as the cards: the game runs this on the player's
+    /// own client, and a bot has none, so its gun stays unloaded while everyone else's is
+    /// ready.
+    /// </summary>
+    private static void LoadRevolver(PlayerStats p, DeckGameplay gp)
+    {
+        try
+        {
+            gp.StartCoroutine(gp.UpdateRevolverUI());
+            Dev.Log("bot", $"{p.PlayerName} loaded its revolver");
+        }
+        catch (Exception e)
+        {
+            Dev.Warn("bot", $"{p.PlayerName} could not load its revolver: {e.Message}");
+        }
     }
 
     /// <summary>
