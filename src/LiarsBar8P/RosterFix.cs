@@ -52,6 +52,7 @@ internal static class RosterFix
             int count = m.Players.Count;
             if (count < 2) return;
 
+            DeckSizePatch.ApplyFor(count);
             RestoreSeats(m, count);
             CorrectPlayerCount(m, count);
             CompactSeatIndices(m, count);

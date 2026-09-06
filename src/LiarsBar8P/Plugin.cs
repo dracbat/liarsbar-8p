@@ -10,13 +10,14 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "josh.liarsbar.eightplayers";
-    public const string Version = "1.5.1";
+    public const string Version = "2.0.0";
 
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
     public static ConfigEntry<bool> Verbose;
     public static ConfigEntry<bool> DiagAutoHost;
     public static ConfigEntry<bool> DiagSoloStart;
+    public static ConfigEntry<bool> DiagDeckPatchTest;
     public static ConfigEntry<bool> ScaleDeck;
 
     public override void Load()
@@ -38,6 +39,9 @@ public class Plugin : BasePlugin
 
         DiagSoloStart = Config.Bind("Debug", "SelfTestForceSoloStart", false,
             "Development self test: force a solo match start to capture in-game seat diagnostics.");
+
+        DiagDeckPatchTest = Config.Bind("Debug", "SelfTestDeckSizePatch", false,
+            "Development self test: at startup, rewrite the deal's hardcoded deck size for a pretend five player table and report whether the write succeeded. Verifies the memory patch without needing other players.");
 
         Log.LogInfo($"=== Liar's Bar 8P loading (target={MaxPlayers.Value}) ===");
 
@@ -61,6 +65,12 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(DiagPatches),    "diagnostics");
         Apply(harmony, typeof(DiagAutoHost),   "self test: auto host");
         Apply(harmony, typeof(DiagSoloStart),  "self test: solo start");
+
+        if (DiagDeckPatchTest.Value)
+        {
+            Log.LogInfo("  [selftest] exercising the deck size patch for 5 players...");
+            DeckSizePatch.ApplyFor(5);
+        }
 
         SpawnHud();
 
