@@ -3,7 +3,8 @@ setlocal
 title Liar's Bar - 8 Player Mod (online installer)
 
 rem ---------------------------------------------------------------------------
-rem  One-file installer. Downloads the latest release from GitHub and installs it.
+rem  One-file installer. Removes any previous install of this mod, then downloads
+rem  and installs the latest release from GitHub.
 rem
 rem  This is a batch script with a PowerShell script embedded at the end of the
 rem  file. cmd exits before reaching it, so you can open this in Notepad and read
@@ -25,7 +26,6 @@ pause
 exit /b
 
 #PS_BEGIN
-
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ProgressPreference = 'SilentlyContinue'
@@ -111,6 +111,31 @@ if (Get-Process -Name "Liar's Bar" -ErrorAction SilentlyContinue) {
     exit 1
 }
 
+# A stale plugin or leftover config has broken sessions before: an old setting
+# survived an update and silently disabled a fix. Every install now starts from a
+# clean slate for this mod's own files. BepInEx's generated interop folder is left
+# alone on purpose - it is expensive to rebuild and is not ours.
+Say ""
+Say "Removing any previous install of this mod..."
+$gone = 0
+$targets = @(
+    (Join-Path $game 'BepInEx\plugins\LiarsBar8P.dll'),
+    (Join-Path $game 'BepInEx\config\josh.liarsbar.eightplayers.cfg')
+)
+$plugDir = Join-Path $game 'BepInEx\plugins'
+if (Test-Path $plugDir) {
+    foreach ($stray in Get-ChildItem $plugDir -Filter '*LiarsBar*' -File -ErrorAction SilentlyContinue) {
+        $targets += $stray.FullName
+    }
+}
+foreach ($old in ($targets | Select-Object -Unique)) {
+    if (Test-Path $old) {
+        try { [IO.File]::Delete($old); Good "removed $(Split-Path $old -Leaf)"; $gone++ }
+        catch { Warn "could not remove $(Split-Path $old -Leaf): $($_.Exception.Message)" }
+    }
+}
+if ($gone -eq 0) { Say "         nothing previous found - clean machine" Gray }
+
 Say ""
 Say "Checking for the latest release..."
 try {
@@ -161,25 +186,12 @@ try {
     }
 
     Say ""
-    Say "Installing..."
-    if (Test-Path (Join-Path $game 'BepInEx\plugins\LiarsBar8P.dll')) {
-        Warn "An existing install was found - it will be updated."
-    }
-
-    $cfgPath = Join-Path $game 'BepInEx\config\josh.liarsbar.eightplayers.cfg'
-    $savedCfg = $null
-    if (Test-Path $cfgPath) { $savedCfg = Get-Content $cfgPath -Raw }
-
+    Say "Installing fresh..."
     foreach ($item in @('BepInEx','dotnet','winhttp.dll','doorstop_config.ini','.doorstop_version','changelog.txt')) {
         $src = Join-Path $srcRoot $item
         if (Test-Path $src) { Copy-Item $src -Destination $game -Recurse -Force }
     }
     Good "Files copied"
-
-    if ($savedCfg) {
-        Set-Content $cfgPath $savedCfg -Encoding utf8
-        Good "Kept your existing settings"
-    }
 }
 catch {
     Say ""
@@ -196,6 +208,7 @@ $checks = @{
     'winhttp.dll (loader)' = Join-Path $game 'winhttp.dll'
     'BepInEx core'         = Join-Path $game 'BepInEx\core\BepInEx.Core.dll'
     '8 Player plugin'      = Join-Path $game 'BepInEx\plugins\LiarsBar8P.dll'
+    'fresh config'         = Join-Path $game 'BepInEx\config\josh.liarsbar.eightplayers.cfg'
 }
 $fail = $false
 foreach ($k in ($checks.Keys | Sort-Object)) {
@@ -205,25 +218,13 @@ foreach ($k in ($checks.Keys | Sort-Object)) {
 Say ""
 if ($fail) { Say "Install INCOMPLETE - see the failures above." Red; exit 1 }
 
-$mp = 8
-$cfgPath = Join-Path $game 'BepInEx\config\josh.liarsbar.eightplayers.cfg'
-if (Test-Path $cfgPath) {
-    $m = [regex]::Match((Get-Content $cfgPath -Raw), 'MaxPlayers\s*=\s*(\d+)')
-    if ($m.Success) { $mp = $m.Groups[1].Value }
-}
-
 Say "=================================================" Green
-Say "  Installed successfully - max $mp players" Green
+Say "  Installed $($rel.tag_name) - clean install" Green
 Say "=================================================" Green
 Say ""
 Say "NEXT:" Cyan
 Say "  1. Launch Liar's Bar."
-Say "  2. The FIRST launch is slow (a few minutes) while it sets up."
-Say "     This happens once. Let it reach the main menu."
+Say "  2. Check the BOTTOM LEFT of the screen - it must read $($rel.tag_name)."
+Say "     Everyone playing together must show the same version."
 Say ""
-Say "IMPORTANT:" Yellow
-Say "  Everyone you play with needs this installer," Yellow
-Say "  and everyone must use the same MaxPlayers value." Yellow
-Say ""
-Say "  Settings: BepInEx\config\josh.liarsbar.eightplayers.cfg" Gray
-Say "  To uninstall, run uninstall.bat from the full zip." Gray
+Say "  The first launch after installing can take a few minutes." Gray

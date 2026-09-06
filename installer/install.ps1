@@ -1,4 +1,4 @@
-﻿<#
+<#
   Liar's Bar - 8 Player Mod installer.
   Finds the game through Steam's own registry keys and library config, then copies
   the loader and plugin in. Nothing in the game folder is modified or deleted.
@@ -114,13 +114,23 @@ if ($missing -contains 'BepInEx' -or $missing -contains 'winhttp.dll') {
 # ------------------------------------------------------------------ install
 Say ""
 Say "Installing..."
-$existing = Test-Path (Join-Path $game 'BepInEx\plugins\LiarsBar8P.dll')
-if ($existing) { Warn "An existing install was found - it will be updated." }
-
-# keep the user's settings across an update
+# A stale plugin or leftover config has broken sessions before: an old setting
+# survived an update and silently disabled a fix. Every install starts from a clean
+# slate for this mod's own files. BepInEx's generated interop folder is left alone
+# on purpose - it is expensive to rebuild and is not ours.
 $cfgPath = Join-Path $game 'BepInEx\config\josh.liarsbar.eightplayers.cfg'
-$savedCfg = $null
-if (Test-Path $cfgPath) { $savedCfg = Get-Content $cfgPath -Raw }
+$targets = @((Join-Path $game 'BepInEx\plugins\LiarsBar8P.dll'), $cfgPath)
+$plugDir = Join-Path $game 'BepInEx\plugins'
+if (Test-Path $plugDir) {
+    foreach ($stray in Get-ChildItem $plugDir -Filter '*LiarsBar*' -File -ErrorAction SilentlyContinue) {
+        $targets += $stray.FullName
+    }
+}
+foreach ($old in ($targets | Select-Object -Unique)) {
+    if (Test-Path $old) {
+        try { [IO.File]::Delete($old); Good "removed old $(Split-Path $old -Leaf)" } catch { }
+    }
+}
 
 try {
     foreach ($item in $payload) {
@@ -136,10 +146,7 @@ try {
     exit 1
 }
 
-if ($savedCfg) {
-    Set-Content $cfgPath $savedCfg -Encoding utf8
-    Good "Kept your existing settings"
-}
+Good "fresh config written"
 
 # ------------------------------------------------------------------- verify
 Say ""
