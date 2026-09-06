@@ -58,7 +58,9 @@ itself up. That happens once.
 version you are running is shown in the bottom-left corner in game.
 '@
 
-$changelog = Get-Content (Join-Path $Root 'CHANGELOG.md') -Raw
+# Windows PowerShell reads a BOM-less file as the system codepage, which turns every em
+# dash into mojibake on the release page. Read as UTF-8, and write back without a BOM.
+$changelog = [IO.File]::ReadAllText((Join-Path $Root "CHANGELOG.md"), [Text.Encoding]::UTF8)
 
 $tags = (Invoke-Gh api "repos/$Repo/releases" --paginate --jq '.[].tag_name')
 if ($tags.Code -ne 0) { throw "could not list releases: $($tags.Out)" }
@@ -81,7 +83,7 @@ foreach ($tag in ($tags.Out -split "`n" | Where-Object { $_.Trim() })) {
     }
 
     $file = Join-Path $env:TEMP "lb8p-notes-$($tag -replace '[^\w.]','').md"
-    Set-Content $file $notes -Encoding utf8
+    [IO.File]::WriteAllText($file, $notes, (New-Object Text.UTF8Encoding $false))
     $r = Invoke-Gh release edit $tag --repo $Repo --notes-file $file
     Remove-Item $file -Force -ErrorAction SilentlyContinue
     if ($r.Code -ne 0) { Warn "$tag - update failed: $($r.Out)" }
