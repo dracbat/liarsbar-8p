@@ -63,6 +63,7 @@ internal static class RosterFix
 
             DeckSizePatch.ApplyFor(count);
             TurnOrderFix.Install();
+            DealArrayPatch.Install();
             RestoreSeats(m, count);
             CorrectPlayerCount(m, count);
             CompactSeatIndices(m, count);

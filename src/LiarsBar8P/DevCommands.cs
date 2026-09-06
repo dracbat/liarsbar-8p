@@ -139,8 +139,10 @@ internal static class DevCommands
                 if (p == null) continue;
                 var gp = p.GetComponent<DeckGameplay>();
                 if (gp == null) continue;
-                sb.AppendLine($"  {p.PlayerName}: {Count(gp.cardTypes)} cards {Types(gp.cardTypes)} " +
-                              $"haveCards={gp.HaveCards}");
+                // Two different things, and the gap between them is the bug that made a
+                // table look dealt while nobody physically held a card.
+                sb.AppendLine($"  {p.PlayerName}: {Count(gp.cardTypes)} card values {Types(gp.cardTypes)}, " +
+                              $"{Count(gp.Cards)} card objects, haveCards={gp.HaveCards}");
             }
         }
         catch (Exception e) { sb.AppendLine($"  failed: {e.Message}"); }
