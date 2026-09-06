@@ -1,12 +1,19 @@
 # Changelog
 
 Every player in a lobby must run the **same version**. The running version is shown in
-the bottom-left corner in game; the host also warns when someone's build differs.
+the top-left corner in game; the host also warns when someone's build differs.
 
 **v1.0.0 is reserved for the first release proven to work with eight people.** Everything
 so far is below it. Versions that were once numbered 1.x and 2.x were folded into the same
 0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
 is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
+
+## v0.21.1 — the version moves to the top left
+
+- The version was drawn along the bottom of the screen, on the same line as the game's
+  own version string. Two of them overlapped into one unreadable smear, which defeats
+  the point of showing it at all. It now sits in the top left, on a dark panel so it
+  stays legible over a bright menu as well as a dark bar.
 
 ## v0.21.0 — the sixth player, and turn order that skipped seats
 
@@ -156,7 +163,7 @@ The real cause of cards never working above four players.
 
 ## v0.10.0 — version visibility, and a doubled deck
 
-- The running version is drawn in the bottom-left corner, and the host names anyone whose
+- The running version is drawn in the top-left corner, and the host names anyone whose
   build differs. Three different builds had been in one lobby at once, and that mismatch
   corrupts shared state for everybody.
 - Above four players the deck is doubled outright rather than sized per player, keeping the
