@@ -8,6 +8,38 @@ so far is below it. Versions that were once numbered 1.x and 2.x were folded int
 0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
 is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v0.23.0 — eight players actually play
+
+The core loop, end to end at eight: everyone registers, everyone is seated, everyone is
+dealt, and the turn goes all the way around the table and wraps back to the first seat.
+
+- **The fifth player could not be seated, and that was one missing component.** When a
+  match starts, the game does not number a player by the order it seats them — it reads
+  the number off the seat itself: `Slots[n].GetComponent<Slot>().SlotID`. The seats this
+  mod adds were bare markers with no such component, so that returned null and the whole
+  seating sweep threw a NullReferenceException on the first added seat. It stopped after
+  four because four is exactly how many seats the game shipped with — everyone after that
+  was left in the lobby roster, never at the table. Added seats now carry a real `Slot`
+  numbered to match their position, with their own seat camera copied across so a person
+  sitting there sees the table from their own chair.
+- **Seat numbers are checked rather than assumed.** Every seat must carry its own list
+  position and no two may share one; a duplicate puts two players on one number and one of
+  them never gets a turn. Anything wrong is reported, not silently patched over.
+- **The first turn was never handed out**, so a fully dealt table simply sat there. The
+  game gives it from inside the deal's animation, behind a filter that does not always
+  produce anybody. A round that is dealt, holding cards and has nobody able to act is now
+  recognised as the stall it is and moved on through the game's own `GiveTurn`.
+- With eight at the table the deal is right: forty cards, forty card objects, five each.
+
+Developer mode gained enough to prove all of the above by itself — bots take a turn,
+throw one card and hand the turn on, and the host's own seat is played too while an
+automatic test is running, so a whole round runs unattended.
+
+Lobby podium placement was also corrected: the shipped podiums are a row, not a ring, and
+extending them as a ring put the extra four *behind* the original four. Wider table
+layout, seat spacing and camera framing are deliberately still outstanding — playable
+first.
+
 ## v0.22.0 — a way to test eight players without eight people
 
 Everything here is off unless `DeveloperMode` is switched on, and none of it changes an

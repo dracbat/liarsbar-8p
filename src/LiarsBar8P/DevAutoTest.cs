@@ -40,7 +40,7 @@ internal static class DevAutoTest
                     Dev.Log("auto", "lobby is up - filling the table with bots");
                     _phase = Phase.Filling;
                     BotManager.FillToMax();
-                    _next = Time.time + 6f;
+                    _next = Time.time + 25f;   // long enough to look at an eight player lobby
                     return;
 
                 case Phase.Filling:

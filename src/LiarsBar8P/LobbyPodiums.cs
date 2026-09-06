@@ -73,6 +73,7 @@ internal static class LobbyPodiums
             {
                 _reported = true;
                 Plugin.Log.LogInfo($"[podium] lobby has {lobby.SpawnSlots.Count} podiums for up to {Limits.Max} players");
+                ReportCamera(lobby);
             }
         }
         catch (Exception e)
@@ -107,7 +108,7 @@ internal static class LobbyPodiums
                 if (s != null && s.transform != null && !s.gameObject.name.StartsWith(Prefix)) vanilla.Add(s);
             if (vanilla.Count < 3) { _geometryFailed = true; return null; }
 
-            if (!ArcSeat(vanilla, index, out Vector3 pos, out Quaternion rot))
+            if (!RowSeat(vanilla, index, out Vector3 pos, out Quaternion rot))
             {
                 _geometryFailed = true;
                 Plugin.Log.LogWarning("[podium] could not work out where extra podiums go - " +
@@ -427,116 +428,180 @@ internal static class LobbyPodiums
     // ------------------------------------------------------------------ geometry
 
     /// <summary>
-    /// Continue the arc the shipped podiums stand on.
+    /// Continue the row the shipped podiums stand in.
     ///
-    /// A circle is fitted to the originals and their angles are unwrapped before
-    /// sorting - angles wrap at 180 degrees, and sorting the raw values once turned a 22
-    /// degree step into 113 and scattered the podiums across the room. New podiums carry
-    /// on past the last one at the same spacing, so the originals never move.
+    /// They are a row, not a ring. A circle fitted to them curves back into the room, and
+    /// extending that circle put the extra podiums *behind* the original four — visible in
+    /// a screenshot as half-hidden characters standing at the back with their name plates
+    /// floating loose. So the row is modelled as what it is: a line with a slight bow.
     ///
-    /// Facing is measured rather than assumed: the angle between each original's forward
-    /// and its direction to the centre is averaged and reused, which is right whether the
-    /// podiums face inward or all face the camera.
+    /// The four are projected onto their own principal axis, giving each a position along
+    /// the row. Two straight-line fits against that position carry everything else — how
+    /// far the row bows sideways, and which way a podium faces, which turns steadily along
+    /// the row (about fifteen degrees per unit, consistent to three degrees across all
+    /// four). Extra podiums continue the line at the same spacing, alternating past each
+    /// end so the group stays centred on the camera rather than growing off one side.
     /// </summary>
-    private static bool ArcSeat(List<LobbySlot> vanilla, int index, out Vector3 pos, out Quaternion rot)
+    private static bool RowSeat(List<LobbySlot> vanilla, int index, out Vector3 pos, out Quaternion rot)
     {
         pos = Vector3.zero;
         rot = Quaternion.identity;
+        if (vanilla.Count < 2) return false;
 
-        var points = new List<Vector3>();
-        foreach (var s in vanilla) points.Add(s.transform.position);
-        if (points.Count < 3) return false;
-
-        var flat = new Vector2[points.Count];
-        for (int i = 0; i < points.Count; i++) flat[i] = new Vector2(points[i].x, points[i].z);
-
-        Geometry.FitCircle(flat, out Vector2 centre, out float radius);
-        if (radius <= 0.01f || float.IsNaN(radius) || float.IsInfinity(radius)) return false;
-
-        var angles = new List<float>();
-        foreach (var f in flat)
-        {
-            float a = Mathf.Atan2(f.y - centre.y, f.x - centre.x) * Mathf.Rad2Deg;
-            angles.Add((a % 360f + 360f) % 360f);
-        }
-        angles.Sort();
-
-        // Start the run just after the widest gap so it never straddles the wrap.
-        int startAt = 0;
-        float widest = -1f;
-        for (int i = 0; i < angles.Count; i++)
-        {
-            float gap = angles[(i + 1) % angles.Count] - angles[i];
-            if (gap < 0) gap += 360f;
-            if (gap > widest) { widest = gap; startAt = (i + 1) % angles.Count; }
-        }
-
-        var run = new List<float>();
-        float previous = angles[startAt];
-        run.Add(previous);
-        for (int k = 1; k < angles.Count; k++)
-        {
-            float a = angles[(startAt + k) % angles.Count];
-            while (a < previous) a += 360f;
-            run.Add(a);
-            previous = a;
-        }
-
-        float step = (run[run.Count - 1] - run[0]) / (run.Count - 1);
-        if (Mathf.Abs(step) < 0.5f) return false;
-
-        float facingOffset = 0f;
-        int counted = 0;
+        // Centroid, and the direction the row runs in.
+        Vector2 centre = Vector2.zero;
+        float height = 0f;
         foreach (var s in vanilla)
         {
-            Vector3 inward = new Vector3(centre.x - s.transform.position.x, 0f, centre.y - s.transform.position.z);
-            if (inward.sqrMagnitude < 1e-4f) continue;
-            facingOffset += Vector3.SignedAngle(inward.normalized, Flat(s.transform.forward), Vector3.up);
-            counted++;
+            var p = s.transform.position;
+            centre += new Vector2(p.x, p.z);
+            height += p.y;
         }
-        if (counted > 0) facingOffset /= counted;
+        centre /= vanilla.Count;
+        height /= vanilla.Count;
 
-        float height = 0f;
-        foreach (var p in points) height += p.y;
-        height /= points.Count;
-
-        // Extra podiums are added at alternating ends of the arc rather than all beyond
-        // one end: the same eight podiums then occupy half the extra room, which matters
-        // because what lies past the shipped arc is unknown. The first extra goes after
-        // the last shipped podium, the second before the first, and so on.
-        int n = index - Limits.VanillaPlayers;
-        int out_ = n / 2 + 1;
-        bool after = (n % 2) == 0;
-        float first = after ? run[run.Count - 1] + step * out_ : run[0] - step * out_;
-        float second = after ? run[0] - step * out_ : run[run.Count - 1] + step * out_;
-
-        // Never let the arc wrap round onto itself.
-        if (Mathf.Abs((run[run.Count - 1] - run[0]) + step * 2 * out_) > 350f) return false;
-
-        // Each candidate is checked for floor underneath, with the check calibrated on the
-        // podiums the game shipped with: if those do not register floor either, the lobby
-        // has no colliders to test against and the check is skipped rather than trusted.
-        bool checkFloor = FloorTestWorks(points);
-
-        foreach (float candidate in new[] { first, second })
+        // Principal axis of the row, from the 2x2 covariance of the points.
+        float sxx = 0f, szz = 0f, sxz = 0f;
+        foreach (var s in vanilla)
         {
-            float rad = candidate * Mathf.Deg2Rad;
-            var at = new Vector3(centre.x + Mathf.Cos(rad) * radius, height, centre.y + Mathf.Sin(rad) * radius);
+            var p = s.transform.position;
+            float dx = p.x - centre.x, dz = p.z - centre.y;
+            sxx += dx * dx; szz += dz * dz; sxz += dx * dz;
+        }
+        float theta = 0.5f * Mathf.Atan2(2f * sxz, sxx - szz);
+        Vector2 dir = new Vector2(Mathf.Cos(theta), Mathf.Sin(theta));
+        if (dir.sqrMagnitude < 1e-6f) return false;
+        dir.Normalize();
+        Vector2 perp = new Vector2(-dir.y, dir.x);
+
+        // Where each podium sits along the row, how far it bows off it, and its facing.
+        int n = vanilla.Count;
+        var t = new float[n];
+        var u = new float[n];
+        var yaw = new float[n];
+        for (int i = 0; i < n; i++)
+        {
+            var p = vanilla[i].transform.position;
+            Vector2 d = new Vector2(p.x - centre.x, p.z - centre.y);
+            t[i] = Vector2.Dot(d, dir);
+            u[i] = Vector2.Dot(d, perp);
+            yaw[i] = vanilla[i].transform.eulerAngles.y;
+        }
+
+        // Facing wraps at 360; unwrap along the row so a straight-line fit is meaningful.
+        var order = new List<int>();
+        for (int i = 0; i < n; i++) order.Add(i);
+        order.Sort((a, b) => t[a].CompareTo(t[b]));
+        for (int k = 1; k < order.Count; k++)
+        {
+            float prev = yaw[order[k - 1]], cur = yaw[order[k]];
+            while (cur - prev > 180f) cur -= 360f;
+            while (prev - cur > 180f) cur += 360f;
+            yaw[order[k]] = cur;
+        }
+
+        if (!Fit(t, u, out float uA, out float uB)) return false;
+        if (!Fit(t, yaw, out float yA, out float yB)) return false;
+
+        float first = t[order[0]];
+        float last = t[order[order.Count - 1]];
+        float step = (last - first) / (n - 1);
+        if (Mathf.Abs(step) < 0.05f) return false;
+
+        // Alternate past each end: the first extra goes beyond the last podium, the second
+        // before the first, and so on, so eight occupy the room symmetrically.
+        int extra = index - Limits.VanillaPlayers;
+        int outward = extra / 2 + 1;
+        bool after = (extra % 2) == 0;
+
+        bool checkFloor = FloorTestWorks(PointsOf(vanilla));
+
+        foreach (float candidate in new[]
+                 {
+                     after ? last + step * outward : first - step * outward,
+                     after ? first - step * outward : last + step * outward,
+                 })
+        {
+            Vector2 flat = centre + dir * candidate + perp * (uA + uB * candidate);
+            var at = new Vector3(flat.x, height, flat.y);
+
             if (checkFloor && !HasFloor(at))
             {
-                Plugin.Log.LogInfo($"[podium] no floor at {at} - trying the other end of the arc");
+                Plugin.Log.LogInfo($"[podium] no floor at {at} - trying the other end of the row");
                 continue;
             }
 
-            Vector3 inward = new Vector3(centre.x - at.x, 0f, centre.y - at.z);
-            if (inward.sqrMagnitude < 1e-4f) continue;
-
             pos = at;
-            rot = Quaternion.LookRotation(Quaternion.AngleAxis(facingOffset, Vector3.up) * inward.normalized, Vector3.up);
+            rot = Quaternion.Euler(0f, yA + yB * candidate, 0f);
             return true;
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// What the lobby camera is and how much of the row it can see.
+    ///
+    /// Eight podiums occupy more than twice the row the shipped four do, so the ones at
+    /// the ends fall outside the shot. Fixing that means knowing what is framing it, and
+    /// nothing so far has said.
+    /// </summary>
+    private static void ReportCamera(LobbyController lobby)
+    {
+        try
+        {
+            var cam = Camera.main;
+            if (cam == null)
+            {
+                var all = UnityEngine.Object.FindObjectsOfType<Camera>();
+                if (all != null && all.Length > 0) cam = all[0];
+            }
+            if (cam == null) { Plugin.Log.LogInfo("[podium] no lobby camera found"); return; }
+
+            float lo = float.MaxValue, hi = float.MinValue;
+            foreach (var s in lobby.SpawnSlots)
+            {
+                if (s == null || s.transform == null) continue;
+                float z = s.transform.position.z;
+                if (z < lo) lo = z;
+                if (z > hi) hi = z;
+            }
+
+            Plugin.Log.LogInfo(
+                $"[podium] camera '{cam.name}' at {cam.transform.position.ToString("F2")} " +
+                $"yaw={cam.transform.eulerAngles.y:F1} fov={cam.fieldOfView:F1} " +
+                $"ortho={cam.orthographic}; the row now spans z {lo:F2}..{hi:F2} ({hi - lo:F2} units)");
+        }
+        catch (Exception e) { Plugin.Log.LogInfo($"[podium] could not read the camera: {e.Message}"); }
+    }
+
+    /// <summary>Least squares y = a + b*x. False if every x is the same.</summary>
+    private static bool Fit(float[] x, float[] y, out float a, out float b)
+    {
+        a = 0f; b = 0f;
+        int n = x.Length;
+        if (n < 2) return false;
+
+        float sx = 0f, sy = 0f, sxx = 0f, sxy = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            sx += x[i]; sy += y[i];
+            sxx += x[i] * x[i]; sxy += x[i] * y[i];
+        }
+
+        float den = n * sxx - sx * sx;
+        if (Mathf.Abs(den) < 1e-6f) return false;
+
+        b = (n * sxy - sx * sy) / den;
+        a = (sy - b * sx) / n;
+        return true;
+    }
+
+    private static List<Vector3> PointsOf(List<LobbySlot> slots)
+    {
+        var pts = new List<Vector3>();
+        foreach (var s in slots) if (s != null && s.transform != null) pts.Add(s.transform.position);
+        return pts;
     }
 
     private static int _floorTest;   // 0 unknown, 1 usable, -1 not

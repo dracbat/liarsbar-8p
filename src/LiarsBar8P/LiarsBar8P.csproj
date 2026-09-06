@@ -1,9 +1,9 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>LiarsBar8P</AssemblyName>
-    <Version>0.22.0</Version>
+    <Version>0.23.0</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -50,6 +50,7 @@
   </ItemGroup>
 
 </Project>
+
 
 
 

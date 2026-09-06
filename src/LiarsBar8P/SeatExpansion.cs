@@ -78,6 +78,7 @@ internal static class SeatExpansion
             float yaw = Mathf.Atan2(-Mathf.Cos(rad), -Mathf.Sin(rad)) * Mathf.Rad2Deg;
 
             var seat = Markers.Create(template, $"Spawn{have + k + 1}_8P", pos, yaw);
+            GiveSlotComponent(seat, template, slots.Count);
             slots.Add(seat);
 
             Plugin.Log.LogInfo(
@@ -85,7 +86,119 @@ internal static class SeatExpansion
         }
 
         Relayout(slots, c, r, y);
+        VerifySeatNumbers(slots);
         Plugin.Log.LogInfo($"[seats] table seats now {slots.Count}");
+    }
+
+    /// <summary>
+    /// Every seat must carry its own list position as its number, and no two may share one.
+    ///
+    /// The game numbers a player by the seat they are put in, and turn order walks those
+    /// numbers. A seat numbered wrongly puts two players on one number — the turn then
+    /// finds whichever comes first and the other never plays — and a gap in the numbers
+    /// makes the turn search step over a seat that is occupied. Both have happened.
+    ///
+    /// Anything wrong here is reported rather than quietly corrected in silence, because a
+    /// seat numbering that needs correcting means something upstream is wrong too.
+    /// </summary>
+    private static void VerifySeatNumbers(Il2CppSystem.Collections.Generic.List<Transform> slots)
+    {
+        var seen = new System.Collections.Generic.Dictionary<int, int>();
+        int problems = 0;
+
+        for (int i = 0; i < slots.Count; i++)
+        {
+            var t = slots[i];
+            if (t == null) { Plugin.Log.LogError($"[seats] seat {i} is missing entirely"); problems++; continue; }
+
+            var slot = t.GetComponent<Slot>();
+            if (slot == null)
+            {
+                Plugin.Log.LogError(
+                    $"[seats] seat {i} ('{t.gameObject.name}') has no Slot component - the match " +
+                    "will throw when it tries to seat anybody here");
+                problems++;
+                continue;
+            }
+
+            if (slot.SlotID != i)
+            {
+                Plugin.Log.LogWarning(
+                    $"[seats] seat {i} ('{t.gameObject.name}') was numbered {slot.SlotID} - corrected to {i}");
+                slot.SlotID = i;
+                problems++;
+            }
+
+            if (seen.TryGetValue(slot.SlotID, out int other))
+            {
+                Plugin.Log.LogError(
+                    $"[seats] seats {other} and {i} both claim number {slot.SlotID} - two players " +
+                    "would share a seat and one of them would never get a turn");
+                problems++;
+            }
+            seen[slot.SlotID] = i;
+        }
+
+        if (problems == 0)
+            Plugin.Log.LogInfo($"[seats] all {slots.Count} seats numbered 0..{slots.Count - 1}, none shared");
+    }
+
+    /// <summary>
+    /// Give a new seat the <c>Slot</c> component the game reads its number from.
+    ///
+    /// This is what stopped the fifth player reaching the table. When the match starts,
+    /// the game does not number players by the order it seats them — it reads the number
+    /// off a component on the seat itself:
+    ///
+    ///     Slots[n].GetComponent&lt;Slot&gt;().SlotID  ->  the player's seat number
+    ///
+    /// A seat created as a bare marker has no such component, so that returns null and the
+    /// whole seating sweep throws a NullReferenceException on the first added seat —
+    /// leaving four players seated and everyone after them nowhere. It seated exactly four
+    /// because four is exactly how many seats the game shipped with.
+    ///
+    /// The per-seat camera is copied from the seat this one was modelled on, positioned
+    /// the same way relative to its own seat, so a person sitting here sees the table from
+    /// their own chair rather than from somebody else's.
+    /// </summary>
+    private static void GiveSlotComponent(Transform seat, Transform template, int index)
+    {
+        try
+        {
+            var slot = seat.gameObject.AddComponent<Slot>();
+            slot.SlotID = index;
+
+            var from = template != null ? template.GetComponent<Slot>() : null;
+            if (from != null && from.Cameraa != null)
+            {
+                var cam = UnityEngine.Object.Instantiate(from.Cameraa);
+                cam.name = $"{seat.gameObject.name}_Camera";
+
+                // Keep the camera where it sits relative to its own seat, not where the
+                // template's camera happens to be in the world.
+                var local = template.InverseTransformPoint(from.Cameraa.transform.position);
+                cam.transform.SetParent(seat, false);
+                cam.transform.position = seat.TransformPoint(local);
+                cam.transform.rotation = seat.rotation *
+                                         (Quaternion.Inverse(template.rotation) * from.Cameraa.transform.rotation);
+                slot.Cameraa = cam;
+            }
+            else
+            {
+                Plugin.Log.LogWarning(
+                    $"[seats] {seat.gameObject.name} has no seat camera to copy - a person sitting " +
+                    "here may see the table from the wrong place");
+            }
+
+            Plugin.Log.LogInfo($"[seats]     {seat.gameObject.name} is seat number {index}" +
+                               (slot.Cameraa != null ? " with its own camera" : ""));
+        }
+        catch (Exception e)
+        {
+            Plugin.Log.LogError(
+                $"[seats] could not make {seat.gameObject.name} a real seat: {e.Message} - " +
+                "the match will not be able to seat anyone here");
+        }
     }
 
     /// <summary>

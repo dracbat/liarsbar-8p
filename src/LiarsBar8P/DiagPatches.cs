@@ -72,6 +72,18 @@ internal static class DiagPatches
             n++;
             Line($"    [{i}] pos={t.position.ToString("F3")} " +
                  $"yaw={t.eulerAngles.y:F1} name={t.gameObject.name}");
+
+            // StartGame reads a player's seat number off a component on the seat itself,
+            // not from the loop index. A seat without it makes StartGame throw, so what
+            // that component is decides whether an added seat is usable at all.
+            try
+            {
+                var names = new System.Collections.Generic.List<string>();
+                foreach (var c in t.GetComponents<Component>())
+                    names.Add(c == null ? "<null>" : c.GetIl2CppType().FullName);
+                Line($"         components: {string.Join(", ", names)}");
+            }
+            catch (System.Exception e) { Line($"         components unreadable: {e.Message}"); }
         }
 
         if (n > 0)

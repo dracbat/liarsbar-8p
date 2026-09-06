@@ -25,6 +25,14 @@ internal static class BotBehaviour
     /// <summary>When each bot currently holding a turn intends to play.</summary>
     private static readonly Dictionary<int, float> _playAt = new();
 
+    /// <summary>
+    /// The active slot a bot last played on, so it plays once per turn rather than once
+    /// per tick. Throwing does not clear the turn flag straight away, so without this a
+    /// bot sees "my turn" again a second later and throws its entire hand in one go —
+    /// which is what it did.
+    /// </summary>
+    private static readonly Dictionary<int, int> _playedOn = new();
+
     /// <summary>Varied per bot without a random number generator, which the log needs stable.</summary>
     private static float ThinkTime(int seat) =>
         MinThinkSeconds + ((seat * 7 % 5) / 4f) * (MaxThinkSeconds - MinThinkSeconds);
@@ -37,9 +45,16 @@ internal static class BotBehaviour
         var m = Dev.Mgr;
         if (m == null || m.Players == null) return;
 
+        // During an unattended test the host's own seat is played too. Without it the round
+        // reaches the tester's turn and stops there, which tests nothing beyond the first
+        // turn. Only ever while the automatic test is running - in an ordinary session,
+        // bots play and people play for themselves.
+        bool playEveryone = DevAutoTest.Active;
+
         foreach (var p in Dev.TablePlayers())
         {
-            if (p == null || !BotManager.IsBot(p)) continue;
+            if (p == null) continue;
+            if (!BotManager.IsBot(p) && !playEveryone) continue;
 
             HoldCards(p);
 
@@ -48,6 +63,9 @@ internal static class BotBehaviour
                 _playAt.Remove(p.Slot);
                 continue;
             }
+
+            // Already had a go while this slot was the active one.
+            if (_playedOn.TryGetValue(p.Slot, out int playedOn) && playedOn == m.ActivePlayerSlot) continue;
 
             if (!_playAt.TryGetValue(p.Slot, out float due))
             {
@@ -60,6 +78,7 @@ internal static class BotBehaviour
 
             if (Time.time < due) continue;
             _playAt.Remove(p.Slot);
+            _playedOn[p.Slot] = m.ActivePlayerSlot;
             Play(p);
         }
     }
@@ -125,6 +144,13 @@ internal static class BotBehaviour
                            (emptied ? " - hand empty" : ""));
 
             gp.RequestThrowCards(thrown, emptied);
+
+            // Hand the turn back. Throwing does not end a bot's turn on its own: the game
+            // ends it from a scheduled pass that does not complete for a player with no
+            // connection, so the bot keeps the turn flag, will not act again because it has
+            // already played, and the table deadlocks with everyone waiting on it. Clearing
+            // it here lets the turn move on to the next player.
+            if (p.HaveTurn) p.NetworkHaveTurn = false;
         }
         catch (Exception e)
         {
