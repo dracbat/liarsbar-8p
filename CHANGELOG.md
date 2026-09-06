@@ -3,6 +3,16 @@
 Every player in a lobby must run the **same version**. The running version is shown in
 the bottom-left corner in game; the host also warns when someone's build differs.
 
+## v2.0.2
+
+- **The plugin file itself carried the build machine's folder path.** The compiler records
+  where an assembly was built and stamps that into the file, so every download contained
+  an absolute path from the machine that produced it. The build no longer emits a symbol
+  file or records source paths, and packaging now refuses to run if any file about to be
+  shipped still contains the build account name.
+- The old settings file is matched by its ending rather than its full name, so a copy left
+  behind by an earlier version is cleared on install even though nothing names it.
+
 ## v2.0.1
 
 - Removed personal identifiers from the project. The plugin id changed from a

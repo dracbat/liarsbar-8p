@@ -122,6 +122,14 @@ $targets = @(
     (Join-Path $game 'BepInEx\plugins\LiarsBar8P.dll'),
     (Join-Path $game 'BepInEx\config\liarsbar.eightplayers.cfg')
 )
+# Earlier versions used a differently prefixed settings file. Match on the suffix so any
+# of them is cleared without naming it, and a stale option cannot survive an update.
+$cfgDir = Join-Path $game 'BepInEx\config'
+if (Test-Path $cfgDir) {
+    foreach ($oldCfg in Get-ChildItem $cfgDir -Filter '*liarsbar.eightplayers.cfg' -File -ErrorAction SilentlyContinue) {
+        $targets += $oldCfg.FullName
+    }
+}
 $plugDir = Join-Path $game 'BepInEx\plugins'
 if (Test-Path $plugDir) {
     foreach ($stray in Get-ChildItem $plugDir -Filter '*LiarsBar*' -File -ErrorAction SilentlyContinue) {

@@ -1,4 +1,4 @@
-﻿<#
+<#
   Builds a distributable zip for other players.
 
   Everyone in the lobby must run the same mod and the same MaxPlayers value, so this
@@ -105,6 +105,25 @@ UNINSTALL
   "Verify integrity of game files" also restores everything.
 "@ | Set-Content "$Staging\INSTALL.txt" -Encoding utf8
 
+# Anything that lands in the staging folder is downloaded by every player, and a compiler
+# or tool can quietly stamp an absolute build path into a file. Once released that is hard
+# to retract, so refuse to package rather than find out afterwards.
+$leak = @()
+foreach ($f in Get-ChildItem $Staging -Recurse -File) {
+    $bytes = [IO.File]::ReadAllBytes($f.FullName)
+    foreach ($enc in @([Text.Encoding]::ASCII, [Text.Encoding]::Unicode)) {
+        if ($enc.GetString($bytes) -like "*$env:USERNAME*") {
+            $leak += $f.FullName.Substring($Staging.Length + 1)
+            break
+        }
+    }
+}
+if ($leak) {
+    Write-Host "Refusing to package - these carry the build account name:" -ForegroundColor Red
+    $leak | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+    throw "personal identifier found in the package"
+}
+Write-Host "No build-account identifiers in the package" -ForegroundColor Green
 if (Test-Path $Zip) { Remove-Item $Zip -Force }
 Compress-Archive -Path "$Staging\*" -DestinationPath $Zip
 Write-Host "Packaged -> $Zip" -ForegroundColor Green
