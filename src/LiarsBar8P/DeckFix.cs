@@ -209,13 +209,16 @@ internal static class DeckFix
             // consumes the whole deck. Keeping that invariant matters more than a round
             // number: 40 cards for five players would leave 15 undealt, which the deal may
             // not expect. At eight players this is 40, exactly the two decks intended.
+            // Cards per player comes from the deck the game shipped with: 20 cards for four
+            // players is 5 each in the basic deck, 28 is 7 each in deck 2. Deriving it keeps
+            // both modes correct instead of assuming five.
             int vanillaDeck = Mathf.Max(masaV, resetV);
-            int deckTarget = Mathf.Max(vanillaDeck, players * CardsPerPlayer);
-            CardTypeFix.NoteVanillaDeck(vanillaDeck);
+            int perPlayerCards = Mathf.Max(1, vanillaDeck / 4);
+            int deckTarget = Mathf.Max(vanillaDeck, perPlayerCards * players);
 
             Plugin.Log.LogInfo(
                 $"[deckfix] {players} players -> deck of {deckTarget} cards " +
-                $"({CardsPerPlayer} each, vanilla was {vanillaDeck})");
+                $"({perPlayerCards} each, vanilla was {vanillaDeck})");
 
             Grow(__instance.ResetCards, spares, deckTarget, "ResetCards");
             Grow(__instance.MasaCards, spares, deckTarget, "MasaCards");

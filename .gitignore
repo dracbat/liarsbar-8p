@@ -17,3 +17,10 @@ dist/
 [Bb]in/
 [Oo]bj/
 *.user
+
+# --- Decompilation output and the decompiler itself ---
+# Cpp2IL's dump is the game's compiled code in readable form. Publishing it would
+# redistribute Curve Animation's work; the findings that matter are in NOTES.md.
+tools/isil_out/
+tools/cpp2il_out/
+tools/Cpp2IL.exe
