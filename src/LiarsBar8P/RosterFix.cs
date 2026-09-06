@@ -49,6 +49,7 @@ internal static class RosterFix
             var m = Manager.Instance;
             if (m == null || m.Players == null) return;
 
+            TurnKickstart.RoundStarting();
             TableFill.EnsureEveryoneSeated(m);
 
             // Sized from who is actually at the table, never from who is in the lobby.
