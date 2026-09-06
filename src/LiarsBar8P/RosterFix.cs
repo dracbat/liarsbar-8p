@@ -49,6 +49,14 @@ internal static class RosterFix
             var m = Manager.Instance;
             if (m == null || m.Players == null) return;
 
+            TableFill.EnsureEveryoneSeated(m);
+
+            // Sized from who is actually at the table, never from who is in the lobby.
+            // Sizing from the lobby was tried: it makes the deck and the card objects
+            // disagree - a forty card deck dealt out of twenty-five card objects - because
+            // the two are grown from different counts. Whoever did make it to the table
+            // gets a round that is internally consistent, which is the difference between
+            // a short table and a broken one.
             int count = m.Players.Count;
             if (count < 2) return;
 
