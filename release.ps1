@@ -1,4 +1,4 @@
-<#
+﻿<#
   One command to ship a release.
 
       .\release.ps1
@@ -185,6 +185,22 @@ if (-not $KeepPrivate) {
 
 # ------------------------------------------------------------------ release
 Step "Publishing release $Tag"
+
+# Prefer the changelog entry for this tag: notes written twice drift apart.
+if (-not $Notes) {
+    $clPath = Join-Path $PSScriptRoot 'CHANGELOG.md'
+    if (Test-Path $clPath) {
+        $cl = Get-Content $clPath -Raw
+        $pattern = '(?ms)^## ' + [regex]::Escape($Tag) + '\b.*?(?=^## |\z)'
+        $m = [regex]::Match($cl, $pattern)
+        if ($m.Success) {
+            $Notes = $m.Value.Trim()
+            Info "release notes taken from CHANGELOG.md"
+        } else {
+            Warn "no CHANGELOG.md section for $Tag - using the generic notes"
+        }
+    }
+}
 
 if (-not $Notes) {
 $Notes = @"
