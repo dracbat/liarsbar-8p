@@ -63,7 +63,7 @@ To confirm it worked, open `BepInEx/LogOutput.log` in the game folder and look f
 
 ## Configure
 
-`BepInEx/config/josh.liarsbar.eightplayers.cfg`, created on first run.
+`BepInEx/config/liarsbar.eightplayers.cfg`, created on first run.
 
 | Setting | Default | Meaning |
 |---|---|---|

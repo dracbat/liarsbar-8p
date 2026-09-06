@@ -118,7 +118,7 @@ Say "Installing..."
 # survived an update and silently disabled a fix. Every install starts from a clean
 # slate for this mod's own files. BepInEx's generated interop folder is left alone
 # on purpose - it is expensive to rebuild and is not ours.
-$cfgPath = Join-Path $game 'BepInEx\config\josh.liarsbar.eightplayers.cfg'
+$cfgPath = Join-Path $game 'BepInEx\config\liarsbar.eightplayers.cfg'
 $targets = @((Join-Path $game 'BepInEx\plugins\LiarsBar8P.dll'), $cfgPath)
 $plugDir = Join-Path $game 'BepInEx\plugins'
 if (Test-Path $plugDir) {
@@ -186,5 +186,5 @@ Say "IMPORTANT:" Yellow
 Say "  Everyone you play with needs this same installer," Yellow
 Say "  and everyone must use the same MaxPlayers value." Yellow
 Say ""
-Say "  Settings: BepInEx\config\josh.liarsbar.eightplayers.cfg" Gray
+Say "  Settings: BepInEx\config\liarsbar.eightplayers.cfg" Gray
 Say "  To remove: run uninstall.bat" Gray

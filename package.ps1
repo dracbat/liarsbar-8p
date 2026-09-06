@@ -28,7 +28,7 @@ $cfgDir = "$Staging\BepInEx\config"
 New-Item -ItemType Directory -Force -Path $cfgDir | Out-Null
 @"
 ## Settings file was created by plugin Liar's Bar 8 Players
-## Plugin GUID: josh.liarsbar.eightplayers
+## Plugin GUID: liarsbar.eightplayers
 
 [General]
 
@@ -61,7 +61,7 @@ SelfTestAutoHostLobby = false
 # Setting type: Boolean
 # Default value: false
 SelfTestForceSoloStart = false
-"@ | Set-Content "$cfgDir\josh.liarsbar.eightplayers.cfg" -Encoding utf8
+"@ | Set-Content "$cfgDir\liarsbar.eightplayers.cfg" -Encoding utf8
 
 # 4. one-click installer / uninstaller
 Copy-Item "$Root\installer\install.bat"     $Staging -Force
@@ -96,7 +96,7 @@ CHECK IT WORKED
      [cap] maxConnections 4 -> 8
 
 SETTINGS
-  BepInEx\config\josh.liarsbar.eightplayers.cfg
+  BepInEx\config\liarsbar.eightplayers.cfg
   MaxPlayers must be the SAME for everyone playing together.
 
 UNINSTALL

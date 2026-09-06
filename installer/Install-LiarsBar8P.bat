@@ -120,7 +120,7 @@ Say "Removing any previous install of this mod..."
 $gone = 0
 $targets = @(
     (Join-Path $game 'BepInEx\plugins\LiarsBar8P.dll'),
-    (Join-Path $game 'BepInEx\config\josh.liarsbar.eightplayers.cfg')
+    (Join-Path $game 'BepInEx\config\liarsbar.eightplayers.cfg')
 )
 $plugDir = Join-Path $game 'BepInEx\plugins'
 if (Test-Path $plugDir) {
@@ -208,7 +208,7 @@ $checks = @{
     'winhttp.dll (loader)' = Join-Path $game 'winhttp.dll'
     'BepInEx core'         = Join-Path $game 'BepInEx\core\BepInEx.Core.dll'
     '8 Player plugin'      = Join-Path $game 'BepInEx\plugins\LiarsBar8P.dll'
-    'fresh config'         = Join-Path $game 'BepInEx\config\josh.liarsbar.eightplayers.cfg'
+    'fresh config'         = Join-Path $game 'BepInEx\config\liarsbar.eightplayers.cfg'
 }
 $fail = $false
 foreach ($k in ($checks.Keys | Sort-Object)) {
