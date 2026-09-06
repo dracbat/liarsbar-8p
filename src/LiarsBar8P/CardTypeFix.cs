@@ -17,28 +17,21 @@ namespace LiarsBar8P;
 /// second deck is an exact copy of the first: 6/6/6/2 becomes 12/12/12/4, preserving the
 /// bluffing odds rather than inventing a new distribution.
 ///
-/// The vanilla size is learned from the indices the game itself asks for before any
-/// wrapping is needed, so no deck size is hardcoded.
+/// The deck size comes from the card list the game shipped with, captured before this mod
+/// grows anything, so it is not hardcoded.
 /// </summary>
 internal static class CardTypeFix
 {
-    /// <summary>Highest index seen while the game was still asking within its own range.</summary>
-    private static int _highestNatural = -1;
     private static int _vanillaSize = 20;
     private static bool _logged;
 
+    /// <summary>
+    /// Indices inside the vanilla deck pass through untouched, so this is a no-op for an
+    /// ordinary four player round. Only the extra cards wrap.
+    /// </summary>
     private static int Wrap(int n, string which)
     {
-        if (n < 0) return n;
-
-        // learn the real deck size: indices the game asks for before we ever wrap
-        if (n <= _highestNatural + 1 && n < _vanillaSize)
-        {
-            if (n > _highestNatural) _highestNatural = n;
-            return n;
-        }
-
-        if (n < _vanillaSize) return n;
+        if (n < 0 || _vanillaSize <= 0 || n < _vanillaSize) return n;
 
         int wrapped = n % _vanillaSize;
         if (!_logged)
