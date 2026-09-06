@@ -50,16 +50,30 @@ internal static class DealFallback
 
             // Wait until there is something to hand out at all.
             var waiting = new List<PlayerStats>();
-            int holding = 0, dealt = 0;
+            var report = new List<string>();
+            int holding = 0, dealt = 0, novalues = 0;
 
             foreach (var p in m.Players)
             {
                 if (p == null || p.Dead) continue;
                 var gp = p.GetComponent<DeckGameplay>();
-                if (gp == null || gp.cardTypes == null || gp.cardTypes.Count == 0) continue;
+                if (gp == null) continue;
+
+                if (gp.cardTypes == null || gp.cardTypes.Count == 0) { novalues++; continue; }
 
                 dealt++;
-                if (gp.HaveCards) holding++;
+                int want = gp.cardTypes.Count;
+                int showing = Showing(gp);
+
+                report.Add($"  seat {p.Slot} '{p.PlayerName}': {want} cards dealt, " +
+                           $"{showing} of {Count(gp.Cards)} card objects switched on " +
+                           $"({Visible(gp)} of them actually in view), holding={gp.HaveCards}");
+
+                // What matters is whether the cards are actually in the hand, not whether
+                // the game says they are. A player in one of the seats this mod adds could
+                // be marked as holding a hand while holding nothing - which is exactly what
+                // "the corner spots don't get cards" looks like from the inside.
+                if (gp.HaveCards && showing >= want) holding++;
                 else waiting.Add(p);
             }
 
@@ -70,6 +84,12 @@ internal static class DealFallback
 
             _doneThisRound = true;
 
+            Plugin.Log.LogInfo("[dealcards] hands three seconds after the deal:\n" +
+                               string.Join("\n", report));
+
+            if (novalues > 0)
+                Plugin.Log.LogWarning($"[dealcards] {novalues} players were never dealt any cards at all");
+
             if (waiting.Count == 0)
             {
                 // The game managed it by itself; nothing to do, and worth knowing.
@@ -78,8 +98,8 @@ internal static class DealFallback
             }
 
             Plugin.Log.LogWarning(
-                $"[dealcards] {waiting.Count} of {dealt} players were dealt cards but never given " +
-                "them - handing them over directly");
+                $"[dealcards] {waiting.Count} of {dealt} players were dealt cards but are not " +
+                "holding them - handing them over directly");
 
             foreach (var p in waiting) Hand(p);
         }
@@ -89,6 +109,43 @@ internal static class DealFallback
             _doneThisRound = true;
         }
     }
+
+    /// <summary>
+    /// How many of a player's card objects have been switched on.
+    ///
+    /// This asks the object itself, not whether it is on screen: the whole hand is hidden
+    /// while a player has their cards down, so a hand that is dealt and a hand that is empty
+    /// look the same from the outside. What the deal switches on is the object.
+    /// </summary>
+    private static int Showing(DeckGameplay gp)
+    {
+        try
+        {
+            if (gp.Cards == null) return 0;
+            int n = 0;
+            foreach (var c in gp.Cards)
+                if (c != null && c.activeSelf) n++;
+            return n;
+        }
+        catch { return 0; }
+    }
+
+    /// <summary>The same count, but for cards a parent is not hiding - only for the report.</summary>
+    private static int Visible(DeckGameplay gp)
+    {
+        try
+        {
+            if (gp.Cards == null) return 0;
+            int n = 0;
+            foreach (var c in gp.Cards)
+                if (c != null && c.activeInHierarchy) n++;
+            return n;
+        }
+        catch { return 0; }
+    }
+
+    private static int Count(Il2CppSystem.Collections.Generic.List<UnityEngine.GameObject> list)
+        => list == null ? -1 : list.Count;
 
     /// <summary>Send one player the hand they were dealt, the way the game would have.</summary>
     private static void Hand(PlayerStats p)

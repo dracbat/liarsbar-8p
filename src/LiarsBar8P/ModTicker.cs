@@ -38,5 +38,8 @@ internal sealed class ModTicker : MonoBehaviour
 
         try { BotBehaviour.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[bot] tick failed: {e.Message}"); }
+
+        try { TurnPointer.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[arrow] tick failed: {e.Message}"); }
     }
 }

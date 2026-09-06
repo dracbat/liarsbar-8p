@@ -8,6 +8,50 @@ so far is below it. Versions that were once numbered 1.x and 2.x were folded int
 0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
 is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v0.25.0 — everyone is one player again
+
+**If you have v0.24.0, update.** With five real players it seated every one of them twice.
+
+- **The mod was seating people before the game had started the match.** A five player game
+  showed it: the match scene loads, the lobby already holds five, and the table roster is
+  still empty because `StartGame` has not been called yet. Seeing five in the lobby and
+  nobody at the table, this decided the game had missed everyone and seated all five itself
+  — and then `StartGame` ran and seated them properly on top. Ten characters, ten roster
+  entries, eight seats, and every player standing inside another one, with the camera
+  looking out of somebody else's face.
+
+  It now waits for the game to seat people and for the table to stop changing before it
+  believes a seat is empty. Two further guards sit behind that: one person can no longer
+  enter the roster twice whatever else goes wrong, and a duplicate entry is dropped rather
+  than moved to a seat of its own, which is what pulled the copies apart across the table.
+
+Three more things reported from an eight player table, each with a definite cause.
+
+- **Players in the seats this mod adds were not dealt a hand.** The safety net that hands
+  out cards when the game's own animation does not asked the game a simple question — is
+  this player holding cards? — and the game answered yes for all eight while the added
+  seats' hands were empty. That false yes is why the net never caught them. It now counts
+  the card objects actually switched on in a hand and compares that with the number of cards
+  dealt, so an empty hand is dealt regardless of what the flag claims. It still does nothing
+  when the hands arrive by themselves.
+
+- **The arrow on the table pointed one seat past the player whose turn it was.** The table
+  carries four arrows, standing at its centre and turned to face the four seats the game
+  shipped with — ninety degrees apart. Eight players sit forty-five degrees apart, so those
+  four arrows land on every *other* seat: showing arrow number three for the player in seat
+  three points at seat six. Nothing in the game aims an arrow at anybody, so one is now aimed
+  straight at the seat in play, and the rest are kept switched off so only one ever shows.
+  At four players the shipped arrows already line up and are left alone.
+
+- **Players five to eight in the lobby stood off the side of the screen.** The four shipped
+  podiums are a row, and the extras were continuing it sideways past both ends — twice the
+  width the lobby camera frames. The row is now doubled instead of lengthened: each extra
+  podium stands behind the shipped one in the same place along the row, half a space to the
+  side so a character at the back is seen in the gap between two at the front rather than
+  hidden behind one. The camera lifts and tilts down until nobody at the back is standing
+  behind somebody at the front, and is left exactly as the game had it if no amount of
+  lifting achieves that.
+
 ## v0.24.0 — everyone is actually dealt a hand
 
 The deal happens in two halves. The first works: every player is given five card values,
