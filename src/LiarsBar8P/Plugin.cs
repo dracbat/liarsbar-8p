@@ -10,7 +10,7 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "liarsbar.eightplayers";
-    public const string Version = "0.21.0";
+    public const string Version = "0.21.1";
 
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
@@ -92,7 +92,7 @@ public class Plugin : BasePlugin
             UnityEngine.Object.DontDestroyOnLoad(go);
             go.hideFlags = UnityEngine.HideFlags.HideAndDontSave;
             go.AddComponent<VersionHud>();
-            Log.LogInfo("  version HUD attached (bottom left)");
+            Log.LogInfo("  version HUD attached (top left)");
         }
         catch (System.Exception e)
         {

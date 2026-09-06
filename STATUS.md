@@ -44,5 +44,5 @@ Confirmed in `BepInEx/LogOutput.log` on a live host, current build:
 - Lobby podiums cannot be spawned through Mirror — a scene object has no build-time
   assetId. The mod uses copies with a fresh, never-spawned identity, which the networking
   layer ignores; their state is therefore filled in per machine rather than synced.
-- Every player must run the same version. The build is drawn bottom-left in game and the
+- Every player must run the same version. The build is drawn top-left in game and the
   host warns about mismatches, because mixed versions have corrupted whole sessions.

@@ -47,7 +47,7 @@ The first game launch after installing is slow (a few minutes) while the loader 
 itself up. That happens once.
 
 **Everyone playing together must install this, and must be on the same version.** The
-version you are running is shown in the bottom-left corner in game.
+version you are running is shown in the top-left corner in game.
 '@
 
 # Native tools write to stderr routinely. Under $ErrorActionPreference = 'Stop',

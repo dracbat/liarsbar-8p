@@ -8,7 +8,7 @@ integrity of game files* undoes the install completely.
 
 **Everyone playing together must install this and run the same version.** A vanilla
 client in a modded lobby will desync. The version you are running is drawn in the
-bottom-left corner in game, and the host is warned when someone's build differs.
+top-left corner in game, and the host is warned when someone's build differs.
 
 ---
 
@@ -58,7 +58,7 @@ Or fully by hand: copy the zip's contents into your Liar's Bar folder so that
 **The first launch after installing is slow** — up to a few minutes while BepInEx
 prepares the game. This happens once. Let it reach the main menu.
 
-To confirm it worked, look at the bottom-left corner in game, or open
+To confirm it worked, look at the top-left corner in game, or open
 `BepInEx/LogOutput.log` and look for:
 
 ```
