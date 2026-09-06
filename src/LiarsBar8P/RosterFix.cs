@@ -31,6 +31,14 @@ internal static class RosterFix
     private const string AddedSuffix = "_8P";
     private static int _lastLogged = -1;
 
+    /// <summary>
+    /// Seats and nameplates removed from the live lists, newest last. Trimming alone would
+    /// be a one way door: if someone joins and the table grows again there would be no
+    /// seat for them, so what was taken out is kept and restored on demand.
+    /// </summary>
+    private static readonly System.Collections.Generic.List<UnityEngine.Transform> _parkedSeats = new();
+    private static readonly System.Collections.Generic.List<TMPro.Examples.WarpTextExample> _parkedPlates = new();
+
     [HarmonyPrefix]
     [HarmonyPriority(Priority.First)]   // must run before the deck and seat logic read these
     [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.ResetRound))]
@@ -44,6 +52,7 @@ internal static class RosterFix
             int count = m.Players.Count;
             if (count < 2) return;
 
+            RestoreSeats(m, count);
             CorrectPlayerCount(m, count);
             CompactSeatIndices(m, count);
             TrimSeatList(m, count);
@@ -61,6 +70,37 @@ internal static class RosterFix
         {
             Plugin.Log.LogError($"[roster] fix failed: {e.Message}");
         }
+    }
+
+    /// <summary>Put previously trimmed seats and nameplates back when the table grows.</summary>
+    private static void RestoreSeats(Manager m, int count)
+    {
+        try
+        {
+            int restored = 0;
+            while (m.Slots != null && m.Slots.Count < count && _parkedSeats.Count > 0)
+            {
+                var t = _parkedSeats[_parkedSeats.Count - 1];
+                _parkedSeats.RemoveAt(_parkedSeats.Count - 1);
+                if (t == null) continue;
+                t.gameObject.SetActive(true);
+                m.Slots.Add(t);
+                restored++;
+            }
+
+            while (m.NameTexts != null && m.NameTexts.Count < count && _parkedPlates.Count > 0)
+            {
+                var p = _parkedPlates[_parkedPlates.Count - 1];
+                _parkedPlates.RemoveAt(_parkedPlates.Count - 1);
+                if (p == null) continue;
+                p.gameObject.SetActive(true);
+                m.NameTexts.Add(p);
+            }
+
+            if (restored > 0)
+                Plugin.Log.LogInfo($"[roster] restored {restored} seat(s); the table grew to {count} players");
+        }
+        catch (Exception e) { Plugin.Log.LogError($"[roster] restore failed: {e.Message}"); }
     }
 
     private static void CorrectPlayerCount(Manager m, int count)
@@ -114,7 +154,7 @@ internal static class RosterFix
             if (t != null && !t.gameObject.name.EndsWith(AddedSuffix)) break;
 
             slots.RemoveAt(last);
-            if (t != null) t.gameObject.SetActive(false);
+            if (t != null) { t.gameObject.SetActive(false); _parkedSeats.Add(t); }
             removed++;
         }
 
@@ -137,7 +177,7 @@ internal static class RosterFix
             if (t != null && !t.gameObject.name.EndsWith(AddedSuffix)) break;
 
             texts.RemoveAt(last);
-            if (t != null) t.gameObject.SetActive(false);
+            if (t != null) { t.gameObject.SetActive(false); _parkedPlates.Add(t); }
             removed++;
         }
 
