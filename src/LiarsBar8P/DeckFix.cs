@@ -27,6 +27,7 @@ namespace LiarsBar8P;
 /// </summary>
 internal static class DeckFix
 {
+    private const int CardsPerPlayer = 5;
     private static bool _networkedWarned;
 
     /// <summary>Sizes seen before any growth, so "double" always means double vanilla.</summary>
@@ -167,6 +168,29 @@ internal static class DeckFix
         catch (Exception e) { Plugin.Log.LogError($"[deckfix] roster dump failed: {e.Message}"); }
     }
 
+    /// <summary>
+    /// Shrink a per player list back if the table got smaller, so nothing walks an entry
+    /// with no player behind it. Objects are deactivated, never destroyed.
+    /// </summary>
+    private static void TrimToPlayers(Il2CppGoList list, int players, string label)
+    {
+        try
+        {
+            if (list == null || players < 4 || list.Count <= players) return;
+            int removed = 0;
+            while (list.Count > players)
+            {
+                int last = list.Count - 1;
+                var go = list[last];
+                list.RemoveAt(last);
+                if (go != null) go.SetActive(false);
+                removed++;
+            }
+            Plugin.Log.LogInfo($"[deckfix]   {label} trimmed by {removed} -> {list.Count}");
+        }
+        catch (Exception e) { Plugin.Log.LogWarning($"[deckfix] {label} trim skipped: {e.Message}"); }
+    }
+
     [HarmonyPrefix]
     [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.ResetRound))]
     private static void TopUp(DeckGamePlayManager __instance, bool first)
@@ -181,12 +205,16 @@ internal static class DeckFix
             int masaV = Vanilla("MasaCards", __instance.MasaCards?.Count ?? 0);
             int resetV = Vanilla("ResetCards", __instance.ResetCards?.Count ?? 0);
 
-            // more than four players: two full decks
-            int deckTarget = Mathf.Max(masaV, resetV) * 2;
+            // Vanilla holds exactly players * 5 cards - 20 for four players - and the deal
+            // consumes the whole deck. Keeping that invariant matters more than a round
+            // number: 40 cards for five players would leave 15 undealt, which the deal may
+            // not expect. At eight players this is 40, exactly the two decks intended.
+            int vanillaDeck = Mathf.Max(masaV, resetV);
+            int deckTarget = Mathf.Max(vanillaDeck, players * CardsPerPlayer);
 
             Plugin.Log.LogInfo(
-                $"[deckfix] {players} players -> doubling the deck to {deckTarget} cards " +
-                $"(vanilla {Mathf.Max(masaV, resetV)})");
+                $"[deckfix] {players} players -> deck of {deckTarget} cards " +
+                $"({CardsPerPlayer} each, vanilla was {vanillaDeck})");
 
             Grow(__instance.ResetCards, spares, deckTarget, "ResetCards");
             Grow(__instance.MasaCards, spares, deckTarget, "MasaCards");
@@ -198,13 +226,19 @@ internal static class DeckFix
             // roster because seats are expanded to the maximum. Over provisioning makes
             // any index in 0..max-1 valid whichever scheme it turns out to be; the cost
             // is a few unused entries.
-            int perPlayer = Mathf.Max(players, Plugin.MaxPlayers.Value);
+            // Exactly one entry per player. Over provisioning was tried and is wrong for the
+            // same reason spare seats are wrong: anything walking these lists would visit
+            // entries with no player behind them. Seat indices are compacted to 0..n-1
+            // before this runs, so no index can exceed the roster.
+            int perPlayer = players;
 
             Grow(__instance.OpenCards, spares, perPlayer, "OpenCards");
             GrowSprites(__instance.OrderSprtes, perPlayer, "OrderSprtes");
             GrowSprites(__instance.CardIcons, perPlayer, "CardIcons");
             GrowSyncInts(__instance.LastRound, perPlayer, "LastRound");
             GrowSyncInts(__instance.LastRoundSpotOn, perPlayer, "LastRoundSpotOn");
+
+            TrimToPlayers(__instance.OpenCards, players, "OpenCards");
 
             Plugin.Log.LogInfo(
                 $"[deckfix] after: MasaCards={__instance.MasaCards.Count} " +
