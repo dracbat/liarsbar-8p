@@ -22,8 +22,14 @@ internal static class DiagAutoHost
     {
         if (!Active || _fired) return;
 
-        // give the main menu time to finish initialising
-        if (++_frames < 600) return;
+        // Counting frames was not enough: the menu can be running before the Steam client
+        // has answered, and CreateLobby then throws "Steamworks is not initialized". Wait
+        // for the game's own flag, then a short settle so the lobby UI exists.
+        bool steamReady;
+        try { steamReady = SteamManager.Initialized; }
+        catch { steamReady = false; }
+        if (!steamReady) { _frames = 0; return; }
+        if (++_frames < 120) return;
 
         _fired = true;
         try

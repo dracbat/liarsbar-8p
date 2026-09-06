@@ -52,6 +52,20 @@ internal static class JoinFix
     private static void OnServerConnect_Prefix(CustomNetworkManager __instance, NetworkConnectionToClient conn)
     {
         Reassert("OnServerConnect");
+
+        // The manager that hosts is a different instance from the one patched at startup,
+        // so its own field is still four here. Nothing in the join path reads it any more,
+        // but anything that does later - the lobby UI, a future game update - would see a
+        // number that contradicts every other cap.
+        try
+        {
+            if (__instance != null && __instance.maxConnections < Target)
+            {
+                Plugin.Log.LogInfo($"[join] host manager maxConnections {__instance.maxConnections} -> {Target}");
+                __instance.maxConnections = Target;
+            }
+        }
+        catch { }
         try
         {
             Plugin.Log.LogInfo(

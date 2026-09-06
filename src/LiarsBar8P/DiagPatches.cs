@@ -149,6 +149,40 @@ internal static class LobbySlotDiag
                 $"    [{i}] name={t.gameObject.name} pos={t.position.ToString("F3")} " +
                 $"localPos={t.localPosition.ToString("F3")} yaw={t.eulerAngles.y:F1} " +
                 $"parent={(t.parent != null ? t.parent.name : "<none>")} children={t.childCount}");
+
+            // A podium has no children, so its name text, ready icon and buttons live
+            // elsewhere. Whether those are per podium or shared decides whether a copied
+            // podium can drive UI of its own.
+            try
+            {
+                Plugin.Log.LogInfo($"         NameText     = {Path(s.NameText != null ? s.NameText.transform : null)}");
+                Plugin.Log.LogInfo($"         CharNameText = {Path(s.CharNameText != null ? s.CharNameText.transform : null)}");
+                Plugin.Log.LogInfo($"         ReadyIcon    = {Path(s.ReadyIcon != null ? s.ReadyIcon.transform : null)}");
+                Plugin.Log.LogInfo($"         SelectChar   = {Path(s.SelectChar != null ? s.SelectChar.transform : null)}");
+                Plugin.Log.LogInfo($"         KickB        = {Path(s.KickB != null ? s.KickB.transform : null)}");
+                Plugin.Log.LogInfo($"         components   = {Components(t.gameObject)}");
+            }
+            catch (System.Exception e) { Plugin.Log.LogInfo($"         (refs unreadable: {e.Message})"); }
         }
+    }
+
+    private static string Path(Transform t)
+    {
+        if (t == null) return "<null>";
+        var parts = new System.Collections.Generic.List<string>();
+        var cur = t;
+        int guard = 0;
+        while (cur != null && guard++ < 32) { parts.Insert(0, cur.name); cur = cur.parent; }
+        var parent = t.parent;
+        string siblings = parent != null ? $" (siblings={parent.childCount})" : "";
+        return string.Join("/", parts) + siblings;
+    }
+
+    private static string Components(GameObject go)
+    {
+        var names = new System.Collections.Generic.List<string>();
+        foreach (var c in go.GetComponents<Component>())
+            names.Add(c == null ? "<null>" : c.GetIl2CppType().Name);
+        return string.Join(", ", names);
     }
 }

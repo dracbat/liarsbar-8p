@@ -55,7 +55,7 @@ internal static class SeatRing
 
             // fit the ring from the seats the game shipped with, so repeated rounds
             // cannot drift as a result of seats this mod has already moved
-            int baseCount = Mathf.Min(4, slots.Count);
+            int baseCount = Mathf.Min(Limits.VanillaPlayers, slots.Count);
             var pts = new Vector2[baseCount];
             float y = 0f;
             for (int i = 0; i < baseCount; i++)

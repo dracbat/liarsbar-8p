@@ -176,7 +176,7 @@ internal static class DeckFix
     {
         try
         {
-            if (list == null || players < 4 || list.Count <= players) return;
+            if (list == null || players < Limits.VanillaPlayers || list.Count <= players) return;
             int removed = 0;
             while (list.Count > players)
             {
@@ -198,7 +198,7 @@ internal static class DeckFix
         try
         {
             int players = PlayerCount();
-            if (players <= 4) return;
+            if (players <= Limits.VanillaPlayers) return;
 
             var spares = __instance.ExtraCards;
 
@@ -213,7 +213,7 @@ internal static class DeckFix
             // players is 5 each in the basic deck, 28 is 7 each in deck 2. Deriving it keeps
             // both modes correct instead of assuming five.
             int vanillaDeck = Mathf.Max(masaV, resetV);
-            int perPlayerCards = Mathf.Max(1, vanillaDeck / 4);
+            int perPlayerCards = Mathf.Max(1, vanillaDeck / Limits.VanillaPlayers);
             int deckTarget = Mathf.Max(vanillaDeck, perPlayerCards * players);
 
             Plugin.Log.LogInfo(

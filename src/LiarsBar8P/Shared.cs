@@ -80,6 +80,56 @@ internal static class Cloning
         }
     }
 
+    /// <summary>
+    /// Copies a networked scene object into a working, never-spawned twin.
+    ///
+    /// The original's NetworkIdentity cannot be reused: Instantiate copies its
+    /// "hasSpawned" flag, and Mirror's Awake then logs "has already spawned" and destroys
+    /// the copy. So the copy is made while the template is inactive (no Awake yet), the
+    /// copied identity is removed, and a brand-new one is added before activation. That
+    /// fresh identity has sceneId 0 and netId 0: Mirror never spawns it, never syncs it
+    /// and never looks for it - but every NetworkBehaviour on the copy gets a valid
+    /// <c>netIdentity</c>, so the game's own components keep working on it.
+    /// </summary>
+    internal static Transform CloneAsUnspawned(Transform template, string name)
+    {
+        if (template == null) return null;
+        bool wasActive = template.gameObject.activeSelf;
+        try
+        {
+            template.gameObject.SetActive(false);
+            var clone = Object.Instantiate(template);
+            clone.gameObject.name = name;
+
+            // Instantiate carries the original's identity state across, which is what makes
+            // Mirror shout "has already spawned" and destroy the copy. Clearing it is safer
+            // than removing the component: NetworkIdentity.OnDestroy would run
+            // NetworkClient.spawned.Remove(netId) and unregister the *original* podium.
+            foreach (var ni in clone.GetComponentsInChildren<Mirror.NetworkIdentity>(true))
+            {
+                if (ni == null) continue;
+                ni.netId = 0;
+                ni.sceneId = 0;
+                ni.hasSpawned = false;
+                ni.isServer = false;
+                ni.isClient = false;
+                ni.isLocalPlayer = false;
+            }
+
+            clone.gameObject.SetActive(true);
+            return clone;
+        }
+        catch (System.Exception e)
+        {
+            Plugin.Log.LogError($"[clone] unspawned copy failed for {name}: {e.Message}");
+            return null;
+        }
+        finally
+        {
+            template.gameObject.SetActive(wasActive);
+        }
+    }
+
     /// <summary>Remove every networking component so the copy is inert to Mirror.</summary>
     internal static void StripNetworking(GameObject go)
     {

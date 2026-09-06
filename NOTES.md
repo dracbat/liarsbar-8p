@@ -31,9 +31,20 @@ the bodies live as native code in `GameAssembly.dll`. Practical consequence:
 - Names and signatures: fully available. Patch by name; survives most updates.
 - Hardcoded literals inside methods: **not** readable without native decompilation.
 
-That is why values are discovered by *instrumenting at runtime* rather than by
+That is why values were first discovered by *instrumenting at runtime* rather than by
 reading constants. Most caps in this game turn out to be serialized Unity inspector
 fields anyway, which can simply be written at runtime.
+
+The ones that are not — the deck size and the seat number turn order wraps at — were
+found by decompiling `GameAssembly.dll` with Cpp2IL, whose output resolves call targets
+to real names. Those constants are immediate operands in machine code, out of reach of
+any Harmony patch, so the mod rewrites them in memory at startup (`NativeCode`,
+`DeckSizePatch`, `TurnOrderFix`). Every such write is guarded: the surrounding
+instruction sequence must match exactly and be the only match in the method, or the fix
+reports itself and is skipped.
+
+The decompiler's output is the game's own code in readable form and is never committed.
+What was learned from it lives in `docs/PLAYER-LIMITS.md`.
 
 ## Architecture
 

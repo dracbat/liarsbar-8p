@@ -3,30 +3,33 @@
 Raises Liar's Bar from 4 players to 8 (configurable 2–16).
 
 Built with [BepInEx 6 (IL2CPP)](https://github.com/BepInEx/BepInEx) + Harmony. No game
-files are modified on disk — everything is patched at runtime.
+files are modified on disk — everything is patched at runtime, and Steam's *Verify
+integrity of game files* undoes the install completely.
+
+**Everyone playing together must install this and run the same version.** A vanilla
+client in a modded lobby will desync. The version you are running is drawn in the
+bottom-left corner in game, and the host is warned when someone's build differs.
 
 ---
 
-## ⚠️ Read this first
+## What works
 
-**This is early. The lobby side works; the in-game side is not proven yet.**
-
-| | Status |
+| | |
 |---|---|
-| 8-player Steam lobby | ✅ Verified — Steam's own API reports the raised member limit |
-| Mirror connection cap 4 → 8 | ✅ Verified at runtime |
-| Lobby podium slots for 8 | ⚠️ Implemented, not yet tested with a full lobby |
-| Liar's Deck proportional deck scaling | ⚠️ Implemented, not yet tested in a real match |
-| In-game seats / nameplates for >4 | ❌ Not done |
-| Liar's Dice and other modes | ❌ Not done |
+| Steam lobby of 8 | ✅ Steam's own API reports the raised member limit |
+| Connections beyond the 4th and the 5th | ✅ Three separate caps, all confirmed raised at host time |
+| Lobby podiums and name plates for 8 | ✅ Built and confirmed present; **not yet seen with 8 real people** |
+| Turn order visiting every seat | ✅ All five wrap-around sites rewritten, confirmed in the log |
+| Dealing to more than four | ✅ The deal's deck size is rewritten; 5 players get 25 cards, 8 get 40 |
+| In-game seat ring and nameplates | ✅ Confirmed with real players |
+| Liar's Dice, Chaos, Spin, Poker | ⚠️ The shared turn-order and cap fixes apply; not separately tested |
 
-Seats, dealing and nameplates only run once a match starts, which needs real connected
-clients. Until that has been tested, **expect an 8-player match to break.** Getting 8
-people into a lobby should work; playing a full round with 8 probably will not, yet.
+The caps and the patches are verified from a real launch. What has **not** happened yet
+is a full round with eight people at the table — so treat the first eight-player game as
+the test it is, and read `BepInEx/LogOutput.log` afterwards if something looks wrong.
 
-**Everyone in the lobby must install this mod and use the same `MaxPlayers` value.** A
-vanilla client joining a modded lobby will desync. This is for private games with
-friends who are all running it.
+`docs/PLAYER-LIMITS.md` maps every place the game assumes four players, and what was
+done about each.
 
 ---
 
@@ -35,8 +38,9 @@ friends who are all running it.
 Download **`Install-LiarsBar8P.bat`** from the
 [latest release](../../releases/latest) and run it.
 
-It finds Liar's Bar through Steam automatically, downloads the mod, and installs it.
-It asks for administrator permission because the game lives under `Program Files`.
+It finds Liar's Bar through Steam automatically, removes any previous copy of the mod,
+and installs the current one. It asks for administrator permission because the game
+lives under `Program Files`. It is the way to update, too.
 
 It is a plain text file — open it in Notepad first if you want to see what it does.
 
@@ -54,24 +58,29 @@ Or fully by hand: copy the zip's contents into your Liar's Bar folder so that
 **The first launch after installing is slow** — up to a few minutes while BepInEx
 prepares the game. This happens once. Let it reach the main menu.
 
-To confirm it worked, open `BepInEx/LogOutput.log` in the game folder and look for:
+To confirm it worked, look at the bottom-left corner in game, or open
+`BepInEx/LogOutput.log` and look for:
 
 ```
 === Liar's Bar 8P loaded ===
 [cap] maxConnections 4 -> 8
+[transport] server maxConnections 4 -> 8
+[turn] GiveTurn: wraps at seat 3 -> 7
 ```
 
 ## Configure
 
-`BepInEx/config/liarsbar.eightplayers.cfg`, created on first run.
+`BepInEx/config/liarsbar.eightplayers.cfg`, created on first run. The installer replaces
+it on every install, so a setting changed by hand does not survive an update — that is
+deliberate: a stale setting once silently disabled a fix for a whole session.
 
 | Setting | Default | Meaning |
 |---|---|---|
 | `MaxPlayers` | `8` | Lobby size. **Must match across all players.** |
-| `ScaleDeck` | `true` | Scale the Liar's Deck with player count so everyone still gets 5 cards. |
-| `VerboseDiagnostics` | `true` | Log seat/slot counts. Useful while the mod is unfinished. |
+| `VerboseDiagnostics` | `true` | Log seat, podium and deck counts. Leave on — it is what makes a bad round diagnosable. |
 | `SelfTestAutoHostLobby` | `false` | Developer only. Leave off. |
 | `SelfTestForceSoloStart` | `false` | Developer only. Leave off. |
+| `SelfTestDeckSizePatch` | `false` | Developer only. Leave off. |
 
 ## Uninstall
 
@@ -92,12 +101,14 @@ dotnet build -c Release
 ```
 
 `deploy.ps1` builds and copies the plugin into the game. `package.ps1` produces the
-distributable zip.
+distributable zip and refuses to run if any file about to ship carries the build
+account's name. `release.ps1` does the whole release in one command.
 
 ## Notes
 
-- `NOTES.md` — technical breakdown: architecture, class map, how the caps were found
-- `STATUS.md` — what is proven versus outstanding
+- `docs/PLAYER-LIMITS.md` — every hard-coded four in the game, and what was done about it
+- `CHANGELOG.md` — what changed in each version, and why
+- `NOTES.md` — architecture and class map
 
 No game assets or binaries are included in this repository.
 

@@ -53,6 +53,7 @@ internal static class RosterFix
             if (count < 2) return;
 
             DeckSizePatch.ApplyFor(count);
+            TurnOrderFix.Install();
             RestoreSeats(m, count);
             CorrectPlayerCount(m, count);
             CompactSeatIndices(m, count);
@@ -143,7 +144,7 @@ internal static class RosterFix
     private static void TrimSeatList(Manager m, int count)
     {
         var slots = m.Slots;
-        if (slots == null || count < 4 || slots.Count <= count) return;
+        if (slots == null || count < Limits.VanillaPlayers || slots.Count <= count) return;
 
         int removed = 0;
         while (slots.Count > count)
@@ -168,7 +169,7 @@ internal static class RosterFix
     private static void TrimNameplates(Manager m, int count)
     {
         var texts = m.NameTexts;
-        if (texts == null || count < 4 || texts.Count <= count) return;
+        if (texts == null || count < Limits.VanillaPlayers || texts.Count <= count) return;
 
         int removed = 0;
         while (texts.Count > count)

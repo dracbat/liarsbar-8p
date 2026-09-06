@@ -28,7 +28,6 @@ namespace LiarsBar8P;
 internal static class DeckSizePatch
 {
     private const uint PAGE_EXECUTE_READWRITE = 0x40;
-    private const int VanillaPlayers = 4;
     private const int ScanBytes = 4096;
 
     [DllImport("kernel32.dll", SetLastError = true)]
@@ -119,7 +118,7 @@ internal static class DeckSizePatch
 
         foreach (var t in _targets)
         {
-            int perPlayer = t.VanillaDeck / VanillaPlayers;      // 5 for basic, 7 for deck2
+            int perPlayer = t.VanillaDeck / Limits.VanillaPlayers;      // 5 for basic, 7 for deck2
             int wanted = perPlayer * players;
             if (t.Current == wanted) continue;
 
