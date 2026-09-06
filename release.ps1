@@ -1,4 +1,4 @@
-﻿<#
+<#
   One command to ship a release.
 
       .\release.ps1
@@ -31,6 +31,24 @@ function Info ($m) { Write-Host "         $m" -ForegroundColor Gray }
 $Repo = 'dracbat/liarsbar-8p'
 $Zip  = "$PSScriptRoot\dist\LiarsBar-8P.zip"
 $Bat  = "$PSScriptRoot\installer\Install-LiarsBar8P.bat"
+
+# Shown on every release page under that version's changelog entry. The changelog says
+# what changed; this says how to install it, and it is the same for every version.
+$InstallFooter = @'
+## Install
+
+Download **Install-LiarsBar8P.bat** below and run it. It finds the game through Steam
+automatically, downloads the mod and installs it. It removes any previous copy first, so
+it is also the way to update.
+
+Prefer to do it by hand? Download the zip, extract it, run install.bat.
+
+The first game launch after installing is slow (a few minutes) while the loader sets
+itself up. That happens once.
+
+**Everyone playing together must install this, and must be on the same version.** The
+version you are running is shown in the bottom-left corner in game.
+'@
 
 # Native tools write to stderr routinely. Under $ErrorActionPreference = 'Stop',
 # PowerShell 5.1 turns that into a terminating error, so every gh call goes through
@@ -194,7 +212,8 @@ if (-not $Notes) {
         $pattern = '(?ms)^## ' + [regex]::Escape($Tag) + '\b.*?(?=^## |\z)'
         $m = [regex]::Match($cl, $pattern)
         if ($m.Success) {
-            $Notes = $m.Value.Trim()
+            # The changelog says what changed; the footer says how to install it.
+            $Notes = $m.Value.Trim() + "`n`n" + $InstallFooter
             Info "release notes taken from CHANGELOG.md"
         } else {
             Warn "no CHANGELOG.md section for $Tag - using the generic notes"
@@ -203,35 +222,7 @@ if (-not $Notes) {
 }
 
 if (-not $Notes) {
-$Notes = @"
-Raises Liar's Bar from 4 players to 8.
-
-## Install
-
-Download **Install-LiarsBar8P.bat** below and run it. It finds the game through
-Steam automatically, downloads the mod and installs it.
-
-Prefer to do it by hand? Download the zip, extract it, run ``install.bat``.
-
-The first game launch after installing is slow (a few minutes) while BepInEx sets
-up. That happens once.
-
-## Status
-
-Verified working:
-- 8 player Steam lobby, confirmed by Steam's own reported member limit
-- Mirror connection cap raised 4 -> 8
-
-Implemented but **not yet tested in a real match**:
-- Lobby podium slots beyond 4
-- Proportional Liar's Deck scaling
-
-Not done yet: in-game seats and nameplates beyond 4, Liar's Dice, other modes.
-Getting 8 people into a lobby should work. Playing a full 8 player round probably
-will not yet.
-
-**Everyone playing together must install this and use the same MaxPlayers value.**
-"@
+    $Notes = "Raises Liar's Bar from 4 players to 8.`n`n" + $InstallFooter
 }
 
 $exists = (Invoke-Gh release view $Tag --repo $Repo).Code -eq 0
