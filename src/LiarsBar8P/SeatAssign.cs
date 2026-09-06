@@ -70,12 +70,13 @@ internal static class SeatAssign
                 if (p != null && p != __instance) taken.Add(p.InGameSlot);
 
             int seat = 0;
-            while (taken.Contains(seat) && seat < Plugin.MaxPlayers.Value) seat++;
+            while (taken.Contains(seat) && seat < Limits.Max) seat++;
 
             Plugin.Log.LogWarning(
                 $"[seatassign] '{__instance.PlayerName}' got no seat from CmdSetPlayer " +
                 $"(no free lobby panel) - assigning seat {seat}");
-            __instance.InGameSlot = seat;
+            // The plain field is server-only state; the generated setter is what reaches clients.
+            __instance.NetworkInGameSlot = seat;
 
             Report("after manual assignment");
         }

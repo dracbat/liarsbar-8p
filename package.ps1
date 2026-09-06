@@ -37,14 +37,6 @@ New-Item -ItemType Directory -Force -Path $cfgDir | Out-Null
 # Default value: 8
 MaxPlayers = $MaxPlayers
 
-[Gameplay]
-
-
-## Scale the Liar's Deck proportionally with player count so everyone still gets five cards.
-# Setting type: Boolean
-# Default value: true
-ScaleDeck = true
-
 [Debug]
 
 ## Dump runtime seat/slot/prefab counts to the log.

@@ -43,7 +43,7 @@ Console.WriteLine();
 string[] required =
 {
     "CapPatches", "JoinFix", "CommandGuard", "SeatAssign", "SeatExpansion", "SeatRing",
-    "LobbyExpansion", "RosterFix", "CardTypeFix", "DeckSizePatch", "DeckFix", "DeckDiag",
+    "LobbyPodiums", "TransportCap", "TurnOrderFix", "RosterFix", "CardTypeFix", "DeckSizePatch", "DeckFix", "DeckDiag",
     "JoinDiag", "VersionCheck", "VersionHud"
 };
 

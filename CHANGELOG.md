@@ -3,6 +3,49 @@
 Every player in a lobby must run the **same version**. The running version is shown in
 the bottom-left corner in game; the host also warns when someone's build differs.
 
+## v2.1.0 — the sixth player, and turn order that skipped seats
+
+Everything here came from mapping the game's compiled code for hard-coded fours before
+changing anything. That map is now `docs/PLAYER-LIMITS.md`.
+
+- **The sixth player was refused by the Steam transport, underneath the game.** There is a
+  third connection limit nobody had found: the Steam transport's own server checks its
+  connection count before the game or its networking layer ever see the attempt, and
+  rejects with *"would exceed max connection count"*. The host does not connect to itself
+  over Steam, so that count holds only the other players — a limit of four meant four
+  guests plus the host, exactly the five that worked, and the sixth bounced with nothing
+  in anyone's log. Raised wherever that server is built.
+- **Turn order silently skipped seats five to eight.** Advancing a turn searches for the
+  next living player and, on finding an empty seat, checks `seat > 3` before wrapping to
+  seat zero. A full table happened to work; the moment anyone in the first four seats died
+  — which is most of a round in this game — the search stepped past seat 3 and jumped
+  straight back to the start, never visiting the later seats. That is the reported "it
+  makes players play when the arrow isn't pointing at them". The same hard-coded seat
+  three governed going backwards. All five places are now rewritten in memory, the same
+  way the deck size is.
+- **Who is on your left, right and across was a fixed four-by-four table.** Anything
+  outside the first four seats fell through to "seat zero", so every extra player thought
+  seat zero lay in all three directions. It is now worked out from the number of players
+  present, and at four players produces exactly the table the game shipped with.
+- **Players beyond the fourth now appear in the lobby.** The lobby has four podiums and
+  the host picks a free one for each arriving player; the fifth threw, and because that
+  same code is what places their body, they had no podium and no avatar until the match
+  started. Extra podiums are now built from the existing ones — with a fresh, never-spawned
+  identity, so the networking layer ignores them entirely — placed by continuing the arc
+  the originals stand on, and each is given its own name plate rather than sharing one.
+- **A seat given to an extra player never reached anybody else.** The fallback that seats
+  a player the game could not place was writing the plain field instead of the synced one,
+  so only the host knew about it. Every other player kept seeing them in seat zero.
+- **Removed a deck patch that was attached to the wrong method.** It was scaling the list
+  of cards handed to `AddCards`, which is not the deal — it is a player *playing* cards.
+  Above four players it would have replaced a two-card play with a whole deck's worth. The
+  deal itself has been handled properly since v2.0.0.
+- One configurable maximum. Everything that raises a cap now reads a single value, and the
+  count the game shipped with is kept separate from it, since scaling the deck in
+  proportion needs the original and must not follow the setting.
+- The plugin no longer waits a fixed number of frames before its optional self-test; it
+  waits for Steam, which was not ready and made the test fail every time.
+
 ## v2.0.2
 
 - **The plugin file itself carried the build machine's folder path.** The compiler records

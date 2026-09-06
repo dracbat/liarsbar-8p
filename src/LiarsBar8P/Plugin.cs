@@ -10,7 +10,7 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "liarsbar.eightplayers";
-    public const string Version = "2.0.2";
+    public const string Version = "2.1.0";
 
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
@@ -18,7 +18,6 @@ public class Plugin : BasePlugin
     public static ConfigEntry<bool> DiagAutoHost;
     public static ConfigEntry<bool> DiagSoloStart;
     public static ConfigEntry<bool> DiagDeckPatchTest;
-    public static ConfigEntry<bool> ScaleDeck;
 
     public override void Load()
     {
@@ -30,9 +29,6 @@ public class Plugin : BasePlugin
 
         Verbose = Config.Bind("Debug", "VerboseDiagnostics", true,
             "Dump runtime seat/prefab/slot counts to the log. Needed while the mod is still being built out.");
-
-        ScaleDeck = Config.Bind("Gameplay", "ScaleDeck", true,
-            "Scale the Liar's Deck proportionally with player count so everyone still gets five cards.");
 
         DiagAutoHost = Config.Bind("Debug", "SelfTestAutoHostLobby", false,
             "Development self test: auto-host a PRIVATE lobby on startup to capture lobby diagnostics.");
@@ -52,10 +48,11 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(JoinFix),        "join limits");
         Apply(harmony, typeof(CommandGuard),   "command guards");
         Apply(harmony, typeof(SeatAssign),     "seat assignment");
-        Apply(harmony, typeof(LobbyExpansion), "lobby slot expansion");
+        Apply(harmony, typeof(TransportCap),   "steam transport cap");
+        Apply(harmony, typeof(LobbyPodiums),   "lobby podiums beyond four");
+        Apply(harmony, typeof(TurnOrderFix),   "turn order");
         Apply(harmony, typeof(SeatExpansion),  "table seat expansion");
         Apply(harmony, typeof(SeatRing),       "seat spacing");
-        Apply(harmony, typeof(DeckScaling),    "deck scaling");
         Apply(harmony, typeof(RosterFix),      "roster + seat indices");
         Apply(harmony, typeof(CardTypeFix),    "card type wrapping");
         Apply(harmony, typeof(DeckFix),        "deck top-up");
@@ -71,6 +68,11 @@ public class Plugin : BasePlugin
             Log.LogInfo("  [selftest] exercising the deck size patch for 5 players...");
             DeckSizePatch.ApplyFor(5);
         }
+
+        // The turn-order constants live in compiled code, so they are rewritten rather than
+        // patched. Done here so the log says plainly whether it worked, and retried at the
+        // start of a round if the game was not ready yet.
+        TurnOrderFix.Install();
 
         SpawnHud();
 
