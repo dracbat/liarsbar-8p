@@ -40,7 +40,11 @@ Download **`Install-LiarsBar8P.bat`** from the
 
 It finds Liar's Bar through Steam automatically, removes any previous copy of the mod,
 and installs the current one. It asks for administrator permission because the game
-lives under `Program Files`. It is the way to update, too.
+lives under `Program Files`.
+
+**Keep the file — running it again is how you update.** It asks GitHub for the newest
+release every time it runs, so it never goes stale and there is no need to download it
+a second time.
 
 It is a plain text file — open it in Notepad first if you want to see what it does.
 

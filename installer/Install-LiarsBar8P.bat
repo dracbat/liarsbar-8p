@@ -232,7 +232,11 @@ Say "=================================================" Green
 Say ""
 Say "NEXT:" Cyan
 Say "  1. Launch Liar's Bar."
-Say "  2. Check the BOTTOM LEFT of the screen - it must read $($rel.tag_name)."
+Say "  2. Check the TOP LEFT of the screen - it must read $($rel.tag_name)."
 Say "     Everyone playing together must show the same version."
 Say ""
 Say "  The first launch after installing can take a few minutes." Gray
+Say ""
+Say "TO UPDATE LATER: run this same file again." Cyan
+Say "  It always fetches whatever the newest release is, so keep it somewhere handy" Gray
+Say "  rather than downloading it again each time." Gray
