@@ -8,6 +8,12 @@ so far is below it. Versions that were once numbered 1.x and 2.x were folded int
 0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
 is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v0.21.2 — the installer is reusable, and says so
+
+- The installer always asked GitHub for the newest release, so re-running the same file
+  has always been enough to update - but nothing said so, and it told people to check the
+  bottom left for their version, which is no longer where it is. It now says both.
+
 ## v0.21.1 — the version moves to the top left
 
 - The version was drawn along the bottom of the screen, on the same line as the game's
