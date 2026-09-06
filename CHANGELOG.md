@@ -3,6 +3,12 @@
 Every player in a lobby must run the **same version**. The running version is shown in
 the bottom-left corner in game; the host also warns when someone's build differs.
 
+## v2.0.2
+
+- The build no longer emits a symbol file or records source paths.
+- The old settings file is matched by its ending rather than its full name, so a copy left
+  behind by an earlier version is cleared on install.
+
 ## v2.0.1
 
 - The plugin id is now `liarsbar.eightplayers`, so the settings file is now
