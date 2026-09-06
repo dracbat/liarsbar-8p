@@ -10,7 +10,7 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "josh.liarsbar.eightplayers";
-    public const string Version = "1.2.0";
+    public const string Version = "1.3.0";
 
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
@@ -100,6 +100,7 @@ public class Plugin : BasePlugin
         }
     }
 }
+
 
 
 
