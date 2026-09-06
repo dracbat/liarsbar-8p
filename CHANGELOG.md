@@ -3,7 +3,12 @@
 Every player in a lobby must run the **same version**. The running version is shown in
 the bottom-left corner in game; the host also warns when someone's build differs.
 
-## v2.1.0 — the sixth player, and turn order that skipped seats
+**v1.0.0 is reserved for the first release proven to work with eight people.** Everything
+so far is below it. Versions that were once numbered 1.x and 2.x were folded into the same
+0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
+is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
+
+## v0.21.0 — the sixth player, and turn order that skipped seats
 
 Everything here came from mapping the game's compiled code for hard-coded fours before
 changing anything. That map is now `docs/PLAYER-LIMITS.md`.
@@ -39,14 +44,14 @@ changing anything. That map is now `docs/PLAYER-LIMITS.md`.
 - **Removed a deck patch that was attached to the wrong method.** It was scaling the list
   of cards handed to `AddCards`, which is not the deal — it is a player *playing* cards.
   Above four players it would have replaced a two-card play with a whole deck's worth. The
-  deal itself has been handled properly since v2.0.0.
+  deal itself has been handled properly since v0.20.0.
 - One configurable maximum. Everything that raises a cap now reads a single value, and the
   count the game shipped with is kept separate from it, since scaling the deck in
   proportion needs the original and must not follow the setting.
 - The plugin no longer waits a fixed number of frames before its optional self-test; it
   waits for Steam, which was not ready and made the test fail every time.
 
-## v2.0.2
+## v0.20.2
 
 - **The plugin file itself carried the build machine's folder path.** The compiler records
   where an assembly was built and stamps that into the file, so every download contained
@@ -58,7 +63,7 @@ changing anything. That map is now `docs/PLAYER-LIMITS.md`.
 - Every release page now describes what actually changed in it. They had all carried the
   same text, and that text still claimed seats and dealing were untested.
 
-## v2.0.1
+## v0.20.1
 
 - Removed personal identifiers from the project. The plugin id changed from a name-based
   one to `liarsbar.eightplayers`, so the settings file is now
@@ -66,7 +71,7 @@ changing anything. That map is now `docs/PLAYER-LIMITS.md`.
   needs doing by hand.
 - Added this changelog. Release notes now come from it rather than being written twice.
 
-## v2.0.0 — the deck was hardcoded
+## v0.20.0 — the deck was hardcoded
 
 The real cause of cards never working above four players.
 
@@ -84,7 +89,7 @@ The real cause of cards never working above four players.
   Jokers. Thresholds now scale with the deck, giving exactly 12/12/12/4 at eight players:
   two vanilla decks.
 
-## v1.5.1 — installers always start clean
+## v0.15.1 — installers always start clean
 
 - Both installers delete this mod's plugin and settings before installing, including any
   renamed or duplicated copies. Keeping settings across an update had let a stale option
@@ -93,7 +98,7 @@ The real cause of cards never working above four players.
 - BepInEx's generated `interop` folder is deliberately left alone; rebuilding it is slow
   and it does not belong to this mod.
 
-## v1.5.0 — fixes to the mod's own patching
+## v0.15.0 — fixes to the mod's own patching
 
 - **Patches were cancelling each other out.** Two of this mod's handlers sat on the same
   game method with no ordering between them. Once one absorbed the error the next saw
@@ -103,12 +108,12 @@ The real cause of cards never working above four players.
   land on an empty chair, but they were discarded — if someone joined and the table grew,
   there was no seat for them. Trimmed seats and nameplates are now kept and restored.
 
-## v1.4.1 — simpler card index wrapping
+## v0.14.1 — simpler card index wrapping
 
 - Removed a "learn the deck size" branch that the following bounds check already covered.
   It only added state that could mislead. An ordinary four player round is unaffected.
 
-## v1.4.0 — lists match the players present
+## v0.14.0 — lists match the players present
 
 - **Seats and per-player lists were expanded to the maximum and left there**, so anything
   walking them visited empty chairs. The turn indicator pointed at nobody while a real
@@ -118,10 +123,10 @@ The real cause of cards never working above four players.
 - Seats this mod added are deactivated rather than destroyed, and seats the game shipped
   with are never removed, so a later round can grow again.
 - The card index is wrapped against the vanilla deck so a second deck is an exact copy of
-  the first, keeping 6/6/6/2 rather than inventing a distribution. (Superseded by v2.0.0,
+  the first, keeping 6/6/6/2 rather than inventing a distribution. (Superseded by v0.20.0,
   which found the deck size itself was fixed in the game's own code.)
 
-## v1.2.0 — best-effort fixes for dealing above four
+## v0.12.0 — best-effort fixes for dealing above four
 
 - `StartPlayerCount` is corrected before the round is set up. It lagged at four while five
   players were seated, so anything looping over it dealt to four people and left the fifth
@@ -129,7 +134,7 @@ The real cause of cards never working above four players.
 - Seat indices are compacted into a contiguous range, so a player cannot hold a seat index
   beyond the number of players present and send something indexing off the end.
 
-## v1.1.1 — players move with their seats
+## v0.11.1 — players move with their seats
 
 - Re-spacing the ring moved the seats, but bodies were placed when they spawned and stayed
   put. The turn arrow follows the seat, so it pointed at empty space while the player acted
@@ -140,7 +145,7 @@ The real cause of cards never working above four players.
   the previous one, and the script reported success anyway. It now publishes drafts and
   fails outright if the latest release is not the one it just built.
 
-## v1.1.0 — the ring fits the players present
+## v0.11.0 — the ring fits the players present
 
 - With five players in an eight seat ring, the occupied seats covered only half the table:
   players bunched on one side, gaps opposite, and the turn indicator pointing into a gap.
@@ -149,7 +154,7 @@ The real cause of cards never working above four players.
 - A player the game could not register now receives the lowest unclaimed seat instead of
   remaining a ghost with no body, no cards and an arrow pointing at their empty chair.
 
-## v1.0.0 — version visibility, and a doubled deck
+## v0.10.0 — version visibility, and a doubled deck
 
 - The running version is drawn in the bottom-left corner, and the host names anyone whose
   build differs. Three different builds had been in one lobby at once, and that mismatch
