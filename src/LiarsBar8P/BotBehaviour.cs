@@ -127,6 +127,11 @@ internal static class BotBehaviour
 
             gp.ApplyCardState(types, active, true);
 
+            // Applying the state records the hand; showing it is a separate step, and it is
+            // the one that puts the card meshes in the player's hands. Without it a bot has
+            // five cards on paper and empty hands on screen.
+            gp.SetHaveCards(true);
+
             int objects = gp.Cards != null ? gp.Cards.Count : -1;
             Dev.Log("bot", $"{p.PlayerName} given {count} card(s) in hand ({objects} card objects) - " +
                            "done here because a bot has no connection to be dealt over");
