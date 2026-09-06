@@ -8,6 +8,26 @@ so far is below it. Versions that were once numbered 1.x and 2.x were folded int
 0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
 is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v0.24.0 — everyone is actually dealt a hand
+
+The deal happens in two halves. The first works: every player is given five card values,
+and that half is plain server code. The second — the animation that puts the card objects
+into people's hands, and then gives out the first turn — is a coroutine, and above four
+players it does not run to completion. The table ends up dealt on paper and empty in the
+hands, with nobody able to act and nothing in any log to say why.
+
+- **The cards are now handed over directly when that animation does not deliver them.**
+  Each waiting player has their hand applied and shown, and the game's own message is sent
+  afterwards so a player on another computer receives theirs the usual way. It waits three
+  seconds first and does nothing at all if the hands arrive on their own, so a table where
+  the game manages by itself is untouched.
+- Sending the message alone is not enough on the machine it is sent from — the hand has to
+  be applied there as well. That distinction cost a test run to find and is the difference
+  between a full hand and an empty one.
+
+Verified at eight players with none of the test tooling driving it: a real player is dealt
+a visible hand where before they got nothing.
+
 ## v0.23.3 — the diagnostic was breaking the deal
 
 - **A watcher added to find out why cards were not handed out was itself stopping them.**

@@ -51,6 +51,7 @@ internal static class RosterFix
 
             TurnKickstart.RoundStarting();
             BotBehaviour.RoundStarting();
+            DealFallback.RoundStarting();
             TableFill.EnsureEveryoneSeated(m);
 
             // Sized from who is actually at the table, never from who is in the lobby.

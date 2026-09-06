@@ -30,6 +30,9 @@ internal sealed class ModTicker : MonoBehaviour
         try { TableFill.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[tablefill] tick failed: {e.Message}"); }
 
+        try { DealFallback.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[dealcards] tick failed: {e.Message}"); }
+
         try { TurnKickstart.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[turnstart] tick failed: {e.Message}"); }
 
