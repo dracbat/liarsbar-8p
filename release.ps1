@@ -208,7 +208,9 @@ Step "Publishing release $Tag"
 if (-not $Notes) {
     $clPath = Join-Path $PSScriptRoot 'CHANGELOG.md'
     if (Test-Path $clPath) {
-        $cl = Get-Content $clPath -Raw
+        # Windows PowerShell reads a BOM-less file as the system codepage, which turns every
+        # em dash in the changelog into mojibake on the release page. Read it as UTF-8.
+        $cl = [IO.File]::ReadAllText($clPath, [Text.Encoding]::UTF8)
         $pattern = '(?ms)^## ' + [regex]::Escape($Tag) + '\b.*?(?=^## |\z)'
         $m = [regex]::Match($cl, $pattern)
         if ($m.Success) {
@@ -233,7 +235,8 @@ if ($exists) {
     Good "assets updated"
 } else {
     $notesFile = Join-Path $env:TEMP "lb8p-notes-$([guid]::NewGuid().ToString('N').Substring(0,6)).md"
-    Set-Content $notesFile $Notes -Encoding utf8
+    # ...and write it back without a BOM, which would otherwise open the release body.
+    [IO.File]::WriteAllText($notesFile, $Notes, (New-Object Text.UTF8Encoding $false))
     $r = Invoke-Gh release create $Tag $Zip $Bat --repo $Repo --title "Liar's Bar 8 Player Mod $Tag" --notes-file $notesFile
     if ($r.Code -ne 0) { Bad "release creation failed"; Info $r.Out; exit 1 }
     Good "release created"
