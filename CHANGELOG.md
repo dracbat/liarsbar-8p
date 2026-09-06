@@ -8,6 +8,26 @@ so far is below it. Versions that were once numbered 1.x and 2.x were folded int
 0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
 is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v0.23.1 — the cards reach every seat
+
+- **The deal built a four-element array and indexed it by seat number.** The routine that
+  physically hands the cards out starts with `new PlayerStats[4]` and then does
+  `array[player.Slot] = player`, so a player in seat four or beyond was off the end of it.
+  It threw on the routine's first step — and because that routine is a coroutine, the
+  exception was swallowed silently. No card objects were handed out, the first turn was
+  never given, and nothing in any log said why: every card was recorded as dealt while the
+  deck sat untouched on the table. The four is an immediate operand handed to the array
+  allocator, so it is rewritten in memory like the deck size and the turn wrap.
+- Bots can no longer be added once a match has started. One added mid-match has no podium,
+  so the game's own seating throws for it, and the resulting errors read like a dealing
+  fault when they were nothing of the kind.
+- Developer mode reports how far the deal gets, because a coroutine that dies part way
+  through is otherwise completely silent. That is what found the above.
+
+Still outstanding: a bot receives no card objects and does not load its revolver. Both
+arrive over a player's own connection and a bot has not got one — a limit of the test
+harness, not of eight players. A real player in seat five is dealt normally.
+
 ## v0.23.0 — eight players actually play
 
 The core loop, end to end at eight: everyone registers, everyone is seated, everyone is

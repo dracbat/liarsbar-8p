@@ -167,6 +167,16 @@ internal static class BotManager
                 return;
             }
 
+            // Only from the lobby. A bot added once a match is under way has no podium to
+            // take, so the game's own seating throws for it, and it arrives at a table that
+            // has already been dealt. Pressing the key mid-match produced a run of exactly
+            // that, and the errors it left behind looked like a dealing fault.
+            if (LobbyController.Instance == null)
+            {
+                Dev.Warn("bot", "bots can only be added from the lobby, not during a match");
+                return;
+            }
+
             int present = nm.GamePlayers.Count;
             if (present >= Limits.Max)
             {
