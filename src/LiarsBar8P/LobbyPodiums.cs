@@ -61,6 +61,11 @@ internal static class LobbyPodiums
         _camHolding = false;
         _camDone = false;
         _camTries = 0;
+        _rigReported = false;
+        _vcam = null;
+        _pulledBack = false;
+        _blendStarted = 0f;
+        _plateHome.Clear();
         BuildAll(__instance);
     }
 
@@ -366,6 +371,14 @@ internal static class LobbyPodiums
             if (_podiums.Count == 0) BuildAll(__instance);
             if (!_camDone) FrameLobby(__instance);
             HoldCamera();
+            FaceThePlates(__instance, _pulledBack);
+
+            if (Dev.Enabled && Time.time >= _nextVisReport)
+            {
+                _nextVisReport = Time.time + 6f;
+                ReportWhoIsVisible(__instance);
+                ReportCameraRig();
+            }
             if (_podiums.Count == 0) return;
 
             var nm = UnityEngine.Object.FindObjectOfType<CustomNetworkManager>();
@@ -658,6 +671,65 @@ internal static class LobbyPodiums
     private static Quaternion _camHomeRot, _camWantedRot;
     private static float _camHomeFov, _camWantedFov;
     private static bool _camHolding, _camDone;
+    private static float _nextVisReport;
+
+    /// <summary>The virtual camera that owns the lobby shot, switched off while we hold it.</summary>
+    private static GameObject _vcam;
+
+    /// <summary>
+    /// Take the lobby shot away from Cinemachine.
+    ///
+    /// The lobby camera carries a <c>CinemachineBrain</c>, and a brain re-poses its camera
+    /// every frame in LateUpdate from whichever virtual camera is live — long after anything
+    /// here runs. That is why raising the camera changed the numbers in the log and nothing
+    /// on the screen: the move was real, and then it was overwritten before the frame was
+    /// drawn. Moving the camera under a live brain is not possible.
+    ///
+    /// With the virtual camera switched off the brain has nothing to drive and stops writing
+    /// to the transform, so the raised shot simply holds. The lobby shot is a fixed one, so
+    /// nothing is lost by taking it over; it is handed straight back when the framing is
+    /// released.
+    /// </summary>
+    private static void SilenceRig()
+    {
+        if (_vcam != null) return;
+        try
+        {
+            foreach (var t in Resources.FindObjectsOfTypeAll<Transform>())
+            {
+                if (t == null || t.gameObject == null) continue;
+                if (!t.gameObject.scene.IsValid() || !t.gameObject.activeInHierarchy) continue;
+
+                foreach (var comp in t.GetComponents<Component>())
+                {
+                    if (comp == null) continue;
+                    if (comp.GetIl2CppType().Name != "CinemachineVirtualCamera") continue;
+                    _vcam = t.gameObject;
+                    break;
+                }
+                if (_vcam != null) break;
+            }
+
+            if (_vcam == null) return;
+
+            _vcam.SetActive(false);
+            Plugin.Log.LogInfo($"[podium] '{_vcam.name}' drives the lobby camera through a Cinemachine " +
+                               "brain - switched off so the raised shot holds");
+        }
+        catch (Exception e)
+        {
+            Plugin.Log.LogWarning($"[podium] could not quieten the camera rig: {e.Message}");
+            _vcam = null;
+        }
+    }
+
+    /// <summary>Give the shot back to whatever was driving it.</summary>
+    private static void RestoreRig()
+    {
+        try { if (_vcam != null) _vcam.SetActive(true); }
+        catch { }
+        _vcam = null;
+    }
     private static int _camTries;
 
     private static Camera LobbyCamera()
@@ -746,7 +818,7 @@ internal static class LobbyPodiums
 
             for (float wider = 0f; wider <= 12.01f; wider += 4f)
             {
-                for (float lift = 0.25f; lift <= 4.01f; lift += 0.25f)
+                for (float lift = 0.25f; lift <= 6.01f; lift += 0.25f)
                 {
                     t.position = _camHome + Vector3.up * lift;
                     t.rotation = Quaternion.LookRotation(focus - t.position, Vector3.up);
@@ -768,6 +840,7 @@ internal static class LobbyPodiums
                     _camWantedRot = t.rotation;
                     _camWantedFov = cam.fieldOfView;
                     _camHolding = true;
+                    SilenceRig();
                     Plugin.Log.LogInfo(
                         $"[podium] lobby camera raised {lift:F2} units" +
                         (wider > 0f ? $" and widened {wider:F0} degrees" : "") +
@@ -782,6 +855,7 @@ internal static class LobbyPodiums
                 t.position = fbPos; t.rotation = fbRot; cam.fieldOfView = fbFov;
                 _camWanted = fbPos; _camWantedRot = fbRot; _camWantedFov = fbFov;
                 _camHolding = true;
+                SilenceRig();
                 Plugin.Log.LogInfo(
                     $"[podium] lobby camera raised {fbLift:F2} units" +
                     (fbWider > 0f ? $" and widened {fbWider:F0} degrees" : "") +
@@ -805,6 +879,7 @@ internal static class LobbyPodiums
         try
         {
             _camHolding = false;
+            RestoreRig();
             if (_cam == null) return;
             _cam.transform.position = _camHome;
             _cam.transform.rotation = _camHomeRot;
@@ -826,13 +901,62 @@ internal static class LobbyPodiums
         try
         {
             var t = _cam.transform;
-            if (Vector3.Distance(t.position, _camWanted) < 0.01f) return;
-            if (Vector3.Distance(t.position, _camHome) > 0.05f) return;
-            t.position = _camWanted;
-            t.rotation = _camWantedRot;
-            _cam.fieldOfView = _camWantedFov;
+
+            // The wider shot is only for a table the game was not built for. At four or
+            // fewer the lobby looks as it always has, and the camera is handed back.
+            bool wanted = Crowded();
+            if (wanted != _pulledBack)
+            {
+                _pulledBack = wanted;
+                _blendFrom = t.position;
+                _blendFromRot = t.rotation;
+                _blendFromFov = _cam.fieldOfView;
+                _blendStarted = Time.time;
+                if (wanted) SilenceRig();
+                Plugin.Log.LogInfo(wanted
+                    ? "[podium] a fifth player has joined - easing the lobby camera back to show everyone"
+                    : "[podium] back to four - easing the lobby camera home");
+            }
+
+            var goalPos = _pulledBack ? _camWanted : _camHome;
+            var goalRot = _pulledBack ? _camWantedRot : _camHomeRot;
+            var goalFov = _pulledBack ? _camWantedFov : _camHomeFov;
+
+            // A cut is jarring in a lobby people are standing around in; a second and a bit
+            // of eased movement reads as the camera stepping back to fit everyone in.
+            float k = _blendStarted <= 0f ? 1f
+                    : Mathf.Clamp01((Time.time - _blendStarted) / BlendSeconds);
+            k = k * k * (3f - 2f * k);          // smoothstep: no jolt at either end
+
+            t.position = Vector3.Lerp(_blendFrom, goalPos, k);
+            t.rotation = Quaternion.Slerp(_blendFromRot, goalRot, k);
+            _cam.fieldOfView = Mathf.Lerp(_blendFromFov, goalFov, k);
+
+            // Once home again, the shot belongs to the game.
+            if (!_pulledBack && k >= 1f) RestoreRig();
         }
         catch { _camHolding = false; }
+    }
+
+    /// <summary>How long the camera takes to move between the two shots.</summary>
+    private const float BlendSeconds = 1.4f;
+
+    private static bool _pulledBack;
+    private static float _blendStarted;
+    private static Vector3 _blendFrom;
+    private static Quaternion _blendFromRot;
+    private static float _blendFromFov;
+
+    /// <summary>Are there more people here than the lobby was built to show?</summary>
+    private static bool Crowded()
+    {
+        try
+        {
+            var nm = UnityEngine.Object.FindObjectOfType<CustomNetworkManager>();
+            int n = nm != null && nm.GamePlayers != null ? nm.GamePlayers.Count : 0;
+            return n > Limits.VanillaPlayers;
+        }
+        catch { return false; }
     }
 
     /// <summary>
@@ -846,8 +970,11 @@ internal static class LobbyPodiums
     /// </summary>
     private static bool Unblocked(Camera cam, List<Vector3> back, List<Vector3> front)
     {
-        const float shoulders = 0.55f;   // half a character's width
-        const float stature = 1.85f;     // the top of a character's head
+        // Generous on both counts. The cast in this game are not all the same size - the
+        // boar is roughly twice the width of the rabbit - and a model that assumes an
+        // average build leaves the widest of them hiding somebody.
+        const float shoulders = 0.8f;    // half a character's width
+        const float stature = 2.15f;     // the top of a character's head
 
         var eye = cam.transform.position;
         var eyeFlat = new Vector2(eye.x, eye.z);
@@ -874,6 +1001,185 @@ internal static class LobbyPodiums
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Put every name plate over the head of the player it names, facing the camera.
+    ///
+    /// The shipped plates hang in the world at positions chosen for the shot the lobby
+    /// normally uses. Move the camera up and back and they no longer read: they sit at odd
+    /// angles, some behind their own character, and with two rows it stops being clear whose
+    /// name is whose - which is what "all over the place" means.
+    ///
+    /// So while the wider shot is being held, each plate is placed directly above its own
+    /// podium and turned to face the camera. Above the head there is nothing to overlap, the
+    /// association with the character underneath is unambiguous, and facing the camera is
+    /// what makes the text legible from a position the plates were never laid out for. The
+    /// original pose of each is kept, so handing the shot back puts them where they were.
+    /// </summary>
+    private static void FaceThePlates(LobbyController lobby, bool pulledBack)
+    {
+        if (_cam == null || lobby == null || lobby.SpawnSlots == null) return;
+
+        try
+        {
+            foreach (var s in lobby.SpawnSlots)
+            {
+                if (s == null || s.NameText == null) continue;
+
+                var plate = s.NameText.transform.parent;
+                if (plate == null) continue;
+
+                int id = plate.GetInstanceID();
+
+                if (!_plateHome.TryGetValue(id, out var home))
+                {
+                    home = (plate.position, plate.rotation);
+                    _plateHome[id] = home;
+                }
+
+                if (!pulledBack)
+                {
+                    plate.position = home.Pos;
+                    plate.rotation = home.Rot;
+                    continue;
+                }
+
+                var over = s.transform.position + Vector3.up * PlateHeight;
+                var toCam = _cam.transform.position - over;
+                if (toCam.sqrMagnitude < 0.01f) continue;
+
+                plate.position = over;
+                plate.rotation = Quaternion.LookRotation(-toCam.normalized, Vector3.up);
+            }
+        }
+        catch (Exception e) { Plugin.Log.LogWarning($"[podium] could not place the name plates: {e.Message}"); }
+    }
+
+    /// <summary>How far above a podium a name plate hangs when the shot is pulled back.</summary>
+    private const float PlateHeight = 2.35f;
+
+    private static readonly Dictionary<int, (Vector3 Pos, Quaternion Rot)> _plateHome = new();
+
+    /// <summary>
+    /// What is actually driving the lobby camera.
+    ///
+    /// The camera was moved, the log agreed it had moved, and the picture did not change —
+    /// which means something puts it back after this does. The likely culprit is a rig
+    /// rather than the camera itself: this game has objects named "..._Camera/cm", and a
+    /// virtual-camera brain re-poses the real camera every frame in LateUpdate, long after
+    /// any of this runs. Moving the camera under a brain is futile; the brain has to be
+    /// moved, or stopped.
+    ///
+    /// So this names every camera in the scene and every component on it, and anything
+    /// nearby that looks like a rig, once, so the right thing can be moved.
+    /// </summary>
+    private static void ReportCameraRig()
+    {
+        if (!Dev.Enabled || _rigReported) return;
+        _rigReported = true;
+
+        try
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("cameras in the lobby:");
+
+            foreach (var c in Resources.FindObjectsOfTypeAll<Camera>())
+            {
+                if (c == null || c.gameObject == null) continue;
+                if (!c.gameObject.scene.IsValid()) continue;
+
+                sb.AppendLine($"  '{Trail(c.transform)}' enabled={c.enabled} active={c.gameObject.activeInHierarchy} " +
+                              $"depth={c.depth} target={(c.targetTexture != null ? "texture" : "screen")} " +
+                              $"at {c.transform.position.ToString("F2")} fov={c.fieldOfView:F1}");
+
+                foreach (var comp in c.GetComponents<Component>())
+                    if (comp != null)
+                        sb.AppendLine($"       component {comp.GetIl2CppType().Name}");
+            }
+
+            // Anything that looks like a virtual camera or a brain, wherever it lives.
+            int rigs = 0;
+            foreach (var go in Resources.FindObjectsOfTypeAll<Transform>())
+            {
+                if (go == null || go.gameObject == null || !go.gameObject.scene.IsValid()) continue;
+                foreach (var comp in go.GetComponents<Component>())
+                {
+                    if (comp == null) continue;
+                    string n = comp.GetIl2CppType().Name;
+                    if (n.IndexOf("Cinemachine", StringComparison.OrdinalIgnoreCase) < 0 &&
+                        n.IndexOf("Brain", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                    if (++rigs > 24) break;
+                    sb.AppendLine($"  rig '{Trail(go)}' has {n} " +
+                                  $"active={go.gameObject.activeInHierarchy} at {go.position.ToString("F2")}");
+                }
+                if (rigs > 24) break;
+            }
+            if (rigs == 0) sb.AppendLine("  no virtual-camera rig found - the camera is posed by ordinary code");
+
+            Dev.Log("podium", sb.ToString().TrimEnd());
+        }
+        catch (Exception e) { Dev.Warn("podium", $"could not read the camera rig: {e.Message}"); }
+    }
+
+    private static bool _rigReported;
+
+    private static string Trail(Transform t)
+    {
+        var parts = new List<string>();
+        var cur = t;
+        int guard = 0;
+        while (cur != null && guard++ < 8) { parts.Insert(0, cur.name); cur = cur.parent; }
+        return string.Join("/", parts);
+    }
+
+    /// <summary>
+    /// Say where every player in the lobby actually appears on screen.
+    ///
+    /// "All eight podiums are in shot" is not the same as "eight characters can be seen": a
+    /// player whose body was never moved onto their podium, or who is standing behind
+    /// somebody broad, is in frame and invisible. This reports each player's place in the
+    /// picture as a fraction of the screen, so the ones that cannot be seen can be named
+    /// rather than counted off a screenshot.
+    /// </summary>
+    private static void ReportWhoIsVisible(LobbyController lobby)
+    {
+        if (!Dev.Enabled || _cam == null) return;
+
+        try
+        {
+            var nm = UnityEngine.Object.FindObjectOfType<CustomNetworkManager>();
+            if (nm == null || nm.GamePlayers == null) return;
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"where each player appears, camera at {_cam.transform.position.ToString("F2")}:");
+
+            foreach (var p in nm.GamePlayers)
+            {
+                if (p == null) continue;
+
+                LobbySlot podium = null;
+                foreach (var s in lobby.SpawnSlots)
+                    if (s != null && s.gameObject.name == p.SlotName) { podium = s; break; }
+
+                var head = p.transform.position + Vector3.up * HeadHeight;
+                var v = _cam.WorldToViewportPoint(head);
+                bool onScreen = v.z > 0f && v.x >= 0f && v.x <= 1f && v.y >= 0f && v.y <= 1f;
+
+                float adrift = podium != null
+                    ? Vector3.Distance(p.transform.position, podium.transform.position)
+                    : -1f;
+
+                sb.AppendLine(
+                    $"  '{p.PlayerName}' podium={p.SlotName} " +
+                    $"screen=({v.x:F2},{v.y:F2}) depth={v.z:F1} " +
+                    (onScreen ? "on screen" : "OFF SCREEN") +
+                    (adrift > 0.5f ? $"  !! standing {adrift:F2} from their podium" : ""));
+            }
+
+            Dev.Log("podium", sb.ToString().TrimEnd());
+        }
+        catch (Exception e) { Dev.Warn("podium", $"could not report who is visible: {e.Message}"); }
     }
 
     /// <summary>Is every one of these points inside the picture, with a little room to spare?</summary>

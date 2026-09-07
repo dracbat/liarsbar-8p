@@ -46,21 +46,34 @@ internal static class TurnKickstart
             }
 
             bool anyoneHasTheTurn = false;
-            bool anyoneHasCards = false;
+            bool everyoneIsHolding = true;
+            int dealt = 0;
             int alive = 0;
 
             foreach (var p in m.Players)
             {
-                if (p == null) continue;
-                if (!p.Dead) alive++;
+                if (p == null || p.Dead) { if (p != null && p.HaveTurn) anyoneHasTheTurn = true; continue; }
+                alive++;
                 if (p.HaveTurn) anyoneHasTheTurn = true;
 
                 var gp = p.GetComponent<DeckGameplay>();
-                if (gp != null && gp.cardTypes != null && gp.cardTypes.Count > 0) anyoneHasCards = true;
+                if (gp == null || gp.cardTypes == null || gp.cardTypes.Count == 0)
+                {
+                    everyoneIsHolding = false;      // not dealt yet
+                    continue;
+                }
+
+                dealt++;
+
+                // Being dealt is not the same as holding. Card values arrive well before the
+                // card objects reach anybody's hands, and starting the turn in that gap gives
+                // a player their turn while their hand is still empty - which is exactly what
+                // was reported: bots taking turns before the cards were dealt.
+                if (!gp.HaveCards || !Holding(gp)) everyoneIsHolding = false;
             }
 
-            // A turn is in progress, or the round has not dealt yet: nothing to do.
-            if (anyoneHasTheTurn || !anyoneHasCards || alive < 2)
+            // A turn is in progress, or the round has not finished dealing: nothing to do.
+            if (anyoneHasTheTurn || dealt == 0 || !everyoneIsHolding || alive < 2)
             {
                 _stalledSince = 0f;
                 if (anyoneHasTheTurn) _startedThisRound = true;
@@ -76,18 +89,38 @@ internal static class TurnKickstart
             // to the next player, and that schedule does not always complete - a table
             // where everyone is dealt and nobody can act is stuck whether it is the first
             // turn or the fifth. Both are the same stall and get the same nudge.
+            int wanted = m.ActivePlayerSlot;
+            bool waiting = WaitingToPlay(m, wanted);
+
             Plugin.Log.LogWarning(
-                $"[turnstart] {alive} players are dealt and holding cards but nobody has the turn " +
-                $"after {GraceSeconds:F0}s ({(_startedThisRound ? "mid-round" : "start of round")}) - moving it on");
+                $"[turnstart] all {alive} players are holding their cards but nobody has the turn " +
+                $"after {GraceSeconds:F0}s ({(_startedThisRound ? "mid-round" : "start of round")}) - " +
+                (waiting
+                    ? $"seat {wanted} is due to play and has not been given it"
+                    : "moving it on"));
             _startedThisRound = true;
 
-            m.GiveTurn();
+            // The distinction matters, and getting it wrong skipped every other player. When
+            // the game has already moved the active slot on and only failed to hand the turn
+            // over, that seat must simply be *given* it. Advancing again from there steps
+            // past a player who never got to act: seat 1, then 3, then 5.
+            if (waiting) m.GiveTurnToActiveSlot();
+            else m.GiveTurn();
 
             bool started = false;
             foreach (var p in m.Players) if (p != null && p.HaveTurn) started = true;
 
             if (started)
                 Plugin.Log.LogInfo($"[turnstart] turn started; active slot is {m.ActivePlayerSlot}");
+            else if (waiting)
+            {
+                // Giving it to the seat that was due did not take; fall back to advancing.
+                Plugin.Log.LogWarning("[turnstart] seat " + wanted + " would not take the turn - advancing instead");
+                m.GiveTurn();
+                foreach (var p in m.Players) if (p != null && p.HaveTurn) started = true;
+                if (!started)
+                    Plugin.Log.LogError("[turnstart] the turn could not be given to anybody - the round cannot proceed");
+            }
             else
                 Plugin.Log.LogError(
                     "[turnstart] asked the game to give the turn and it still did not - the round " +
@@ -98,5 +131,45 @@ internal static class TurnKickstart
             Plugin.Log.LogError($"[turnstart] failed: {e.Message}");
             _startedThisRound = true;      // do not retry a throwing path every quarter second
         }
+    }
+
+    /// <summary>
+    /// Is there a living player on the active seat who has not yet been given the turn?
+    ///
+    /// This is the ordinary stall: the game moves the active slot on after somebody plays
+    /// and then does not complete the handover, so a seat is due to play and holds nothing.
+    /// Telling those two cases apart is what stops the turn skipping every other player.
+    /// </summary>
+    private static bool WaitingToPlay(Manager m, int slot)
+    {
+        try
+        {
+            if (slot < 0 || m.Players == null) return false;
+            foreach (var p in m.Players)
+                if (p != null && p.Slot == slot && !p.Dead && !p.HaveTurn) return true;
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// Are this player's cards actually in their hands?
+    ///
+    /// <c>HaveCards</c> is a flag the game sets, and it sets it for everybody while players
+    /// in the added seats hold nothing. The card objects being switched on is the physical
+    /// fact. <c>activeSelf</c> rather than <c>activeInHierarchy</c>, because a whole hand is
+    /// hidden while a player has their cards down and that says nothing about the deal.
+    /// </summary>
+    private static bool Holding(DeckGameplay gp)
+    {
+        try
+        {
+            if (gp.Cards == null || gp.cardTypes == null) return false;
+            int on = 0;
+            foreach (var c in gp.Cards)
+                if (c != null && c.activeSelf) on++;
+            return on >= gp.cardTypes.Count;
+        }
+        catch { return false; }
     }
 }

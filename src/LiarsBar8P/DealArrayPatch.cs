@@ -109,12 +109,122 @@ internal static class DealArrayPatch
             Plugin.Log.LogInfo(
                 $"[dealarray] {owner.Name}.{routine}: the deal's player array grows " +
                 $"{Limits.VanillaPlayers} -> {want}, so seats {Limits.VanillaPlayers}+ can be dealt to");
+
+            PatchSeatCursor(owner, routine, state, code, want);
             return 1;
         }
         catch (Exception e)
         {
             Plugin.Log.LogError($"[dealarray] {owner.Name}.{routine}: {e.Message}");
             return 0;
+        }
+    }
+
+    /// <summary>
+    /// Raise the number of seats the deal actually walks.
+    ///
+    /// This is the one that mattered most, and it hid behind the array. The routine does not
+    /// deal everybody in one pass: it deals ONE seat, then increments a cursor on the manager
+    /// and re-launches itself for the next. The cursor is compared against four:
+    ///
+    ///     mov eax,[rsi+258h]      ; the seat cursor, zeroed in ResetRound
+    ///     inc eax
+    ///     mov [rsi+258h],eax
+    ///     cmp eax,4               ; &lt;- this
+    ///     jl  &lt;deal the next seat&gt;
+    ///
+    /// Below four it goes round again; at four it stops re-launching and moves on to give out
+    /// the first turn. So with the array grown, all eight players are put into it correctly —
+    /// and then only the first four are visited. Seats four and beyond are never told the game
+    /// has started and never told they are holding cards, which is exactly what was reported:
+    /// the corner seats dealt on paper and empty in the hand. The turn is then handed out
+    /// regardless, which is why it could arrive before anybody was holding anything.
+    ///
+    /// The two builds of this routine differ in both base register and field offset, so the
+    /// shape is matched rather than the bytes: any `mov eax,[base+disp32]` / `inc eax` /
+    /// `mov [base+disp32],eax` with the SAME base and offset, followed by `cmp eax,4` and a
+    /// `jl`. Requiring the increment and the matching store is what makes it unmistakable —
+    /// a bare `cmp eax,4` would not be.
+    ///
+    /// Fewer players than the maximum is safe: an unvisited slot in the array is null, the
+    /// routine's own null check sends it round to the next seat, and the cursor simply steps
+    /// past at the cost of one short wait each.
+    /// </summary>
+    private static void PatchSeatCursor(Type owner, string routine, Type state, IntPtr code, int want)
+    {
+        try
+        {
+            if (want > 127)
+            {
+                Plugin.Log.LogWarning("[dealarray] the seat cursor is a byte-sized compare - " +
+                                      $"{want} will not fit, so the deal is left walking four seats");
+                return;
+            }
+
+            IntPtr site = IntPtr.Zero;
+            int hits = 0;
+
+            for (int i = 0; i < ScanBytes; i++)
+            {
+                int p = i;
+                bool rex = false;
+
+                if (!NativeCode.TryReadByte(code, p, out byte b0)) continue;
+                if (b0 == 0x41) { rex = true; p++; if (!NativeCode.TryReadByte(code, p, out b0)) continue; }
+
+                if (b0 != 0x8B) continue;                                    // mov r32, r/m32
+                if (!NativeCode.TryReadByte(code, p + 1, out byte modrm)) continue;
+                if ((modrm & 0xC0) != 0x80) continue;                        // [base + disp32]
+                if ((modrm & 0x38) != 0x00) continue;                        // into eax
+                if ((modrm & 0x07) == 0x04) continue;                        // no SIB form
+                if (!NativeCode.TryReadInt32(code, p + 2, out int disp)) continue;
+
+                int q = p + 6;
+                if (!NativeCode.TryReadByte(code, q, out byte inc0) || inc0 != 0xFF) continue;
+                if (!NativeCode.TryReadByte(code, q + 1, out byte inc1) || inc1 != 0xC0) continue;   // inc eax
+                q += 2;
+
+                if (rex)
+                {
+                    if (!NativeCode.TryReadByte(code, q, out byte r2) || r2 != 0x41) continue;
+                    q++;
+                }
+
+                if (!NativeCode.TryReadByte(code, q, out byte st) || st != 0x89) continue;           // mov r/m32, r32
+                if (!NativeCode.TryReadByte(code, q + 1, out byte stm) || stm != modrm) continue;    // same base, same reg
+                if (!NativeCode.TryReadInt32(code, q + 2, out int disp2) || disp2 != disp) continue; // same field
+                q += 6;
+
+                if (!NativeCode.TryReadByte(code, q, out byte cmp) || cmp != 0x83) continue;         // cmp r/m32, imm8
+                if (!NativeCode.TryReadByte(code, q + 1, out byte cmpr) || cmpr != 0xF8) continue;   // ...eax
+                if (!NativeCode.TryReadByte(code, q + 2, out byte imm) || imm != Limits.VanillaPlayers) continue;
+                if (!NativeCode.TryReadByte(code, q + 3, out byte jl) || jl != 0x7C) continue;       // jl short
+
+                hits++;
+                if (hits == 1) site = code + q + 2;
+            }
+
+            if (hits != 1)
+            {
+                Plugin.Log.LogWarning(
+                    $"[dealarray] {state.Name}: expected one seat cursor limit, found {hits} - " +
+                    "left as shipped, so the deal will still stop after four seats");
+                return;
+            }
+
+            if (!NativeCode.WriteByte(site, (byte)want))
+            {
+                Plugin.Log.LogError($"[dealarray] {state.Name}: could not raise the seat cursor limit");
+                return;
+            }
+
+            Plugin.Log.LogInfo(
+                $"[dealarray] {owner.Name}.{routine}: the deal now walks {want} seats rather than " +
+                $"{Limits.VanillaPlayers}, so every seat is dealt and told the round has begun");
+        }
+        catch (Exception e)
+        {
+            Plugin.Log.LogError($"[dealarray] {owner.Name}.{routine} seat cursor: {e.Message}");
         }
     }
 }
