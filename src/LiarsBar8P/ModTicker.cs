@@ -39,6 +39,9 @@ internal sealed class ModTicker : MonoBehaviour
         try { BotBehaviour.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[bot] tick failed: {e.Message}"); }
 
+        try { SeatRing.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[seatring] tick failed: {e.Message}"); }
+
         try { DevShots.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[shots] tick failed: {e.Message}"); }
 

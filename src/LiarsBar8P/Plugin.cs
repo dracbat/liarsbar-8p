@@ -10,7 +10,7 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "liarsbar.eightplayers";
-    public const string Version = "0.28.0";
+    public const string Version = "0.29.0";
 
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
@@ -20,6 +20,7 @@ public class Plugin : BasePlugin
     public static ConfigEntry<bool> DiagDeckPatchTest;
     public static ConfigEntry<bool> DeveloperMode;
     public static ConfigEntry<bool> DevAutoTest;
+    public static ConfigEntry<int> DevTestPlayers;
     public static ConfigEntry<float> DevShotSeconds;
 
     public override void Load()
@@ -56,6 +57,13 @@ public class Plugin : BasePlugin
             "With developer mode on: once a lobby is hosted, fill it with bots and start the " +
             "match automatically, printing the state at each step. One launch, one whole round, " +
             "no keyboard.");
+
+        DevTestPlayers = Config.Bind("Developer", "AutoTestPlayers", 0,
+            "With AutoTestFullTable on: how many players to sit at the table, counting the " +
+            "host. Zero means fill every seat. Set it to 5 or 6 to test a partly full table, " +
+            "where the seats have to be re-spaced - that is a different case from a full ring " +
+            "and has to be tested without changing MaxPlayers, which would change what is " +
+            "being tested.");
 
         DevShotSeconds = Config.Bind("Developer", "ScreenshotEverySeconds", 0f,
             "With developer mode on: take a screenshot this often, into " +

@@ -262,7 +262,12 @@ internal static class BotManager
         }
     }
 
-    internal static void FillToMax()
+    internal static void FillToMax() => FillTo(Limits.Max);
+
+    /// <summary>
+    /// Add bots until the lobby holds <paramref name="target"/> players, the host included.
+    /// </summary>
+    internal static void FillTo(int target)
     {
         try
         {
@@ -270,10 +275,12 @@ internal static class BotManager
             var nm = Dev.Net;
             if (nm == null || nm.GamePlayers == null) { Dev.Warn("bot", "host a lobby first"); return; }
 
-            int want = Limits.Max - nm.GamePlayers.Count;
-            if (want <= 0) { Dev.Warn("bot", $"already at {nm.GamePlayers.Count}/{Limits.Max}"); return; }
+            if (target > Limits.Max) target = Limits.Max;
 
-            Dev.Log("bot", $"filling {nm.GamePlayers.Count} -> {Limits.Max}");
+            int want = target - nm.GamePlayers.Count;
+            if (want <= 0) { Dev.Warn("bot", $"already at {nm.GamePlayers.Count}/{target}"); return; }
+
+            Dev.Log("bot", $"filling {nm.GamePlayers.Count} -> {target}");
             for (int i = 0; i < want; i++) AddBot();
         }
         catch (Exception e) { Dev.Warn("bot", $"fill failed: {e}"); }
