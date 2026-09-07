@@ -8,6 +8,41 @@ so far is below it. Versions that were once numbered 1.x and 2.x were folded int
 0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
 is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v0.28.0 — tested with real players at last
+
+Every test until now used fake players made inside the host's own process. They fill seats
+and play cards, but they have no network connection at all, so nothing that happens *between*
+machines was ever exercised — which is exactly where a real table breaks. Twice now, "it
+worked with bots" has meant nothing.
+
+**Several real copies of the game can now be run on one machine and played against each
+other.** Two facts made it possible: copies of the game will run side by side, and the build
+already contains a plain TCP transport (Telepathy) beside the Steam one, so Mirror can be
+pointed at 127.0.0.1 instead of Steam. Steam itself cannot do this — every copy signs into
+the same account, so they cannot be distinct members of one lobby.
+
+A five player game has now been played this way, with five genuine connections: all five
+seated on their own seats, a deck of 25 dealt in the right proportions, every player holding
+their cards, and the turn passing from one to the next. No errors from the mod on any of the
+five.
+
+What that immediately found and fixed:
+
+- **The deal fallback was re-dealing to everybody, every round.** With real clients the cards
+  arrive correctly but the flag saying a player is holding them lags behind. The fallback saw
+  "not holding" and handed out five fresh hands over the network each round. It now tells the
+  two cases apart: cards present but unflagged is just a flag to set, and only a genuinely
+  empty hand is dealt again.
+- **Two players with the same name were treated as the same person.** The guard against one
+  player being seated twice fell back to matching on display name, so two friends who happen
+  to share a Steam name would have had one of them silently dropped from the table. It now
+  only falls back to names when there is no Steam id to go on at all.
+- **Every copy of the game now writes its own log.** BepInEx writes one log file in the game
+  folder, so a second copy could not open it and everything it had to say was lost.
+
+Developer-only and off unless asked for: the harness is driven by environment variables, so a
+normal installation is untouched.
+
 ## v0.27.0 — the turn is written down, and the table is clean
 
 - **Whose turn it is now appears in words**, top left, under the round card and the claim.

@@ -301,8 +301,13 @@ internal static class TableFill
             foreach (var known_ in m.Players) if (known_ == ps) { known = true; break; }
             if (known) continue;
 
-            bool sameFace = (ps.Player_Id != 0 && ids.Contains(ps.Player_Id))
-                            || (!string.IsNullOrEmpty(ps.PlayerName) && names.Contains(ps.PlayerName));
+            // Same person, or merely the same name? A Steam id is unique and settles it. The
+            // name only settles it when there is no id to go on at all - two friends with the
+            // same display name are two players, and dropping one of them because they picked
+            // the same name would be a far worse bug than the one this guard is for.
+            bool sameFace = ps.Player_Id != 0
+                ? ids.Contains(ps.Player_Id)
+                : (!string.IsNullOrEmpty(ps.PlayerName) && names.Contains(ps.PlayerName) && NoIdsAtAll(m));
             if (sameFace)
             {
                 Plugin.Log.LogWarning(
@@ -326,6 +331,18 @@ internal static class TableFill
     /// whichever of them is found first acts for both. StartGame produces this above four
     /// players, so any duplicate is moved to a free seat.
     /// </summary>
+    /// <summary>Is nobody at this table carrying a Steam id, so only names are left to go on?</summary>
+    private static bool NoIdsAtAll(Manager m)
+    {
+        try
+        {
+            foreach (var p in m.Players)
+                if (p != null && p.Player_Id != 0) return false;
+        }
+        catch { }
+        return true;
+    }
+
     private static void Separate(Manager m)
     {
         var taken = new Dictionary<int, PlayerStats>();
@@ -340,8 +357,9 @@ internal static class TableFill
             // the second one a seat of its own is how one player became two at opposite
             // sides of the table. Drop it instead.
             var sitting = taken[ps.Slot];
-            bool sameFace = (ps.Player_Id != 0 && ps.Player_Id == sitting.Player_Id)
-                            || (!string.IsNullOrEmpty(ps.PlayerName) && ps.PlayerName == sitting.PlayerName);
+            bool sameFace = ps.Player_Id != 0 || sitting.Player_Id != 0
+                ? ps.Player_Id == sitting.Player_Id
+                : !string.IsNullOrEmpty(ps.PlayerName) && ps.PlayerName == sitting.PlayerName;
             if (sameFace)
             {
                 Plugin.Log.LogWarning(

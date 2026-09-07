@@ -834,7 +834,7 @@ internal static class LobbyPodiums
             away = away.sqrMagnitude < 1e-4f ? -Vector3.forward : away.normalized;
 
             bool found = false, haveFallback = false;
-            float bestCost = float.MaxValue, fbCost = float.MaxValue;
+            float bestCost = float.MaxValue;
             Vector3 bestPos = Vector3.zero, fbPos = Vector3.zero;
             Quaternion bestRot = Quaternion.identity, fbRot = Quaternion.identity;
             float bestFov = 0f, fbFov = 0f;
