@@ -4,205 +4,226 @@ using UnityEngine;
 namespace LiarsBar8P;
 
 /// <summary>
-/// Gives every seat the marking on the table that the shipped four seats have.
+/// Takes the markings off the table.
 ///
-/// The table carries a group called <c>TurnArrows</c> holding four discs, each turned to a
-/// different quarter of the table — 180, 90, 0 and 270 degrees, which are exactly the
-/// bearings of the four seats the game shipped with. Each draws a pale chevron on the
-/// tabletop in front of its seat.
+/// The table carries a group the game calls <c>TurnArrows</c>: four discs, each drawing a
+/// pale chevron on the tabletop in front of one of the four seats the game shipped with.
+/// The name is misleading and it cost a night to establish that they are not a turn
+/// indicator at all. In a four player round all four are switched on at once, on every turn;
+/// nothing drawn on the tabletop changes angle when the turn moves, at four players or at
+/// eight; and nothing in the game's code aims anything at a player. They are static seat
+/// markings, and the game simply leaves them on.
 ///
-/// The name is misleading, and it cost a night to establish that. They are *not* a turn
-/// indicator. In a four player round all four are switched on at once, on every turn, and
-/// nothing drawn on the tabletop changes angle when the turn moves — verified by watching
-/// every drawn thing on the table across turns, at four players and at eight. Nothing in
-/// the game's code aims anything at a player either. They are seat markings, and the game
-/// simply leaves them on.
+/// Which is why they mislead at eight. The seats sit forty-five degrees apart on the same
+/// circle, so four markings land on every *other* seat: the chevron nearest whoever is
+/// playing usually belongs to their neighbour. Reading it as "whose turn is it" gives the
+/// wrong answer half the time, and that is precisely what was reported.
 ///
-/// Which explains the report exactly. With eight players the seats sit forty-five degrees
-/// apart on the same circle, so the four shipped markings land on seats 0, 2, 4 and 6 and
-/// the other four seats have none. A player reads the marking nearest whoever is playing
-/// and finds it belongs to their neighbour: "the arrow is pointing at the person to the
-/// right".
-///
-/// So the fix is not to aim anything. It is to give the other four seats the marking they
-/// are missing, by copying one of the shipped discs and turning it to the seat's own
-/// bearing — the same relationship the shipped four already have with their seats. Copying
-/// carries the artwork's own orientation with it, whatever that is, so no assumption is
-/// made about which way the chevron is painted. Each seat ends up marked exactly as the
-/// game marks a seat.
-///
-/// At four players there is nothing to add and this does nothing at all.
+/// Giving every seat its own marking was tried and it works, but it does not help: eight
+/// identical static chevrons say no more about the turn than four did. So they are removed,
+/// and whose turn it is is stated in words instead - see <see cref="TurnHud"/>.
 /// </summary>
 internal static class TurnPointer
 {
-    /// <summary>Copies this mod makes, named so they can be recognised again.</summary>
+    /// <summary>Copies an earlier build of this mod may have left on the table.</summary>
     private const string Prefix = "SeatMark8P_";
 
     private static Manager _match;
-    private static Transform _group;
-    private static bool _done;
+    private static Transform[] _groups;
+    private static bool _said;
+    private static bool _broken;
 
     internal static void Tick()
     {
+        if (_broken) return;
+
         try
         {
             var m = Manager.Instance;
-            if (m == null) { _match = null; return; }
+            if (m == null) { _match = null; _groups = null; return; }
 
             if (!ReferenceEquals(m, _match))
             {
                 _match = m;
-                _group = null;
-                _done = false;
+                _groups = null;
+                _said = false;
             }
 
-            if (_done) return;
-            if (m.Slots == null || m.Slots.Count <= Limits.VanillaPlayers) { _done = true; return; }
-
-            // The seat ring is laid out at the start of a round; before that the seats are
-            // wherever the scene left them and a marking placed now would be in the wrong
-            // place. Waiting for the ring costs nothing.
-            if (!Centre(m, out Vector3 centre)) return;
-
-            if (!Find()) { _done = true; return; }
-
-            MarkEverySeat(m, centre);
-            _done = true;
+            // Held off rather than switched off once. The first attempt cleared them at the
+            // start of the match and they came back part way through - the game switches its
+            // own markings on again as a round begins, so this has to keep up with it.
+            if (_groups == null) _groups = FindGroups();
+            Clear();
         }
         catch (Exception e)
         {
-            Plugin.Log.LogError($"[seatmark] could not mark the seats: {e.Message}");
-            _done = true;
+            Plugin.Log.LogError($"[seatmark] could not clear the table markings: {e.Message}");
+            _broken = true;
         }
     }
 
     /// <summary>
-    /// Make sure there is one marking per seat, each turned to its seat's bearing.
+    /// The marking groups, found once per match.
     ///
-    /// The shipped discs are left exactly as they are: their bearings already match the
-    /// seats they belong to. Only the seats without one get a copy.
+    /// Searching the whole scene every quarter second to switch off four objects would be
+    /// silly; the transforms do not move, so they are looked up once and kept.
     /// </summary>
-    private static void MarkEverySeat(Manager m, Vector3 centre)
+    private static Transform[] FindGroups()
     {
-        var template = FirstDrawn();
-        if (template == null)
+        var found = new System.Collections.Generic.List<Transform>();
+        foreach (var t in UnityEngine.Object.FindObjectsOfType<Transform>(true))
         {
-            Plugin.Log.LogInfo("[seatmark] the table has no seat marking to copy - left as it is");
-            return;
+            if (t == null || t.gameObject == null) continue;
+            string n = t.gameObject.name;
+
+            // The group itself, and every disc of the same artwork anywhere on the table.
+            // The one proven to draw the chevron is called "CirclePoker (2)" and lives in
+            // the group; the others are its siblings, and one of those kept drawing after
+            // the group was switched off.
+            if (n == "TurnArrows" || n == "Circle" || n.StartsWith("CirclePoker")) found.Add(t);
         }
+        return found.ToArray();
+    }
 
-        int added = 0, already = 0;
+    /// <summary>
+    /// Switch off every marking, including any this mod added in an earlier version.
+    ///
+    /// Switched off rather than destroyed: these are the game's own scene objects, and a
+    /// mod that deletes scene objects has nothing to give back if it turns out to be wrong.
+    /// </summary>
+    private static void Clear()
+    {
+        if (_groups == null || _groups.Length == 0) return;
 
-        for (int slot = 0; slot < m.Slots.Count; slot++)
+        int off = 0, removed = 0;
+
+        foreach (var t in _groups)
         {
-            var seat = m.Slots[slot];
-            if (seat == null) continue;
+            if (t == null || t.gameObject == null) continue;
 
-            var d = seat.position - centre;
-            if (new Vector2(d.x, d.z).sqrMagnitude < 1e-4f) continue;
-            float bearing = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg;
+            // Children are only ever switched off inside the TurnArrows group, where every
+            // child is a marking. The sibling discs are NOT walked: one of them is the
+            // parent of "kartdon", card furniture the table needs, and switching off every
+            // child of every disc took that with it - a quarter of a second into any round,
+            // repeatedly, so the game could never put it back.
+            bool markingsOnly = t.gameObject.name == "TurnArrows";
 
-            if (HasMarkAt(bearing)) { already++; continue; }
+            if (markingsOnly)
+                for (int i = t.childCount - 1; i >= 0; i--)
+                {
+                    var c = t.GetChild(i);
+                    if (c == null) continue;
 
-            string name = Prefix + slot;
-            Transform mark = null;
-            for (int i = 0; i < _group.childCount; i++)
+                    if (c.gameObject.name.StartsWith(Prefix))
+                    {
+                        // A copy this mod made. That one really can go.
+                        UnityEngine.Object.Destroy(c.gameObject);
+                        removed++;
+                        continue;
+                    }
+
+                    if (c.gameObject.activeSelf) { c.gameObject.SetActive(false); off++; }
+                }
+
+            // The disc's own renderer, rather than the object. One of these discs is the
+            // parent of card furniture ("kartdon"), and switching the object off would take
+            // that with it; switching off only what it draws leaves everything underneath
+            // working and simply stops the marking appearing.
+            var own = t.GetComponent<Renderer>();
+            if (own != null && own.enabled) { own.enabled = false; off++; }
+
+            // A group with nothing but markings under it can go entirely.
+            if (markingsOnly && t.gameObject.activeSelf)
             {
-                var c = _group.GetChild(i);
-                if (c != null && c.gameObject.name == name) { mark = c; break; }
-            }
-
-            if (mark == null)
-            {
-                var copy = UnityEngine.Object.Instantiate(template.gameObject, _group);
-                if (copy == null) continue;
-                copy.name = name;
-                mark = copy.transform;
-            }
-
-            mark.position = template.position;
-            mark.localScale = template.localScale;
-            mark.rotation = Quaternion.Euler(0f, bearing, 0f);
-            mark.gameObject.SetActive(true);
-            added++;
-        }
-
-        Plugin.Log.LogInfo(
-            $"[seatmark] {already} of the table's seat markings were already in place and {added} " +
-            $"were added, so all {m.Slots.Count} seats are marked as the game marks its own four");
-    }
-
-    /// <summary>Is one of the existing markings already turned to this bearing?</summary>
-    private static bool HasMarkAt(float bearing)
-    {
-        for (int i = 0; i < _group.childCount; i++)
-        {
-            var c = _group.GetChild(i);
-            if (c == null || c.gameObject.name.StartsWith(Prefix)) continue;
-            if (Mathf.Abs(Mathf.DeltaAngle(c.rotation.eulerAngles.y, bearing)) < 5f)
-            {
-                if (!c.gameObject.activeSelf) c.gameObject.SetActive(true);
-                return true;
+                t.gameObject.SetActive(false);
+                off++;
             }
         }
-        return false;
-    }
 
-    /// <summary>A shipped marking that actually draws something, to copy from.</summary>
-    private static Transform FirstDrawn()
-    {
-        for (int i = 0; i < _group.childCount; i++)
+        if ((off > 0 || removed > 0) && !_said)
         {
-            var c = _group.GetChild(i);
-            if (c == null || c.gameObject.name.StartsWith(Prefix)) continue;
-            var r = c.GetComponentInChildren<Renderer>(true);
-            if (r != null) return c;
+            _said = true;
+            Plugin.Log.LogInfo(
+                $"[seatmark] the table's seat markings are switched off ({off} objects" +
+                (removed > 0 ? $", {removed} added by an earlier build removed" : "") +
+                ") and held off - whose turn it is is shown in the corner instead");
         }
-        return null;
     }
 
-    private static bool Centre(Manager m, out Vector3 centre)
+    /// <summary>
+    /// Name anything still drawn on the tabletop, so a marking that survives can be found.
+    ///
+    /// Switching off the group the chevron demonstrably belongs to should be the end of it,
+    /// but it has come back once already. If any of it is still showing, this says what and
+    /// where rather than leaving it to another round of screenshots.
+    /// </summary>
+    internal static void ReportLeftovers(Manager m)
     {
-        centre = Vector3.zero;
-        int n = 0;
-        foreach (var s in m.Slots) { if (s == null) continue; centre += s.position; n++; }
-        if (n == 0) return false;
-        centre /= n;
+        if (!Dev.Enabled) return;
 
-        // Before the ring is laid out the seats are not evenly spaced; every seat being the
-        // same distance from the middle is what says the layout has happened.
-        float first = -1f;
-        foreach (var s in m.Slots)
-        {
-            if (s == null) continue;
-            var d = s.position - centre;
-            float r = new Vector2(d.x, d.z).magnitude;
-            if (first < 0f) first = r;
-            else if (Mathf.Abs(r - first) > 0.15f) return false;
-        }
-        return first > 0.1f;
-    }
-
-    private static bool Find()
-    {
-        if (_group != null) return true;
         try
         {
-            foreach (var t in UnityEngine.Object.FindObjectsOfType<Transform>(true))
+            if (m == null || m.Slots == null || m.Slots.Count == 0) return;
+
+            Vector3 centre = Vector3.zero;
+            int n = 0;
+            foreach (var s in m.Slots) { if (s == null) continue; centre += s.position; n++; }
+            if (n == 0) return;
+            centre /= n;
+
+            var sb = new System.Text.StringBuilder("still drawn on the tabletop:\n");
+            int shown = 0;
+
+            foreach (var r in UnityEngine.Object.FindObjectsOfType<Renderer>())
             {
-                if (t == null || t.gameObject == null) continue;
-                if (t.gameObject.name != "TurnArrows" || t.childCount == 0) continue;
-                _group = t;
-                if (!t.gameObject.activeSelf) t.gameObject.SetActive(true);
-                return true;
+                if (r == null || !r.enabled || r.gameObject == null) continue;
+                if (!r.gameObject.activeInHierarchy) continue;
+                if (r.GetComponentInParent<PlayerStats>() != null) continue;
+
+                // Whether the drawn thing *overlaps* the tabletop, rather than whether its
+                // middle happens to sit there. A decal or a wide flat mesh has its middle at
+                // the table centre or off it entirely, and the first version of this missed
+                // exactly that.
+                var b = r.bounds;
+                if (b.min.y > centre.y + 1.2f || b.max.y < centre.y + 0.5f) continue;
+                var d = b.center - centre;
+                float flat = new Vector2(d.x, d.z).magnitude - new Vector2(b.extents.x, b.extents.z).magnitude;
+                if (flat > 1.6f) continue;
+
+                var path = r.transform;
+                var parts = new System.Collections.Generic.List<string>();
+                int guard = 0;
+                while (path != null && guard++ < 5) { parts.Insert(0, path.name); path = path.parent; }
+
+                if (++shown > 30) break;
+                sb.AppendLine($"  '{string.Join("/", parts)}' reaches {flat:F2} from the rim, " +
+                              $"height {d.y:F2}, size {b.size.ToString("F2")}");
             }
-            Plugin.Log.LogInfo("[seatmark] this table has no seat markings to extend");
-            return false;
+
+            if (shown == 0) sb.AppendLine("  no drawn object overlaps the tabletop");
+
+            // Decals are not renderers, so nothing above would ever find one.
+            int decals = 0;
+            foreach (var t in UnityEngine.Object.FindObjectsOfType<Transform>())
+            {
+                if (t == null || t.gameObject == null || !t.gameObject.activeInHierarchy) continue;
+                var dd = t.position - centre;
+                if (new Vector2(dd.x, dd.z).magnitude > 2f) continue;
+
+                foreach (var comp in t.GetComponents<Component>())
+                {
+                    if (comp == null) continue;
+                    string cn = comp.GetIl2CppType().Name;
+                    if (cn.IndexOf("Decal", StringComparison.OrdinalIgnoreCase) < 0 &&
+                        cn.IndexOf("Projector", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                    if (++decals > 12) break;
+                    sb.AppendLine($"  DECAL '{t.name}' has {cn} at {t.position.ToString("F2")}");
+                }
+                if (decals > 12) break;
+            }
+            if (decals == 0) sb.AppendLine("  no decal projectors near the table either");
+            Dev.Log("seatmark", sb.ToString().TrimEnd());
         }
-        catch (Exception e)
-        {
-            Plugin.Log.LogWarning($"[seatmark] could not find the seat markings: {e.Message}");
-            return false;
-        }
+        catch { }
     }
 }

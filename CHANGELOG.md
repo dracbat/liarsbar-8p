@@ -8,6 +8,46 @@ so far is below it. Versions that were once numbered 1.x and 2.x were folded int
 0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
 is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v0.27.0 — the turn is written down, and the table is clean
+
+- **Whose turn it is now appears in words**, top left, under the round card and the claim.
+  "BOT-7's turn", or "Your turn" in green when it is you. This is the thing the markings on
+  the table were being read as, and it says it plainly instead.
+
+- **The markings on the table are gone.** They were never a turn indicator: at four players
+  all four are switched on at once on every turn, nothing drawn on the tabletop changes
+  angle when the turn moves, and nothing in the game aims anything at a player. They are
+  four static seat markings, so with eight seats they sit in front of every *other* seat and
+  the one nearest the player up is usually their neighbour's. They are switched off and held
+  off, because the game turns them back on as each round begins.
+
+- **The lobby camera steps back rather than climbing.** It was rising four metres and looking
+  down at the tops of everyone's heads - which also put each name plate, and the
+  character-select panel in the same group, on top of the character's own body, so nobody
+  could find where to click to change character. It now prefers stepping back, rises only as
+  much as it must, and chooses the framing that leaves the fewest people hidden behind
+  somebody rather than the first one that merely fits everybody in.
+
+- **The name plates are turned to face the camera and otherwise left alone.** Moving them was
+  the mistake above; the game already puts each one beside the podium it belongs to.
+
+- **The camera move is smooth.** The blend was being stepped on the half-second sweep that
+  does the podium bookkeeping, so a move lasting a second and a bit was sampled about three
+  times. It runs every frame now; the bookkeeping still does not.
+
+Four defects found by an audit of the whole mod and fixed:
+
+- **The seat ring sank a metre every round at two or three players.** The ring is fitted from
+  the first four seats, and unused seats are parked four metres down - below four players
+  those two sets overlap, so each round fitted the ring partly from a seat the previous round
+  had dropped. The table, and everyone at it, sank and drifted until the game was unplayable.
+- **Renumbered seats never reached the other players.** Compacting seat indices wrote the
+  SyncVar's backing field instead of the synced property, so the host renumbered everybody
+  and told nobody: the seat a player is drawn at, dealt to and given the turn at could
+  disagree between machines.
+- **Clearing the table markings switched off card furniture with them.** Fixed by touching
+  only the marking group's children and, for the discs beside it, only what they draw.
+
 ## v0.26.1 — developer mode stops taking photographs
 
 - **Screenshots are off unless asked for.** Developer mode had begun taking a picture every

@@ -10,7 +10,7 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "liarsbar.eightplayers";
-    public const string Version = "0.26.1";
+    public const string Version = "0.27.0";
 
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
@@ -119,6 +119,10 @@ public class Plugin : BasePlugin
 
             Il2CppInterop.Runtime.Injection.ClassInjector.RegisterTypeInIl2Cpp<ModTicker>();
             go.AddComponent<ModTicker>();
+
+            // Whose turn it is, for every player - not a developer tool.
+            Il2CppInterop.Runtime.Injection.ClassInjector.RegisterTypeInIl2Cpp<TurnHud>();
+            go.AddComponent<TurnHud>();
             Log.LogInfo("  version HUD attached (top left)");
 
             if (DeveloperMode.Value)

@@ -88,8 +88,16 @@ internal static class SeatRing
                     0f, Mathf.Atan2(-Mathf.Cos(rad), -Mathf.Sin(rad)) * Mathf.Rad2Deg, 0f);
             }
 
-            // unused seats go below and outside so nothing is left standing mid-table
-            for (int i = n; i < slots.Count; i++)
+            // Unused seats go below and outside so nothing is left standing mid-table - but
+            // never a seat the fit above reads.
+            //
+            // The ring is fitted from the first four seats, and this loop starts at the
+            // number of players. Below four players those overlap: it parked a seat the fit
+            // reads, and next round the fit averaged in a position four metres down. The
+            // whole ring sank a metre a round at three players, two at two, taking the
+            // players with it, and never recovered. At four and above the two ranges do not
+            // meet and this changes nothing.
+            for (int i = Mathf.Max(n, baseCount); i < slots.Count; i++)
             {
                 var t = slots[i];
                 if (t == null) continue;
