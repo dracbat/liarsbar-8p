@@ -8,6 +8,62 @@ so far is below it. Versions that were once numbered 1.x and 2.x were folded int
 0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
 is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v0.26.0 — every seat is dealt, and dealt a fair deck
+
+The night's work. Two constants found by reading the compiled deal account for most of what
+was wrong with a round of more than four players.
+
+- **The deal only ever visited four seats.** It does not deal everyone in one pass: it deals
+  one seat, steps a cursor on, and re-launches itself for the next — and the cursor stops at
+  four. So with the player array already widened, all eight players were placed into it
+  correctly and then only the first four were ever visited. Seats five to eight were never
+  told the round had begun and never told they were holding cards: dealt on paper, empty in
+  the hand. The deal then declared itself finished and handed out the first turn regardless,
+  which is why a turn could arrive before anybody was holding anything. One constant, and it
+  explains the empty corner seats, the missing hands and the early turn together.
+
+- **More than half the deck was Jokers.** Which face a card gets is decided by three
+  thresholds on its index — under 6 an Ace, under 12 a King, under 18 a Queen, otherwise a
+  Joker — and those are the numbers for a twenty card deck. Doubling the deck without
+  touching them made every card from nineteen up a Joker: twenty-two of forty, against two
+  in twenty as shipped. Not a crash, and worse for it — the game ran and the bluffing was
+  ruined. The mod had patched the method that does this arithmetic, but the compiler had
+  inlined that method into both deals, so the patch had no call site and had never once run.
+  Eight players now get **12 Aces, 12 Kings, 12 Queens and 4 Jokers** — exactly two vanilla
+  decks, which is the composition this was always meant to have.
+
+- **The turn no longer skips every other player.** When the safety net stepped in it advanced
+  from a seat the game had already moved on, so seat 1 was followed by seat 3, then 5. It now
+  distinguishes a seat that is merely waiting to be handed the turn from a table with nobody
+  due, and gives rather than advances.
+
+- **Turns no longer begin before the cards arrive.** The watchdog was watching for card
+  *values* to exist, which happens well before the cards reach anyone's hands.
+
+- **The lobby camera pulls back only when a fifth player joins**, and eases there over about
+  a second rather than cutting; it returns when the table drops back to four. It also had to
+  be taken off the Cinemachine brain that owns the lobby shot — the brain re-poses the camera
+  every frame after everything else runs, so the raised shot was being applied and then
+  overwritten before the frame was drawn.
+
+- **Lobby name plates** hang above the player they name and turn to face the camera while the
+  wider shot is held, so it is clear whose name is whose.
+
+- **Table name plates for the added seats** follow the ring of seats. They had been placed by
+  taking one seat's offset in world space and reusing it for all of them, which left all
+  three at the same angle and outside the ring.
+
+- **A player dropping mid-round** no longer strands the turn: the ring walked to find the next
+  player who can act was four seats wide.
+
+- **The seat markings on the table.** The group the game calls `TurnArrows` is not a turn
+  indicator, despite the name — at four players all four are switched on at once on every
+  turn, and nothing drawn on the table changes angle when the turn moves. They are markings,
+  one per shipped seat. With eight players they land on every *other* seat, so the marking
+  nearest whoever is playing usually belongs to their neighbour, which is what "the arrow is
+  pointing at the person to the right" is. Every seat now has one, copied from the game's own
+  and turned to that seat's bearing.
+
 ## v0.25.1 — the version it says it is
 
 v0.25.0 called itself v0.24.0. **Install this over it.**

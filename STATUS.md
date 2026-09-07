@@ -36,11 +36,21 @@ Confirmed in `BepInEx/LogOutput.log` on a live host, current build:
 
 - **A full round with eight people.** Everything above is either verified solo or
   verified at five. Six, seven and eight have never been in one lobby.
-- **That the table arrow lands on the right person.** It is aimed at the seat in play from
-  the seat ring, and the log shows it following every turn, but nobody has yet watched the
-  table and confirmed the arrow is over the right player's cards.
-- **The raised lobby camera.** The second row is confirmed by eye; the lift that is meant to
-  clear the back row over the front has only been reasoned about, not seen.
+- **What the "arrow" on the table actually is.** The group named `TurnArrows` holds four
+  objects 90° apart, one per shipped seat — and at four players *all four are switched on at
+  once, on every turn*. Nothing drawn on the tabletop changes angle when the turn moves, in
+  a four player round or an eight player one. So they are static seat markings, not a turn
+  indicator: a player reads the marking nearest the person playing, and at eight players
+  there is a marking in front of only every other seat, which is exactly what "the arrow is
+  pointing at the person to the right" looks like. What actually shows whose turn it is has
+  not been identified; `PlayerStats.SetEmissionByTurn` changes a *material* on the player,
+  which no transform-and-active-state scan would ever have caught.
+- **Whether turns pass by themselves with real players.** In every bot run the watchdog has
+  to nudge each turn — but it does so at four players as well, where the game is otherwise
+  vanilla. Bots do not play through the game's own throw path (they clear `HaveTurn`
+  directly), so the game's pass-turn step is never triggered for them. This is most likely
+  an artefact of the bots rather than something a human table hits, and only real players
+  can settle it.
 - **Liar's Dice, Chaos, Spin and Poker.** They share the turn-order and cap fixes, which
   are mode-independent, but no round has been played in them since.
 
