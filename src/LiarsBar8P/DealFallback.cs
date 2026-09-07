@@ -50,6 +50,7 @@ internal static class DealFallback
 
             // Wait until there is something to hand out at all.
             var waiting = new List<PlayerStats>();
+            var flagOnly = new List<PlayerStats>();
             var report = new List<string>();
             int holding = 0, dealt = 0, novalues = 0;
 
@@ -65,15 +66,27 @@ internal static class DealFallback
                 int want = gp.cardTypes.Count;
                 int showing = Showing(gp);
 
-                report.Add($"  seat {p.Slot} '{p.PlayerName}': {want} cards dealt, " +
-                           $"{showing} of {Count(gp.Cards)} card objects switched on " +
-                           $"({Visible(gp)} of them actually in view), holding={gp.HaveCards}");
+                bool mine = IsLocal(p);
 
-                // What matters is whether the cards are actually in the hand, not whether
-                // the game says they are. A player in one of the seats this mod adds could
-                // be marked as holding a hand while holding nothing - which is exactly what
-                // "the corner spots don't get cards" looks like from the inside.
-                if (gp.HaveCards && showing >= want) holding++;
+                report.Add($"  seat {p.Slot} '{p.PlayerName}'{(mine ? " (this machine)" : "")}: " +
+                           $"{want} cards dealt, {showing} of {Count(gp.Cards)} card objects " +
+                           $"switched on, holding={gp.HaveCards}");
+
+                // Two different things can be wrong, and they want different answers.
+                //
+                // Testing with five real connected clients showed the common case plainly:
+                // every player's card objects were switched on - the cards really had been
+                // dealt - while the flag saying they were holding them was still false. That
+                // wants the flag set, and nothing else. Dealing them a hand they already have
+                // means an unnecessary message to every client, every round.
+                //
+                // The other case is the one this exists for: no card objects switched on at
+                // all, which is what a player in an added seat used to get. That wants the
+                // whole hand handed over.
+                bool hasCards = showing >= want;
+
+                if (gp.HaveCards && hasCards) holding++;
+                else if (hasCards) flagOnly.Add(p);
                 else waiting.Add(p);
             }
 
@@ -89,6 +102,18 @@ internal static class DealFallback
 
             if (novalues > 0)
                 Plugin.Log.LogWarning($"[dealcards] {novalues} players were never dealt any cards at all");
+
+            // Dealt, but not yet marked as holding: say so and move on. The turn will not be
+            // given out until everyone is marked, so this is what unblocks the round.
+            foreach (var p in flagOnly)
+            {
+                try
+                {
+                    p.GetComponent<DeckGameplay>().SetHaveCards(true);
+                    Plugin.Log.LogInfo($"[dealcards] '{p.PlayerName}' already had their cards - marked as holding them");
+                }
+                catch (Exception e) { Plugin.Log.LogWarning($"[dealcards] could not mark '{p.PlayerName}': {e.Message}"); }
+            }
 
             if (waiting.Count == 0)
             {
@@ -128,6 +153,22 @@ internal static class DealFallback
             return n;
         }
         catch { return 0; }
+    }
+
+    /// <summary>Is this the player sitting at this computer?</summary>
+    private static bool IsLocal(PlayerStats p)
+    {
+        try
+        {
+            var nm = UnityEngine.Object.FindObjectOfType<CustomNetworkManager>();
+            if (nm == null || nm.GamePlayers == null) return false;
+
+            foreach (var g in nm.GamePlayers)
+                if (g != null && g.isOwned)
+                    return !string.IsNullOrEmpty(g.PlayerName) && g.PlayerName == p.PlayerName;
+        }
+        catch { }
+        return false;
     }
 
     /// <summary>The same count, but for cards a parent is not hiding - only for the report.</summary>

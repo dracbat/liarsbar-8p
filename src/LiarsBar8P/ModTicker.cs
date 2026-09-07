@@ -42,6 +42,9 @@ internal sealed class ModTicker : MonoBehaviour
         try { DevShots.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[shots] tick failed: {e.Message}"); }
 
+        try { Loopback.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[loopback] tick failed: {e.Message}"); }
+
         try { TurnHud.Refresh(); }
         catch (Exception e) { Plugin.Log.LogError($"[turnhud] refresh failed: {e.Message}"); }
 

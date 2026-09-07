@@ -10,7 +10,7 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "liarsbar.eightplayers";
-    public const string Version = "0.27.0";
+    public const string Version = "0.28.0";
 
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
@@ -25,6 +25,10 @@ public class Plugin : BasePlugin
     public override void Load()
     {
         Log = base.Log;
+
+        // Its own log file per process, before anything else can want to write to one.
+        InstanceLog.Start(System.Environment.GetEnvironmentVariable("LIARSBAR8P_ROLE") ?? "game");
+        Loopback.Configure();
 
         MaxPlayers = Config.Bind("General", "MaxPlayers", 8,
             new ConfigDescription("Maximum players per lobby. Every player must run the same value.",
@@ -85,6 +89,9 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(TableFill),      "seat everyone StartGame missed");
         Apply(harmony, typeof(DealTrace),      "deal trace");
         Apply(harmony, typeof(DevLogging),     "developer logging");
+
+        // Only does anything when the loopback harness is running.
+        if (Loopback.Active) Apply(harmony, typeof(LoopbackSteamStub), "loopback steam stub");
 
         if (DiagDeckPatchTest.Value)
         {

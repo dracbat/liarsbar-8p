@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>LiarsBar8P</AssemblyName>
-    <Version>0.27.0</Version>
+    <Version>0.28.0</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -32,6 +32,9 @@
     <Reference Include="Il2Cppmscorlib"><HintPath>$(Interop)\Il2Cppmscorlib.dll</HintPath></Reference>
     <Reference Include="Assembly-CSharp"><HintPath>$(Interop)\Assembly-CSharp.dll</HintPath></Reference>
     <Reference Include="Mirror"><HintPath>$(Interop)\Mirror.dll</HintPath></Reference>
+    <!-- Telepathy, for running several copies of the game against each other over loopback. -->
+    <Reference Include="Mirror.Transports"><HintPath>$(Interop)\Mirror.Transports.dll</HintPath></Reference>
+    <Reference Include="FizzySteamworks"><HintPath>$(Interop)\FizzySteamworks.dll</HintPath></Reference>
     <Reference Include="com.rlabrecque.steamworks.net"><HintPath>$(Interop)\com.rlabrecque.steamworks.net.dll</HintPath></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(Interop)\UnityEngine.CoreModule.dll</HintPath></Reference>
     <Reference Include="UnityEngine"><HintPath>$(Interop)\UnityEngine.dll</HintPath></Reference>
