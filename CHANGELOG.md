@@ -1,7 +1,7 @@
 # Changelog
 
 Every player in a lobby must run the **same version**. The running version is shown in
-the top-left corner in game; the host also warns when someone's build differs.
+the top-left corner in game, and every player is warned when someone's build differs.
 
 **v1.0.0 is reserved for the first release proven to work with eight people.** Everything
 so far is below it. Versions that were once numbered 1.x and 2.x were folded into the same
@@ -60,6 +60,21 @@ on the machine: the ring is fitted from seats that are identical in every copy o
 and divided by a player count everyone agrees on, so each peer arrives at the same
 positions and a client is only moving a body to where the host already put it.
 
+That last clause was not true when it was first written, and an audit of the change caught
+it. The count came from `Manager.Players` — the server's roster, empty on a client — falling
+back to `StartPlayerCount`, which the mod was writing to the **SyncVar's backing field** and
+therefore never sending. A client would have sized the ring for four at a table of eight and
+parked the seats the extra players were sitting in four metres under the floor, taking their
+nameplates and their own cameras with them. The count is now written through the syncing
+property, read from it in preference to the roster, and the parking loop refuses to move a
+seat anyone occupies whatever the count says. Three separate reviewers found this one.
+
+A client also laid out only once, when the player count changed — which on a client happens
+before the other players have spawned. It laid the table out for one body and left everyone
+who arrived a few frames later at the shipped positions, on that screen, for the whole match.
+It now re-lays out when the bodies change too, and forgets what it knew when a new match
+starts.
+
 The seat ring also reports what it actually produced now, a few seconds *after* the round
 is under way rather than at the moment it places anything — where everyone was put and
 where they ended up are different questions, and only the second one is worth anything.
@@ -67,11 +82,68 @@ where they ended up are different questions, and only the second one is worth an
 The chair, it turns out, is part of the character rather than part of the room, so it
 travels with them — there was no furniture left behind.
 
+### Found by auditing the above
+
+Everything in this release was then read back over, and these came out of it. Several are
+faults in the fixes themselves; two would have shipped a broken release to everybody.
+
+- **Nobody but the host could see whose turn it was.** The turn readout walked the server's
+  roster, so it was permanently blank on every client — and the tabletop markings it replaced
+  are switched off on *every* machine. Other players had no indicator at all. It now reads
+  the synced active slot and finds players in the scene, and names the seat when it cannot
+  find a player for it.
+- **Aiming at a neighbour disagreed between machines.** "Who is across from me" also keyed
+  off the server's roster, so a client fell through to the shipped four-seat table and
+  answered seat 0 for every seat above the third, while the host answered correctly.
+- **Both deal methods were Harmony-patched *and* natively rewritten.** The mod's own rule is
+  never to do both to one method, because a detour overwrites the bytes the scan reads. Two
+  logging patches were quietly breaking it; they are gone, and the safety net that was on the
+  deal has moved to `ResetRound`, which nothing scans.
+- **The turn watchdog switched itself off the moment anyone emptied their hand** — for the
+  rest of the round, at exactly the point in a round when stalls are likeliest. It now tells
+  "played out" apart from "not dealt yet", and stands aside during a liar resolution rather
+  than handing somebody the turn in the middle of one.
+- **A release could publish a stale plugin.** Nothing checked that the zip's plugin matched
+  the tag. The zip on disk really did contain 0.28.0 while the tag would have been v0.29.0 —
+  and the installer tells every downloader to check exactly that number on screen, so a
+  correct install would have looked broken to everyone. Now verified inside the zip, and the
+  release aborts naming both numbers.
+- **The "nothing sensitive would be published" gate only looked at tracked files**, and the
+  very next step commits untracked ones and makes the repo public. A stray decompilation
+  dump or a log carrying local paths would have passed. It now checks everything that would
+  actually be committed.
+- **The installer crashed instead of asking.** With no Steam in the registry it died on a raw
+  PowerShell error rather than reaching the "type the folder in yourself" prompt, and its
+  fallback guess for the standard Steam folder expanded to `C:\Program Files(x86)\Steam` —
+  no space, a path that can never exist.
+- **Ordinary players were being written a log they never asked for**: about a megabyte and a
+  half per launch, mirroring BepInEx's own log into a folder nothing ever tidied and the
+  uninstaller does not touch. It is now only written when several copies run at once, which
+  is the case it exists for, and old ones are pruned.
+- The table markings could come back permanently: one transient exception latched the whole
+  thing off for the rest of the process, so later matches showed the misleading chevrons
+  again with nothing in the log to say why. It now retries and gives up per match, loudly.
+- The red version-mismatch banner was never cleared once the lobby ended, so it stayed across
+  the screen for the whole match and back at the main menu, naming somebody who had left.
+- Screenshots overwrote the previous run's in place; each run now gets its own folder, and
+  old ones are capped.
+- A lobby that failed to arrange podiums pushed a 30-second back-off that the *next* lobby
+  inherited, so it spent its first half minute doing nothing.
+- Developer logging was silent on clients — the hooks are on SyncVar setters, which Mirror
+  only calls on the server. Clients now poll, tagged `seen` to be honest that a poll
+  edge-samples.
+- Documentation corrected where it asserted things the code does not do: the version audit
+  runs on every peer rather than the host, `CardTypeFix` has never fired (the thresholds are
+  rewritten inside the deals instead), the turn watchdog does not fire once per round, and
+  the bots no longer clear `HaveTurn` themselves.
+
 ### Also
 
 - A liar call that never resolves now says so in the log and restarts the round, instead of
   freezing the table silently. The trigger pull runs on the losing player's own machine, and
-  a bot has none, so this is a step that can genuinely stop.
+  a bot has none, so this is a step that can genuinely stop. It also checks that the match is
+  not simply *over*: it fired at the exact moment a match was won and dealt a fresh hand to a
+  table with one player left, stepping on the victory screen.
 - `AutoTestPlayers` sets how many sit down in an automatic test. A partly full table has to
   re-space its seats and a full one does not, so they are different cases — and testing the
   five player case by lowering `MaxPlayers` would change what is being tested.

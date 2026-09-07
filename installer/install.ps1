@@ -31,7 +31,11 @@ function Get-SteamRoot {
             }
         } catch { }
     }
-    foreach ($g in @("$env:ProgramFiles(x86)\Steam", "$env:ProgramFiles\Steam", "C:\Steam")) {
+    # Braces are required around a variable name containing brackets. Without them PowerShell
+    # expands $env:ProgramFiles and leaves "(x86)" as literal text, giving
+    # "C:\Program Files(x86)\Steam" - no space, so the one guess that would have found a
+    # standard Steam install could never match anything.
+    foreach ($g in @("${env:ProgramFiles(x86)}\Steam", "$env:ProgramFiles\Steam", "C:\Steam")) {
         if ($g -and (Test-Path $g)) { return $g }
     }
     return $null
@@ -44,8 +48,12 @@ function Get-GameDir {
     $libs = New-Object System.Collections.Generic.List[string]
     if ($SteamRoot) { $libs.Add($SteamRoot) }
 
-    $vdf = Join-Path $SteamRoot 'steamapps\libraryfolders.vdf'
-    if ($SteamRoot -and (Test-Path $vdf)) {
+    # Guard the Join-Path, not just the Test-Path. With no Steam in the registry $SteamRoot is
+    # null, and Join-Path throws on a null Path - so instead of the "type the folder in
+    # yourself" prompt further down, the installer died with a raw PowerShell error and the
+    # person had no way forward.
+    $vdf = if ($SteamRoot) { Join-Path $SteamRoot 'steamapps\libraryfolders.vdf' } else { $null }
+    if ($vdf -and (Test-Path $vdf)) {
         foreach ($m in [regex]::Matches((Get-Content $vdf -Raw), '"path"\s+"([^"]+)"')) {
             $libs.Add(($m.Groups[1].Value -replace '\\\\', '\'))
         }

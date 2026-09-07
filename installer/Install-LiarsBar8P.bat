@@ -64,8 +64,11 @@ function Get-SteamRoot {
 function Get-GameDir ($SteamRoot) {
     $libs = New-Object System.Collections.Generic.List[string]
     if ($SteamRoot) { $libs.Add($SteamRoot) }
-    $vdf = Join-Path $SteamRoot 'steamapps\libraryfolders.vdf'
-    if ($SteamRoot -and (Test-Path $vdf)) {
+    # Join-Path throws on a null Path, and $SteamRoot is null when Steam is not in the
+    # registry - so this crashed with a raw error instead of reaching the prompt that asks
+    # the person to type the folder in themselves.
+    $vdf = if ($SteamRoot) { Join-Path $SteamRoot 'steamapps\libraryfolders.vdf' } else { $null }
+    if ($vdf -and (Test-Path $vdf)) {
         foreach ($m in [regex]::Matches((Get-Content $vdf -Raw), '"path"\s+"([^"]+)"')) {
             $libs.Add(($m.Groups[1].Value -replace '\\\\', '\'))
         }

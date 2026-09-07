@@ -92,8 +92,11 @@ identifiers (`MasaCards` = table cards, `Sansur` = censor, `Sayilar` = numbers).
 Relevant members on `DeckGamePlayManager`:
 
 - `void AddCards(List<int> types)` — builds the deck from a type list
-- `int ToCardTypeBasic(int n)` / `int ToCardTypeDeck2(int n)` — index → card type mapping
-  (**this is the deck composition function to patch for proportional scaling**)
+- `int ToCardTypeBasic(int n)` / `int ToCardTypeDeck2(int n)` — index → card type mapping.
+  **Do not patch these**: they are inlined into both deal methods at every site the deal
+  uses, so a Harmony patch on them has no call site and never runs. The thresholds
+  (6/12/18 basic, 8/16/24 deck2) are rewritten as immediate operands inside the deals
+  instead — `DealBasicOrDevil` contains the block twice.
 - `void DealBasicOrDevil()`, `void DealDeck2()` — dealing entry points
 - `IEnumerator GiveCardPlayer()` — per-player card handout
 - `void ResetRound(bool first)` — round setup

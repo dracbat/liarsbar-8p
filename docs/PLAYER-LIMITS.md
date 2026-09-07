@@ -128,9 +128,18 @@ in all three directions. This drives aiming and `CheckSlotFull`.
 
 `DeckGamePlayManager.DealBasicOrDevil` and `DealDeck2` build their deck from a constant
 compiled into the game — `Enumerable.Range(1, 20)` and `Enumerable.Range(1, 28)`. No
-amount of adding card objects changes it. Fixed in v0.20.0 (`DeckSizePatch`), with card
-faces rescaled to match (`CardTypeFix`), since `ToCardTypeBasic` is arithmetic over the
-card index with thresholds sized for twenty cards.
+amount of adding card objects changes it. Fixed in v0.20.0 (`DeckSizePatch`).
+
+The card **faces** have to be rescaled with the deck, because `ToCardTypeBasic` is
+arithmetic over the card index with thresholds sized for twenty cards — everything past the
+last threshold is a Joker, so a bigger deck was more than half Jokers. That is also done by
+`DeckSizePatch`, which rewrites the three thresholds where they actually live: **inlined
+into both deal methods**, twice over in `DealBasicOrDevil` (ordinary and devil rounds).
+
+`CardTypeFix`, which Harmony-patches `ToCardTypeBasic` / `ToCardTypeDeck2` directly, has
+never been observed to fire — those methods are inlined at every site the deal uses, so the
+patches have no call site. It is kept as an inert fallback in case a non-inlined caller
+exists or appears in a later build; it is not what makes the mix correct today.
 
 `Manager.StartPlayerCount` lagging at four also dealt to only four people; corrected since
 v0.12.0 (`RosterFix`).

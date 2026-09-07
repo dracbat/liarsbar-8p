@@ -14,7 +14,9 @@ namespace LiarsBar8P;
 /// Rather than guess at that filter, this watches for the state that matters — a round is
 /// under way, cards are dealt, and nobody holds the turn — and if that persists, asks the
 /// game to give the turn through its own <c>GiveTurn</c>, which is the same method every
-/// later turn goes through. It fires at most once per round and says so loudly, because a
+/// later turn goes through. It fires whenever the table stalls for GraceSeconds, first turn
+/// or not - it used to claim once per round, which was never true and mattered, because a
+/// stall late in a round is as dead as one at the start. Every firing is logged loudly, because a
 /// round needing this means the game's own path did not run and that is worth seeing.
 /// </summary>
 internal static class TurnKickstart
@@ -25,11 +27,23 @@ internal static class TurnKickstart
     private static float _stalledSince;
     private static bool _startedThisRound;
 
-    /// <summary>Called when a round begins, so each round gets one chance at this.</summary>
+    /// <summary>
+    /// Seats that have been dealt a hand this round.
+    ///
+    /// An empty hand reads identically to a hand that has not arrived yet, and both used to
+    /// mean "the round is not ready, stand down". But a player who has thrown their last
+    /// card is still in the round, still takes turns, and their empty hand switched this
+    /// watchdog off for everybody until the round ended. Remembering who was dealt tells the
+    /// two cases apart.
+    /// </summary>
+    private static readonly System.Collections.Generic.HashSet<int> _dealtThisRound = new();
+
+    /// <summary>Called when a round begins, to forget what the last one was doing.</summary>
     internal static void RoundStarting()
     {
         _startedThisRound = false;
         _stalledSince = 0f;
+        _dealtThisRound.Clear();
     }
 
     internal static void Tick()
@@ -57,8 +71,17 @@ internal static class TurnKickstart
                 if (p.HaveTurn) anyoneHasTheTurn = true;
 
                 var gp = p.GetComponent<DeckGameplay>();
-                if (gp == null || gp.cardTypes == null || gp.cardTypes.Count == 0)
+                bool hasCards = gp != null && gp.cardTypes != null && gp.cardTypes.Count > 0;
+
+                if (hasCards) _dealtThisRound.Add(p.Slot);
+
+                if (!hasCards)
                 {
+                    // Already played their hand out this round: still in, still takes turns,
+                    // and emphatically not a reason to stand down. Only a seat that has never
+                    // held cards this round means the deal has not reached everybody yet.
+                    if (_dealtThisRound.Contains(p.Slot)) { dealt++; continue; }
+
                     everyoneIsHolding = false;      // not dealt yet
                     continue;
                 }
@@ -80,6 +103,22 @@ internal static class TurnKickstart
                 _stalledSince = 0f;
                 return;
             }
+
+            // A liar has been called. The reveal and whatever follows it are legitimately
+            // turn-less, and they end the round rather than continue it - handing somebody
+            // the turn in the middle of that is worse than the stall this guards against.
+            // It matters more now that the watchdog stays awake once hands start emptying,
+            // which is exactly when calls happen.
+            try
+            {
+                var deck = Dev.Deck;
+                if (deck != null && deck.LiarCalled)
+                {
+                    _stalledSince = 0f;
+                    return;
+                }
+            }
+            catch { }
 
             // A turn is in progress, or the round has not finished dealing: nothing to do.
             if (anyoneHasTheTurn || dealt == 0 || !everyoneIsHolding || alive < 2)
@@ -138,7 +177,9 @@ internal static class TurnKickstart
         catch (Exception e)
         {
             Plugin.Log.LogError($"[turnstart] failed: {e.Message}");
-            _startedThisRound = true;      // do not retry a throwing path every quarter second
+            // Only changes the wording of the next log line from "start of round" to
+            // "mid-round"; it does not stop this running again.
+            _startedThisRound = true;
         }
     }
 

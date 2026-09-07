@@ -93,7 +93,9 @@ internal static class JoinDiag
                 Plugin.Log.LogWarning(
                     $"[joindiag] StartPlayerCount {__instance.StartPlayerCount} -> {actual} " +
                     "(it lags because StartGame threw; turn order skips players otherwise)");
-                __instance.StartPlayerCount = actual;
+                // The SyncVar property, not the backing field: clients size their seat ring
+                // from this number, and one that never leaves the host is worse than useless.
+                __instance.NetworkStartPlayerCount = actual;
             }
         }
         catch (Exception e) { Plugin.Log.LogError($"[joindiag] {e.Message}"); }

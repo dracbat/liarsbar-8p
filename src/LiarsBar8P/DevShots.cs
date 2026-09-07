@@ -46,7 +46,18 @@ internal static class DevShots
                     root = System.IO.Path.Combine(
                         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                         "LiarsBar8P", "shots");
+
+                // A folder per run, because the file names are a counter that restarts at 001
+                // with the process. One fixed folder meant a second test run overwrote the
+                // first run's pictures in place - destroying the record this exists to keep,
+                // and doing it silently. The run is stamped under the harness variable too,
+                // or several copies started together would collide there instead.
+                root = System.IO.Path.Combine(
+                    root,
+                    $"{DateTime.Now:yyyyMMdd-HHmmss}-{System.Diagnostics.Process.GetCurrentProcess().Id}");
+
                 System.IO.Directory.CreateDirectory(root);
+                PruneOldRuns(System.IO.Directory.GetParent(root));
                 _folder = root;
                 Plugin.Log.LogInfo($"[shots] screenshots go to {root}");
             }
@@ -57,6 +68,29 @@ internal static class DevShots
             }
             return _folder;
         }
+    }
+
+    /// <summary>
+    /// Keep only the newest few runs. A folder per run stops one test overwriting another,
+    /// but it also means they pile up, and at a few megabytes a shot that is hundreds of
+    /// megabytes nothing ever removes. Only reached when screenshots are switched on at all,
+    /// which is off by default.
+    /// </summary>
+    private const int KeepRuns = 5;
+
+    private static void PruneOldRuns(System.IO.DirectoryInfo parent)
+    {
+        try
+        {
+            if (parent == null || !parent.Exists) return;
+            var runs = parent.GetDirectories();
+            if (runs.Length <= KeepRuns) return;
+
+            Array.Sort(runs, (a, b) => b.LastWriteTimeUtc.CompareTo(a.LastWriteTimeUtc));
+            for (int i = KeepRuns; i < runs.Length; i++)
+                try { runs[i].Delete(true); } catch { }
+        }
+        catch { }
     }
 
     /// <summary>Take one now, tagged with what was happening.</summary>

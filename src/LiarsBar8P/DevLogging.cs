@@ -79,14 +79,19 @@ internal static class DevLogging
 
     // ------------------------------------------------------------------ dealing
 
-    [HarmonyPostfix]
-    [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.DealBasicOrDevil))]
-    private static void DealtBasic() => ReportDeal("DealBasicOrDevil");
-
-    [HarmonyPostfix]
-    [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.DealDeck2))]
-    private static void DealtDeck2() => ReportDeal("DealDeck2");
-
+    // There are deliberately NO Harmony patches on DealBasicOrDevil or DealDeck2 here.
+    //
+    // Both of those methods have their bytes scanned and rewritten by DeckSizePatch - the
+    // deck size and the three card-face thresholds are immediate operands inside them. A
+    // Harmony patch detours the method by overwriting its opening bytes, which is precisely
+    // what that scan reads, so the two cannot both be applied to one method: at best the
+    // scan fails and the log cheerfully reports a deck it did not resize, at worst a write
+    // lands inside the detour stub and the next deal jumps into nothing.
+    //
+    // This was a postfix on each of them purely to print the resulting hands. The same
+    // picture comes from the ResetRound prefix below and from DealTrace's hook on the outer
+    // GiveCardsVisualRoutine, neither of which is byte-scanned - so nothing was lost by
+    // deleting them, and the rule holds: never Harmony-patch a method you also native-scan.
     private static void ReportDeal(string which)
     {
         if (!Dev.Enabled) return;
@@ -115,6 +120,78 @@ internal static class DevLogging
     }
 
     // -------------------------------------------------------------------- turns
+
+    /// <summary>
+    /// Report turns, seats and deaths on a machine that is not the host.
+    ///
+    /// The hooks below are postfixes on SyncVar setters, and Mirror only calls those on the
+    /// server - a client receives the new value by deserialisation instead. So on a client
+    /// every one of them was silent, and a loopback copy's log said nothing at all about the
+    /// things the loopback harness exists to observe.
+    ///
+    /// This is a poll, so it is edge-sampled: a flag set and cleared inside one quarter-second
+    /// tick shows up as one transition or none. Lines are tagged "seen" rather than "turn" to
+    /// keep that honest - a missing line here is not evidence that nothing happened. The
+    /// host's own log keeps the exact, unsampled ordering from the setters.
+    /// </summary>
+    private static readonly System.Collections.Generic.List<PlayerStats> _watched = new();
+    private static float _watchedAt = -999f;
+    private static int _lastSlot = int.MinValue;
+    private static readonly System.Collections.Generic.Dictionary<int, bool> _lastTurn = new();
+    private static readonly System.Collections.Generic.Dictionary<int, bool> _lastDead = new();
+
+    internal static void PollClientState()
+    {
+        if (!Dev.Enabled) return;
+        try
+        {
+            var m = Manager.Instance;
+            if (m == null) { _lastSlot = int.MinValue; _lastTurn.Clear(); _lastDead.Clear(); return; }
+            if (Mirror.NetworkServer.active) return;      // the setters already cover the host
+
+            if (UnityEngine.Time.time - _watchedAt >= 2f)
+            {
+                _watchedAt = UnityEngine.Time.time;
+                _watched.Clear();
+                var all = UnityEngine.Object.FindObjectsOfType<PlayerStats>();
+                if (all != null)
+                    for (int i = 0; i < all.Count; i++)
+                        if (all[i] != null) _watched.Add(all[i]);
+            }
+
+            int slot = m.ActivePlayerSlot;
+            if (slot != _lastSlot)
+            {
+                _lastSlot = slot;
+                string who = "nobody";
+                for (int i = 0; i < _watched.Count; i++)
+                    if (_watched[i] != null && _watched[i].Slot == slot) { who = Dev.Describe(_watched[i]); break; }
+                Dev.Log("seen", $"active slot -> {slot} :: {who}");
+            }
+
+            for (int i = 0; i < _watched.Count; i++)
+            {
+                var p = _watched[i];
+                if (p == null) continue;
+                int key = p.Slot;
+
+                bool turn = p.HaveTurn;
+                if (!_lastTurn.TryGetValue(key, out bool hadTurn) || hadTurn != turn)
+                {
+                    _lastTurn[key] = turn;
+                    if (turn) Dev.Log("seen", $"turn given to {Dev.Describe(p)}");
+                }
+
+                bool dead = p.Dead;
+                if (!_lastDead.TryGetValue(key, out bool wasDead) || wasDead != dead)
+                {
+                    _lastDead[key] = dead;
+                    if (dead) Dev.Log("seen", $"{p.PlayerName} is out (seat {p.Slot})");
+                }
+            }
+        }
+        catch { }
+    }
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(Manager), "set_NetworkActivePlayerSlot")]
@@ -166,6 +243,21 @@ internal static class DevLogging
     }
 
     // ------------------------------------------------------------------ rounds
+
+    /// <summary>
+    /// Report the hands after the deal. Hung on ResetRound - which calls the deal, and which
+    /// nothing byte-scans - rather than on the deal itself, which is scanned.
+    /// </summary>
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.ResetRound))]
+    private static void RoundDealt(DeckGamePlayManager __instance)
+    {
+        if (!Dev.Enabled) return;
+        // Which of the two deals ran is not worth guessing at from here; the hands are the
+        // point, and DeckSizePatch already names the one it resized.
+        try { ReportDeal("the deal"); }
+        catch { }
+    }
 
     [HarmonyPrefix]
     [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.ResetRound))]
