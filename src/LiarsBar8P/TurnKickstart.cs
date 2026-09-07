@@ -72,6 +72,15 @@ internal static class TurnKickstart
                 if (!gp.HaveCards || !Holding(gp)) everyoneIsHolding = false;
             }
 
+            // The deal is still running: the first turn is its job, and it is about to give
+            // it out. Stepping in here starts the round early and the deal then hands the
+            // turn back to the first seat, so a whole lap of play is thrown away.
+            if (DealTrace.Dealing)
+            {
+                _stalledSince = 0f;
+                return;
+            }
+
             // A turn is in progress, or the round has not finished dealing: nothing to do.
             if (anyoneHasTheTurn || dealt == 0 || !everyoneIsHolding || alive < 2)
             {

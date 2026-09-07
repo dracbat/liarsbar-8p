@@ -21,7 +21,7 @@ Confirmed in `BepInEx/LogOutput.log` on a live host, current build:
 | 8 podiums in two rows, all on screen | seen in a screenshot of an eight player lobby |
 | 8 seated, all dealt five cards | `[dealcards] hands three seconds after the deal` lists all eight |
 | Turn rotates through all eight seats | `active slot -> 4 … 5 … 6 … 7 … 0 … 1` |
-| The table arrow follows the turn | `[dev:arrow] pointing the table arrow at seat 5 … 6 … 7 … 0` |
+| Whose turn it is, shown top-left | `Your turn` / `BOT-3's turn`, and the tabletop markings hidden |
 | Clean boot | no patch failures, no exceptions from the mod |
 
 ## Verified with other people
@@ -35,7 +35,10 @@ Confirmed in `BepInEx/LogOutput.log` on a live host, current build:
 ## Not yet proven
 
 - **A full round with eight people.** Everything above is either verified solo or
-  verified at five. Six, seven and eight have never been in one lobby.
+  verified at five. Six, seven and eight have never been in one lobby. The loopback
+  harness cannot settle it either: a running copy of the game holds about 8 GB, so eight of
+  them want ~64 GB and this machine has exactly that with Windows already in it. Five fit
+  with room to spare; eight is a real table or nothing.
 - **What the "arrow" on the table actually is.** The group named `TurnArrows` holds four
   objects 90° apart, one per shipped seat — and at four players *all four are switched on at
   once, on every turn*. Nothing drawn on the tabletop changes angle when the turn moves, in

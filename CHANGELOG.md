@@ -8,6 +8,75 @@ so far is below it. Versions that were once numbered 1.x and 2.x were folded int
 0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
 is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v0.29.0 — a round that can actually end
+
+Bots could deal, sit down and take turns, but they could never *finish* a game, and three
+separate faults were hiding behind that.
+
+**Bots can call liar.** They only ever threw cards, so every round ended the one way: with
+everybody's hand empty. Nobody was ever shot, nobody was ever eliminated, and a winner was
+unreachable no matter how long a test was left running. They now call liar on roughly every
+third move, and always when they have nothing left to throw.
+
+Which player to challenge is tracked by the mod rather than read from the game's own
+`LastBetPlayer`. That field is filled in by the announcing half of a claim, which never runs
+for a player with no connection, so at a table of bots it stays empty and every call was
+declined as "nothing to challenge".
+
+**The turn stopped dead at the end of the first lap.** A bot remembered which turn it had
+already played on by the seat number that was active at the time. Seat numbers come round
+again: once play had gone all the way round the table and arrived back at seat 0, that bot
+found it had "already played on turn 0", declined to act, and the table sat there
+permanently. Turns are counted now, so the same seat a lap later is a different turn.
+
+**A bot's throw did not move the turn on.** The game passes the turn from a scheduled step
+that runs on the throwing player's own machine, and a bot has none. Clearing the turn flag
+was not enough — that left the active slot still pointing at the bot that had just played,
+so the watchdog handed the turn straight back to it. The turn is now actually moved on, and
+only if the game has not done it itself two and a half seconds later, so a real player's
+turn is untouched.
+
+**The round started before the cards were dealt.** The turn watchdog waits for every player
+to be holding cards, and this mod puts cards straight into a bot's hands itself because a
+bot has no connection to be dealt over — so "everyone is holding" became true while the game
+was still dealing. The watchdog started the round early, the bots played a full lap, and
+then the real deal finished and handed the first turn back to seat 0, throwing that lap
+away. The watchdog now stands aside while a deal is running.
+
+### Everyone except the host was looking at the old table
+
+Five players were reported as bunched on one side. Measuring the host's table said the
+opposite — gaps of 72.0° where even is 72.0°, every player 1.33 m from the middle — and
+that turned out to be the whole problem: **only the host had an evenly spaced table.**
+
+The seats are re-spaced from `ResetRound`, which is server-side code. A client never runs
+it, so nothing on a client's machine ever laid its table out: every player except the host
+was still looking at the four seats the game ships with, which is exactly what "they are
+all on one side" looks like from a player's seat. It could not be seen from the host's
+screen, which is the screen it was being judged on.
+
+Every machine now lays out its own table. That is safe because the answer does not depend
+on the machine: the ring is fitted from seats that are identical in every copy of the game
+and divided by a player count everyone agrees on, so each peer arrives at the same
+positions and a client is only moving a body to where the host already put it.
+
+The seat ring also reports what it actually produced now, a few seconds *after* the round
+is under way rather than at the moment it places anything — where everyone was put and
+where they ended up are different questions, and only the second one is worth anything.
+
+The chair, it turns out, is part of the character rather than part of the room, so it
+travels with them — there was no furniture left behind.
+
+### Also
+
+- A liar call that never resolves now says so in the log and restarts the round, instead of
+  freezing the table silently. The trigger pull runs on the losing player's own machine, and
+  a bot has none, so this is a step that can genuinely stop.
+- `AutoTestPlayers` sets how many sit down in an automatic test. A partly full table has to
+  re-space its seats and a full one does not, so they are different cases — and testing the
+  five player case by lowering `MaxPlayers` would change what is being tested.
+
+
 ## v0.28.0 — tested with real players at last
 
 Every test until now used fake players made inside the host's own process. They fill seats

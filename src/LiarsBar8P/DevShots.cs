@@ -66,6 +66,12 @@ internal static class DevShots
         // with the panel and the log, and it should not start writing megabytes to disk and
         // stuttering once a round just because it is on.
         if (!Dev.Enabled || Every <= 0f) return;
+
+        // In a loopback test the joining copies are 640x400 windows nobody is watching, and
+        // they all read the same config - so without this, five copies photograph themselves
+        // at once. Only the host's view is worth keeping.
+        if (Loopback.Mine == Loopback.Role.Client) return;
+
         try
         {
             string dir = Folder;

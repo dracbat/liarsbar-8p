@@ -21,6 +21,21 @@ internal static class DevAutoTest
 
     internal static bool Active => Dev.Enabled && Plugin.DevAutoTest != null && Plugin.DevAutoTest.Value;
 
+    /// <summary>
+    /// How many players to sit down, counting the host. Zero in the config means every
+    /// seat; a smaller number tests a partly full table, where the seats have to be
+    /// re-spaced to share the ring out evenly - a case a full table never exercises.
+    /// </summary>
+    private static int Target
+    {
+        get
+        {
+            int want = Plugin.DevTestPlayers != null ? Plugin.DevTestPlayers.Value : 0;
+            if (want <= 0) return Limits.Max;
+            return Mathf.Clamp(want, 2, Limits.Max);
+        }
+    }
+
     internal static void Tick()
     {
         if (!Active || _phase == Phase.Done) return;
@@ -37,9 +52,9 @@ internal static class DevAutoTest
                     if (_next == 0f) { _next = Time.time + 4f; return; }
                     if (Time.time < _next) return;
 
-                    Dev.Log("auto", "lobby is up - filling the table with bots");
+                    Dev.Log("auto", $"lobby is up - seating {Target} at the table");
                     _phase = Phase.Filling;
-                    BotManager.FillToMax();
+                    BotManager.FillTo(Target);
                     _next = Time.time + 25f;   // long enough to look at an eight player lobby
                     return;
 
@@ -47,9 +62,9 @@ internal static class DevAutoTest
                     if (Time.time < _next) return;
 
                     int players = Dev.LobbyPlayers().Count;
-                    if (players < Limits.Max)
+                    if (players < Target)
                     {
-                        Dev.Warn("auto", $"only {players}/{Limits.Max} made it into the lobby - starting anyway");
+                        Dev.Warn("auto", $"only {players}/{Target} made it into the lobby - starting anyway");
                     }
                     DevCommands.PrintPlayerList();
                     DevCommands.PrintPodiums();
