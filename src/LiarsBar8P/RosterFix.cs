@@ -53,6 +53,7 @@ internal static class RosterFix
             BotBehaviour.RoundStarting();
             DealFallback.RoundStarting();
             DevShots.Take("round_start");
+            TurnPointer.ReportLeftovers(m);
             TableFill.EnsureEveryoneSeated(m);
 
             // Sized from who is actually at the table, never from who is in the lobby.
@@ -142,7 +143,13 @@ internal static class RosterFix
         for (int i = 0; i < order.Count; i++)
         {
             before.Append($" {order[i].Slot}");
-            if (order[i].Slot != i) { order[i].Slot = i; changed = true; }
+
+            // NetworkSlot, not Slot. The plain field is the SyncVar's backing store: writing
+            // it changes the number on the host and tells nobody. Every other peer would
+            // carry on believing the old seat numbers, so the seat a player is drawn at, the
+            // seat that gets dealt to and the seat the turn goes to would disagree between
+            // machines. Only the Network property marks it dirty and sends it.
+            if (order[i].Slot != i) { order[i].NetworkSlot = i; changed = true; }
         }
 
         if (changed)

@@ -364,14 +364,23 @@ internal static class LobbyPodiums
     {
         try
         {
+            if (__instance == null) return;
+
+            // Every frame, and deliberately so. Moving the camera is what the eye is
+            // watching, and running it on the half-second timer below sampled a move that
+            // takes a second and a bit about three times - which is exactly as choppy as it
+            // sounds. The easing was never the problem; the sampling rate was. The name
+            // plates turn to face the camera, so they have to keep up with it.
+            HoldCamera();
+            FaceThePlates(__instance, _pulledBack);
+
+            // Everything past here walks the podium list and the roster, which is far too
+            // much to do every frame and changes far too slowly to need it.
             if (Time.time < _nextSweep) return;
             _nextSweep = Time.time + 0.5f;
-            if (__instance == null) return;
 
             if (_podiums.Count == 0) BuildAll(__instance);
             if (!_camDone) FrameLobby(__instance);
-            HoldCamera();
-            FaceThePlates(__instance, _pulledBack);
 
             if (Dev.Enabled && Time.time >= _nextVisReport)
             {
@@ -810,56 +819,79 @@ internal static class LobbyPodiums
                 if (s != null && s.transform != null) focus += s.transform.position + Vector3.up * (HeadHeight * 0.5f);
             focus /= lobby.SpawnSlots.Count;
 
-            // Lifting is what was asked for, so try every lift before widening at all.
-            bool haveFallback = false;
-            Vector3 fbPos = Vector3.zero;
-            Quaternion fbRot = Quaternion.identity;
-            float fbFov = 0f, fbLift = 0f, fbWider = 0f;
+            // Step BACK rather than climb. Lifting alone does fit everybody in, and the first
+            // version did exactly that - four units up, looking down at the tops of their
+            // heads. It framed the room and ruined the shot: from up there each name plate,
+            // and the character-select panel in the same group, lands on the character's own
+            // body instead of above them, which is why nobody could find where to click.
+            //
+            // Pulling back fits the same people in while keeping something close to the eye
+            // line the lobby was composed at. A little rise still helps see over the front
+            // row, so both are searched and the one that moves the camera least - counting a
+            // rise as four times as costly as a step back - wins.
+            var away = -t.forward;
+            away.y = 0f;
+            away = away.sqrMagnitude < 1e-4f ? -Vector3.forward : away.normalized;
 
-            for (float wider = 0f; wider <= 12.01f; wider += 4f)
+            bool found = false, haveFallback = false;
+            float bestCost = float.MaxValue, fbCost = float.MaxValue;
+            Vector3 bestPos = Vector3.zero, fbPos = Vector3.zero;
+            Quaternion bestRot = Quaternion.identity, fbRot = Quaternion.identity;
+            float bestFov = 0f, fbFov = 0f;
+            float bestBack = 0f, bestLift = 0f, fbBack = 0f, fbLift = 0f;
+            int bestHidden = 0;
+
+            // A floor under the rise. Stepping back alone would satisfy the test - the back
+            // row stands in the gaps, not directly behind anybody - but a little elevation
+            // is what makes two rows read as two rows rather than a crowd, and it is what
+            // was asked for. Not so much that the shot looks down on people.
+            for (float pull = 0f; pull <= 8.01f; pull += 0.5f)
             {
-                for (float lift = 0.25f; lift <= 6.01f; lift += 0.25f)
+                for (float lift = 0.75f; lift <= 2.51f; lift += 0.25f)
                 {
-                    t.position = _camHome + Vector3.up * lift;
+
+                    // Every combination is tried. An earlier version skipped any candidate
+                    // that could not beat the cheapest shot found so far - but the cheapest
+                    // is always the first "everyone is in frame" one, half a step back, so
+                    // that test threw away every shot that would actually have cleared the
+                    // back row. Two hundred candidates is nothing; measure them all.
+                    t.position = _camHome + away * pull + Vector3.up * lift;
                     t.rotation = Quaternion.LookRotation(focus - t.position, Vector3.up);
-                    cam.fieldOfView = _camHomeFov + wider;
+                    cam.fieldOfView = _camHomeFov;
                     if (!InShot(cam, marks)) continue;
 
-                    // Everyone in frame is worth keeping even if the back row is still
-                    // partly hidden, so the first of those is remembered as a second best.
-                    if (!haveFallback)
+                    // Someone hidden counts for far more than a step of camera movement, so
+                    // the shot that shows the most people wins, and among equally good ones
+                    // the one that moves least - and a rise costs more than a step back,
+                    // because rising is what turns the lobby into a view of everyone's scalp.
+                    int hidden = Blocked(cam, back, front);
+                    float cost = hidden * 10f + pull + lift * 2f;
+
+                    if (cost < bestCost)
                     {
+                        found = hidden == 0; bestCost = cost;
+                        bestPos = t.position; bestRot = t.rotation; bestFov = cam.fieldOfView;
+                        bestBack = pull; bestLift = lift; bestHidden = hidden;
                         haveFallback = true;
-                        fbPos = t.position; fbRot = t.rotation; fbFov = cam.fieldOfView;
-                        fbLift = lift; fbWider = wider;
+                        fbPos = bestPos; fbRot = bestRot; fbFov = bestFov;
+                        fbBack = pull; fbLift = lift;
                     }
-
-                    if (!Unblocked(cam, back, front)) continue;
-
-                    _camWanted = t.position;
-                    _camWantedRot = t.rotation;
-                    _camWantedFov = cam.fieldOfView;
-                    _camHolding = true;
-                    SilenceRig();
-                    Plugin.Log.LogInfo(
-                        $"[podium] lobby camera raised {lift:F2} units" +
-                        (wider > 0f ? $" and widened {wider:F0} degrees" : "") +
-                        $" - all {lobby.SpawnSlots.Count} podiums in shot and the back row clear " +
-                        "of the front");
-                    return;
                 }
             }
 
-            if (haveFallback)
+            if (found || haveFallback)
             {
-                t.position = fbPos; t.rotation = fbRot; cam.fieldOfView = fbFov;
-                _camWanted = fbPos; _camWantedRot = fbRot; _camWantedFov = fbFov;
+                _camWanted = found ? bestPos : fbPos;
+                _camWantedRot = found ? bestRot : fbRot;
+                _camWantedFov = found ? bestFov : fbFov;
+                t.position = _camWanted; t.rotation = _camWantedRot; cam.fieldOfView = _camWantedFov;
                 _camHolding = true;
                 SilenceRig();
                 Plugin.Log.LogInfo(
-                    $"[podium] lobby camera raised {fbLift:F2} units" +
-                    (fbWider > 0f ? $" and widened {fbWider:F0} degrees" : "") +
-                    " - everyone is in shot, though the back row is not fully clear of the front");
+                    $"[podium] lobby camera steps back {(found ? bestBack : fbBack):F2} and rises " +
+                    $"{(found ? bestLift : fbLift):F2} - all {lobby.SpawnSlots.Count} podiums in shot" +
+                    (bestHidden == 0 ? " and nobody hidden behind anybody"
+                                     : $", with {bestHidden} of the back row still partly behind somebody"));
                 return;
             }
 
@@ -968,13 +1000,38 @@ internal static class LobbyPodiums
     /// against every front-row character standing near it - treating each as a person's
     /// width and height - and has to pass over their head.
     /// </summary>
+    /// <summary>
+    /// How many of the back row are hidden behind somebody in the front row.
+    ///
+    /// A count rather than a yes-or-no, because "nobody is hidden" is often not achievable
+    /// at all: two rows a metre and three quarters apart, seen from across the room, will
+    /// usually leave somebody behind somebody. Asking only whether the shot is perfect meant
+    /// every shot failed, and the search then settled for the cheapest one that merely fit
+    /// everybody in frame - which is how the back row ended up behind the front row again.
+    /// Counting lets it choose the shot that hides the fewest people.
+    /// </summary>
+    private static int Blocked(Camera cam, List<Vector3> back, List<Vector3> front)
+    {
+        int n = 0;
+        foreach (var b in back)
+        {
+            var one = new List<Vector3> { b };
+            if (!Unblocked(cam, one, front)) n++;
+        }
+        return n;
+    }
+
     private static bool Unblocked(Camera cam, List<Vector3> back, List<Vector3> front)
     {
-        // Generous on both counts. The cast in this game are not all the same size - the
-        // boar is roughly twice the width of the rabbit - and a model that assumes an
-        // average build leaves the widest of them hiding somebody.
-        const float shoulders = 0.8f;    // half a character's width
-        const float stature = 2.15f;     // the top of a character's head
+        // Half a character's width, and it matters that this is honest rather than generous.
+        // Set to 0.8 it exceeded the half-step the back row is staggered by, so every
+        // back-row player counted as hidden behind a front-row one no matter where the
+        // camera went - no shot could ever satisfy it, and the search always fell through to
+        // "everyone is in frame, somewhere". Half a step is 0.76, so this has to be under
+        // that for the stagger to count for anything, which it plainly does: the gaps are
+        // exactly where the back row is visible.
+        const float shoulders = 0.5f;
+        const float stature = 2.0f;      // the top of a character's head
 
         var eye = cam.transform.position;
         var eyeFlat = new Vector2(eye.x, eye.z);
@@ -1045,11 +1102,18 @@ internal static class LobbyPodiums
                     continue;
                 }
 
-                var over = s.transform.position + Vector3.up * PlateHeight;
-                var toCam = _cam.transform.position - over;
-                if (toCam.sqrMagnitude < 0.01f) continue;
+                // Turned to face the camera, and left exactly where the game put it.
+                //
+                // Moving them was a mistake. This group is not only a name - it holds the
+                // character-select panel a player clicks to change who they are - so moving
+                // it moves the thing you click. From the raised shot they ended up over the
+                // characters' own bodies and nobody could find them. The game already places
+                // each group beside the podium it belongs to, which is the right place; all
+                // it needed was to be turned to be readable from a different angle.
+                plate.position = home.Pos;
 
-                plate.position = over;
+                var toCam = _cam.transform.position - plate.position;
+                if (toCam.sqrMagnitude < 0.01f) continue;
                 plate.rotation = Quaternion.LookRotation(-toCam.normalized, Vector3.up);
             }
         }
