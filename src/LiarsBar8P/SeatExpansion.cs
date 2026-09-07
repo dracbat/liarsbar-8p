@@ -261,9 +261,17 @@ internal static class SeatExpansion
     }
 
     /// <summary>
-    /// Nameplates hang above each seat. Their offset from their own seat is reused so a
-    /// new plate sits the same way over its new seat. Non-fatal: a missing nameplate
-    /// costs a label, a thrown exception would cost the match.
+    /// Nameplates hang over each seat, and the shipped ones are children of the seat they
+    /// belong to (<c>SpawnPoints/Spawn3/Text (TMP)</c>), so they turn and move with it.
+    ///
+    /// A copy therefore only has to be hung on the new seat in the same local pose, and it
+    /// is right by construction — over the seat, at the seat's own height, facing the way
+    /// that seat faces. The first attempt at this instead placed copies by a *world* offset
+    /// taken from one seat and reused for all of them, with the template's world rotation:
+    /// around a ring that is meaningless, and it showed — the three added plates all stood
+    /// at yaw 225, at a radius outside the ring of seats, parented to nothing.
+    ///
+    /// Non-fatal: a missing nameplate costs a label, a thrown exception would cost the match.
     /// </summary>
     private static void ExpandNameplates(Manager m, int want)
     {
@@ -277,23 +285,45 @@ internal static class SeatExpansion
             int have = texts.Count;
             Plugin.Log.LogInfo($"[seats] expanding nameplates {have} -> {want}");
 
-            var lastText = texts[have - 1];
-            var lastSeat = slots[have - 1];
-            Vector3 offset = lastText.transform.position - lastSeat.position;
+            var template = texts[have - 1].transform;
+
+            // The seat the template hangs on, asked of the plate itself rather than assumed
+            // from an index - the seat list has been reordered by now.
+            var templateSeat = template.parent;
+            if (templateSeat == null) templateSeat = slots[have - 1];
 
             for (int k = have; k < want; k++)
             {
                 var seat = slots[k];
-                var clone = Cloning.SafeClone(lastText.transform, $"NameText{k + 1}_8P");
+                if (seat == null) break;
+
+                var clone = Cloning.SafeClone(template, $"NameText{k + 1}_8P");
                 if (clone == null) break;
 
-                clone.position = seat.position + offset;
-                clone.rotation = lastText.transform.rotation;
+                if (ReferenceEquals(template.parent, templateSeat))
+                {
+                    // Hang it on the new seat exactly as the original hangs on its own.
+                    clone.SetParent(seat, false);
+                    clone.localPosition = template.localPosition;
+                    clone.localRotation = template.localRotation;
+                    clone.localScale = template.localScale;
+                }
+                else
+                {
+                    // Not a child of its seat after all: carry the pose across by frame.
+                    var local = templateSeat.InverseTransformPoint(template.position);
+                    clone.SetParent(seat, false);
+                    clone.position = seat.TransformPoint(local);
+                    clone.rotation = seat.rotation *
+                                     (Quaternion.Inverse(templateSeat.rotation) * template.rotation);
+                }
 
                 var comp = clone.GetComponent<TMPro.Examples.WarpTextExample>();
                 if (comp == null) { UnityEngine.Object.Destroy(clone.gameObject); break; }
                 texts.Add(comp);
-                Plugin.Log.LogInfo($"[seats]   + nameplate for seat {k + 1}");
+                Plugin.Log.LogInfo(
+                    $"[seats]   + nameplate for seat {k} on '{seat.name}' at " +
+                    $"{clone.position.ToString("F2")} yaw={clone.rotation.eulerAngles.y:F1}");
             }
 
             Plugin.Log.LogInfo($"[seats] nameplates now {texts.Count}");

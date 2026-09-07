@@ -74,6 +74,53 @@ internal static class TurnOrderFix
         return false;
     }
 
+    /// <summary>
+    /// The same neighbour table again, in the overload that returns the player.
+    ///
+    /// <c>GetTargetPlayer(mySlot, direction)</c> does not call <c>GetTargetSlot</c>: the
+    /// compiler inlined a second, independent copy of the four-by-four table into it, so
+    /// fixing the first one left this one still answering for a four seat table. Everything
+    /// that asks "who is across from me" or "who is to my left" through this overload gets
+    /// the player in seat zero for any seat above the third.
+    ///
+    /// It is a nest of compares rather than a single constant, so there is nothing to
+    /// rewrite; it is answered here instead, from the same arithmetic as the other table.
+    /// </summary>
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(Manager), nameof(Manager.GetTargetPlayer),
+                  new Type[] { typeof(int), typeof(CharController.Targets) })]
+    private static bool NeighbourPlayer(Manager __instance, int myslot,
+                                        CharController.Targets targetdirection,
+                                        ref PlayerStats __result)
+    {
+        int n;
+        try { n = __instance?.Players?.Count ?? 0; }
+        catch { return true; }
+
+        if (n <= Limits.VanillaPlayers) return true;      // the shipped table is right
+        if (myslot < 0 || myslot >= n) { __result = null; return false; }
+
+        int want = (int)targetdirection switch
+        {
+            Across   => (myslot + n / 2) % n,
+            Previous => (myslot + n - 1) % n,
+            Next     => (myslot + 1) % n,
+            _        => -1,
+        };
+
+        __result = null;
+        if (want < 0) return false;
+
+        try
+        {
+            foreach (var p in __instance.Players)
+                if (p != null && p.Slot == want) { __result = p; break; }
+        }
+        catch { }
+
+        return false;
+    }
+
     // ------------------------------------------------------------------- the wrap
 
     /// <summary>
@@ -102,10 +149,123 @@ internal static class TurnOrderFix
         done += PatchCompare("GiveTurnTexas", maxSlot);
         done += PatchMoveImm("BackGiveTurn", maxSlot);
         done += PatchMoveImm("findbackplayer", maxSlot);
+        done += PatchLeaverRing();
 
         // Nothing resolved means the game was not ready yet rather than that the patterns
         // are wrong, so leave the door open for the next round to try again.
         _installed = done > 0;
+    }
+
+    /// <summary>
+    /// Hand the turn on correctly when the player whose turn it was disconnects.
+    ///
+    /// <c>DeckGamePlayManager.GiveTurnSkippingLeaver</c> walks the ring looking for the next
+    /// player who can act, and it walks exactly four seats. A leaver in seat five hands the
+    /// turn to seat two — a chair with nothing to do with them — and seats four upwards can
+    /// never be reached at all. Once four of eight are out, every seat it can reach is empty
+    /// and the round stops dead. With people playing over the internet somebody dropping
+    /// mid-round is ordinary, so this is not a corner case.
+    ///
+    /// The wrap is a power-of-two trick rather than a division:
+    ///
+    ///     and ecx, 0x80000003    ; keep the low bits (and the sign)
+    ///     jge +7 / dec ecx / or ecx, 0xFFFFFFFC / inc ecx    ; fix up a negative
+    ///     ...
+    ///     cmp r14d, 4            ; how many seats to try
+    ///
+    /// which means the modulus has to *stay* a power of two: writing five here would compute
+    /// "and 5", which is not a modulo at all and would give nonsense seats. So the next power
+    /// of two at or above the maximum is used — eight for any table of five to eight. Probing
+    /// eight residues at a smaller table is harmless: the empty ones find nobody and it keeps
+    /// looking.
+    ///
+    /// The three immediates are two halves of one modulus and its probe count. They are
+    /// written together or not at all.
+    /// </summary>
+    private static int PatchLeaverRing()
+    {
+        try
+        {
+            int p = 1;
+            while (p < Limits.Max) p <<= 1;              // next power of two at or above the max
+            if (p < 4 || p > 128)
+            {
+                Plugin.Log.LogWarning($"[turn] a ring of {p} seats is out of range - the leaver handover is left as shipped");
+                return 0;
+            }
+            if (p == Limits.VanillaPlayers) return 1;    // nothing to change
+
+            var code = NativeCode.CodePointer(typeof(DeckGamePlayManager), "GiveTurnSkippingLeaver");
+            if (code == IntPtr.Zero) return 0;
+
+            // The wrap: add / and imm32 / jge / dec / or imm8 / inc / store.
+            IntPtr ring = IntPtr.Zero;
+            int ringHits = 0;
+            IntPtr bound = IntPtr.Zero;
+            int boundHits = 0;
+
+            for (int i = 0; i < 4096; i++)
+            {
+                if (Match(code, i, 0x41, 0x03, 0xCE, 0x81, 0xE1) &&
+                    NativeCode.TryReadInt32(code, i + 5, out int mask) && mask == unchecked((int)0x80000003) &&
+                    Match(code, i + 9, 0x7D, 0x07, 0xFF, 0xC9, 0x83, 0xC9, 0xFC, 0xFF, 0xC1, 0x89, 0x4E, 0x10))
+                {
+                    ringHits++;
+                    if (ringHits == 1) ring = code + i;
+                }
+
+                // The probe count: inc r14d / cmp r14d, 4 / jle back.
+                if (Match(code, i, 0x41, 0xFF, 0xC6, 0x41, 0x83, 0xFE) &&
+                    NativeCode.TryReadByte(code, i + 6, out byte n) && n == Limits.VanillaPlayers &&
+                    NativeCode.TryReadByte(code, i + 7, out byte jle) && jle == 0x0F)
+                {
+                    boundHits++;
+                    if (boundHits == 1) bound = code + i + 6;
+                }
+            }
+
+            if (ringHits != 1 || boundHits != 1)
+            {
+                Plugin.Log.LogWarning(
+                    $"[turn] GiveTurnSkippingLeaver: expected one ring and one probe count, found " +
+                    $"{ringHits} and {boundHits} - left as shipped, so a player dropping mid-round " +
+                    "may still strand the turn");
+                return 1;      // resolved; retrying will not help
+            }
+
+            // All three, or none: a mask that does not match its fix-up gives wrong seats.
+            if (!NativeCode.WriteInt32(ring + 5, unchecked((int)(0x80000000u | (uint)(p - 1)))))
+            {
+                Plugin.Log.LogError("[turn] GiveTurnSkippingLeaver: could not widen the ring");
+                return 1;
+            }
+            if (!NativeCode.WriteByte(ring + 15, (byte)(0x100 - p)) ||
+                !NativeCode.WriteByte(bound, (byte)p))
+            {
+                // Put the mask back rather than leave a half-applied modulus.
+                NativeCode.WriteInt32(ring + 5, unchecked((int)0x80000003));
+                Plugin.Log.LogError("[turn] GiveTurnSkippingLeaver: could not finish widening the ring - put back as shipped");
+                return 1;
+            }
+
+            Plugin.Log.LogInfo(
+                $"[turn] GiveTurnSkippingLeaver: the ring walked when somebody drops grows " +
+                $"{Limits.VanillaPlayers} -> {p} seats");
+            return 1;
+        }
+        catch (Exception e)
+        {
+            Plugin.Log.LogError($"[turn] GiveTurnSkippingLeaver: {e.Message}");
+            return 0;
+        }
+    }
+
+    /// <summary>Do these exact bytes sit at this offset?</summary>
+    private static bool Match(IntPtr code, int offset, params byte[] want)
+    {
+        for (int k = 0; k < want.Length; k++)
+            if (!NativeCode.TryReadByte(code, offset + k, out byte got) || got != want[k]) return false;
+        return true;
     }
 
     /// <summary>
