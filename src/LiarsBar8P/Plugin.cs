@@ -10,7 +10,7 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "liarsbar.eightplayers";
-    public const string Version = "0.26.0";
+    public const string Version = "0.26.1";
 
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
@@ -20,6 +20,7 @@ public class Plugin : BasePlugin
     public static ConfigEntry<bool> DiagDeckPatchTest;
     public static ConfigEntry<bool> DeveloperMode;
     public static ConfigEntry<bool> DevAutoTest;
+    public static ConfigEntry<float> DevShotSeconds;
 
     public override void Load()
     {
@@ -51,6 +52,12 @@ public class Plugin : BasePlugin
             "With developer mode on: once a lobby is hosted, fill it with bots and start the " +
             "match automatically, printing the state at each step. One launch, one whole round, " +
             "no keyboard.");
+
+        DevShotSeconds = Config.Bind("Developer", "ScreenshotEverySeconds", 0f,
+            "With developer mode on: take a screenshot this often, into " +
+            "%LOCALAPPDATA%\\LiarsBar8P\\shots. Zero turns it off, which is what you want while " +
+            "actually playing - it writes a few megabytes a shot and pauses briefly each time. " +
+            "Set it to 5 when you want a picture record of a test run.");
 
         Log.LogInfo($"=== Liar's Bar 8P loading (target={MaxPlayers.Value}) ===");
 
