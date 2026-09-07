@@ -485,11 +485,17 @@ internal static class LobbyPodiums
         if (vanilla.Count < 2) return false;
         if (!Measure(vanilla, out Row row)) return false;
 
+        // Beyond one extra row, keep going back a row at a time. Clamping instead would put
+        // every podium past the eighth on the same spot as the eighth - three characters
+        // standing inside each other with their name plates on top of one another. Eight
+        // players never reach that, but the maximum is a setting and it accepts more.
         int extra = index - Limits.VanillaPlayers;
-        float along = row.Along[Mathf.Clamp(extra, 0, row.Along.Length - 1)] + row.Step * 0.5f;
+        int wide = row.Along.Length;
+        int rank = extra / wide;                       // 0 is the row straight behind the shipped one
+        float along = row.Along[extra % wide] + row.Step * 0.5f;
 
-        // Far enough back to stand clear of the front row, close enough to stay in one shot.
-        float depth = Mathf.Clamp(Mathf.Abs(row.Step) * 1.15f, 1.2f, 3f);
+        // Far enough back to stand clear of the row in front, close enough to stay in shot.
+        float depth = Mathf.Clamp(Mathf.Abs(row.Step) * 1.15f, 1.2f, 3f) * (rank + 1);
 
         var behind = row.At(along, depth);
         if (!row.CheckFloor || HasFloor(behind))

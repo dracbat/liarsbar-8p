@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>LiarsBar8P</AssemblyName>
-    <Version>0.25.0</Version>
+    <Version>0.25.1</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -48,6 +48,25 @@
   <ItemGroup>
     <Reference Update="@(Reference)"><Private>false</Private></Reference>
   </ItemGroup>
+
+  <!--
+    The version is written twice: here, and as a const in Plugin.cs, because the BepInPlugin
+    attribute needs a compile-time constant and cannot read this one. They drifted apart
+    once - v0.25.0 shipped calling itself v0.24.0, which put the wrong number in the corner
+    of the screen and, far worse, made the version handshake tell a genuine v0.24.0 player
+    that their build matched. Everyone in a lobby must run the same build, and that check is
+    what enforces it, so the two numbers disagreeing is a shipping defect, not a typo.
+
+    This refuses to build when they disagree.
+  -->
+  <Target Name="VersionsMustAgree" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <_PluginSource>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\Plugin.cs'))</_PluginSource>
+      <_WantedLine>public const string Version = "$(Version)";</_WantedLine>
+    </PropertyGroup>
+    <Error Condition="!$(_PluginSource.Contains('$(_WantedLine)'))"
+           Text="Plugin.cs does not declare version $(Version). The number shown in game and used by the version handshake comes from Plugin.cs, so it must match &lt;Version&gt; in this file. Expected to find: $(_WantedLine)" />
+  </Target>
 
 </Project>
 
