@@ -8,6 +8,26 @@ so far is below it. Versions that were once numbered 1.x and 2.x were folded int
 0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
 is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v0.25.1 — the version it says it is
+
+v0.25.0 called itself v0.24.0. **Install this over it.**
+
+- **The version was written down twice and the two disagreed.** The number in the corner of
+  the screen, the name the loader logs, and the handshake that compares builds between
+  players all come from a constant in the source; the release number comes from the project
+  file. Only the second was raised. So v0.25.0 shipped announcing itself as v0.24.0 — the
+  wrong number on screen, and, far more serious, a handshake that would have told somebody
+  on a genuine v0.24.0 that their build matched. Everyone in a lobby has to be on the same
+  build, and that check is what enforces it.
+- **The build now refuses to run when those two numbers disagree**, with a message saying
+  which file to change. This was a shipping defect rather than a typo, so it is stopped at
+  the point where it is made rather than noticed afterwards.
+- A podium fix that only shows above eight: podiums past the eighth were all placed on the
+  same spot as the eighth instead of continuing into a further row. Eight never reaches it,
+  but the maximum is a setting that accepts more.
+
+Everything in v0.25.0 below is in this build too.
+
 ## v0.25.0 — everyone is one player again
 
 **If you have v0.24.0, update.** With five real players it seated every one of them twice.
