@@ -115,13 +115,22 @@ if ($who.Code -eq 0) { Info "account: $($who.Out)" }
 
 # ------------------------------------------------------------- never publish
 Step "Checking nothing sensitive would be published"
-$bad = git ls-files | Select-String -Pattern 'GameAssembly|global-metadata|\.exe$|members\.txt|^backup/|^recon/'
+# Tracked files AND untracked ones that .gitignore does not cover - because a few lines below
+# this, `git add -A` commits the untracked ones too and the repo is made public in the same
+# run. Inspecting only `git ls-files` meant a fresh Cpp2IL dump, a stray log carrying
+# C:\Users\<name>\ paths, or a screenshot dropped in for a bug report all passed this gate
+# and were published. --exclude-standard keeps .gitignore honoured, so backup/ and recon/
+# still do not appear; the anchors work because these are clean paths, not porcelain status
+# lines with a two-character prefix.
+$candidates = git ls-files --cached --others --exclude-standard
+$bad = $candidates | Select-String -Pattern 'GameAssembly|global-metadata|\.exe$|members\.txt|ints\.txt|keywords\.txt|isil|cpp2il|\.log$|^backup/|^recon/'
 if ($bad) {
     Bad "These must never be published:"
     $bad | ForEach-Object { Info $_ }
+    Info "Delete them, or add them to .gitignore, then run this again."
     exit 1
 }
-Good "no game binaries or decompilation dumps tracked"
+Good "no game binaries, dumps or logs would be committed"
 
 # --------------------------------------------------------------------- version
 if (-not $Tag) {
@@ -155,6 +164,38 @@ if (-not $SkipBuild) {
 foreach ($a in @($Zip, $Bat)) {
     if (-not (Test-Path $a)) { Bad "missing asset: $a"; exit 1 }
 }
+
+# The zip is the thing people actually download, so the version check has to be made against
+# the plugin INSIDE it, not against the staging folder or the freshly built DLL - those can
+# all disagree. With -SkipBuild nothing rebuilds, so a stale dist\ would otherwise be
+# published under a new tag: the release page would say v0.29.0 while the installed mod drew
+# v0.28.0 in the corner, and the installer tells every downloader to check exactly that
+# number. A correct install would look broken to everyone who followed the instructions.
+Step "Checking the zip's plugin matches $Tag"
+$want = $Tag.TrimStart('v')
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$tmp = Join-Path ([IO.Path]::GetTempPath()) ("lb8p-verify-" + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $tmp | Out-Null
+try {
+    $zf = [IO.Compression.ZipFile]::OpenRead($Zip)
+    try {
+        $entry = $zf.Entries | Where-Object { $_.FullName -like '*BepInEx/plugins/LiarsBar8P.dll' -or $_.FullName -like '*BepInEx\plugins\LiarsBar8P.dll' } | Select-Object -First 1
+        if (-not $entry) { Bad "the zip contains no BepInEx/plugins/LiarsBar8P.dll"; exit 1 }
+        $out = Join-Path $tmp 'LiarsBar8P.dll'
+        [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $out, $true)
+    } finally { $zf.Dispose() }
+
+    $fv = (Get-Item $out).VersionInfo.FileVersion    # "0.29.0.0" - four parts, the tag has three
+    if ([version]$fv -ne [version]"$want.0") {
+        Bad "the zip ships plugin $fv but the tag is $Tag (want $want)."
+        Info "Run without -SkipBuild, or rebuild and re-run package.ps1."
+        exit 1
+    }
+    Good "zip ships plugin $fv, matching $Tag"
+} finally {
+    Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 Good "assets ready"
 Info "$([IO.Path]::GetFileName($Zip))  $([math]::Round((Get-Item $Zip).Length/1MB,1)) MB"
 Info "$([IO.Path]::GetFileName($Bat))  $([math]::Round((Get-Item $Bat).Length/1KB,1)) KB"

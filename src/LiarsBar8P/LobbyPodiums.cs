@@ -66,6 +66,14 @@ internal static class LobbyPodiums
         _pulledBack = false;
         _blendStarted = 0f;
         _plateHome.Clear();
+
+        // The sweep's back-off is part of "nothing learned about the last lobby", and was
+        // the one thing left out of it. A failure at the end of one lobby pushes this thirty
+        // seconds into the future, and without clearing it the next lobby spends its first
+        // half minute not arranging podiums at all - which is most of the time anyone spends
+        // in a lobby.
+        _nextSweep = 0f;
+
         BuildAll(__instance);
     }
 

@@ -39,17 +39,41 @@ internal sealed class TurnHud : MonoBehaviour
         try
         {
             var m = Manager.Instance;
-            if (m == null || m.Players == null || !m.GameStarted) { _line = null; return; }
+            if (m == null || !m.GameStarted) { _line = null; return; }
+
+            // Not Manager.Players: that is the server's roster and is empty on a client, so
+            // reading it left this readout permanently blank on every screen but the host's -
+            // and since the tabletop markings this replaced are switched off on every peer,
+            // those players had no way at all to tell whose turn it was.
+            var seated = Seated();
 
             PlayerStats up = null;
-            foreach (var p in m.Players)
+            for (int i = 0; i < seated.Count; i++)
+            {
+                var p = seated[i];
                 if (p != null && p.HaveTurn && !p.Dead) { up = p; break; }
+            }
+
+            // Nobody is claiming the turn. The active slot is a SyncVar and is right on every
+            // machine, so it still answers the question - and it tracks the game's own notion
+            // of whose turn it is, which moves on when the turn does rather than lagging.
+            int slot = m.ActivePlayerSlot;
+            if (up == null)
+            {
+                for (int i = 0; i < seated.Count; i++)
+                {
+                    var p = seated[i];
+                    if (p != null && p.Slot == slot && !p.Dead) { up = p; break; }
+                }
+            }
 
             if (up == null)
             {
-                // Between turns. Saying nothing is better than saying something stale: a
-                // name left on screen after that player has acted is worse than a blank.
-                _line = null;
+                // A seat this machine has no player object for - a bot, whose object is never
+                // network-spawned and so cannot be seen from a client. Name the seat rather
+                // than show nothing.
+                _isYou = false;
+                _line = slot >= 0 ? $"Seat {slot + 1}'s turn" : null;
                 return;
             }
 
@@ -63,6 +87,33 @@ internal sealed class TurnHud : MonoBehaviour
         {
             _line = null;
         }
+    }
+
+    /// <summary>
+    /// The players at the table, found in the scene and cached.
+    ///
+    /// A scene scan four times a second would be wasteful for something that changes once a
+    /// match, so the answer is kept for a couple of seconds. Entries are still null-checked
+    /// by callers: a player destroyed inside that window is null under Unity's operator
+    /// while the array still holds the reference.
+    /// </summary>
+    private static readonly System.Collections.Generic.List<PlayerStats> _seated = new();
+    private static float _seatedAt = -999f;
+
+    private static System.Collections.Generic.List<PlayerStats> Seated()
+    {
+        if (Time.time - _seatedAt < 2f) return _seated;
+        _seatedAt = Time.time;
+        _seated.Clear();
+        try
+        {
+            var all = UnityEngine.Object.FindObjectsOfType<PlayerStats>();
+            if (all != null)
+                for (int i = 0; i < all.Count; i++)
+                    if (all[i] != null) _seated.Add(all[i]);
+        }
+        catch { }
+        return _seated;
     }
 
     /// <summary>Is this the player sitting at this computer?</summary>

@@ -28,7 +28,11 @@ internal static class SeatRing
     private static Vector2 _centre;
     private static float _radius;
 
-    /// <summary>Where the seats stood before this mod moved any of them.</summary>
+    /// <summary>
+    /// Where the first four seats stood the first time this ran - which is after the seat
+    /// expansion has already re-laid them out, not where the game shipped them. Only the
+    /// furniture list below reads it, and only to have somewhere to look.
+    /// </summary>
     private static Vector3[] _vanilla;
 
     /// <summary>When to measure where everyone actually ended up. Zero means never.</summary>
@@ -63,17 +67,56 @@ internal static class SeatRing
         return found;
     }
 
+    /// <summary>
+    /// How many are at this table, as a number every machine agrees on.
+    ///
+    /// This is the one input to the layout that has to be identical everywhere, because each
+    /// peer divides the ring by it and a disagreement puts the same player in two different
+    /// chairs depending on whose screen you look at.
+    ///
+    /// So the synced count comes first and the server's own roster second, rather than the
+    /// other way round. <c>Manager.Players</c> fills in over several frames on the host and is
+    /// empty on a client for the whole match, so preferring it meant the host sized the ring
+    /// from a half-filled roster while clients sized it from something else entirely.
+    /// </summary>
     private static int PlayerCount()
     {
         try
         {
             var m = Manager.Instance;
             if (m == null) return 0;
-            if (m.Players != null && m.Players.Count > 0) return m.Players.Count;
             if (m.StartPlayerCount > 0) return m.StartPlayerCount;
+            if (m.Players != null && m.Players.Count > 0) return m.Players.Count;
         }
         catch { }
         return 0;
+    }
+
+    /// <summary>
+    /// The highest seat index anybody is actually sitting in.
+    ///
+    /// The parking loop below drops unused seats through the floor, and an unused seat is
+    /// decided by a count. If that count is ever wrong - and on a client it is a synced value
+    /// that can arrive late - parking would take a seat somebody is in, along with the
+    /// nameplate hanging on it and, for the added seats, that player's own camera. This is
+    /// the check that makes a wrong count cost a cosmetic gap instead of putting a player
+    /// under the floor looking up at the room.
+    /// </summary>
+    private static int HighestOccupiedSlot(Manager m)
+    {
+        int highest = -1;
+        try
+        {
+            var players = PlayersHere(m);
+            for (int i = 0; i < players.Count; i++)
+            {
+                var p = players[i];
+                if (p == null) continue;
+                if (p.Slot > highest) highest = p.Slot;
+            }
+        }
+        catch { }
+        return highest;
     }
 
     [HarmonyPrefix]
@@ -91,10 +134,15 @@ internal static class SeatRing
     /// player's seat.
     ///
     /// Every machine computing this for itself is safe because the answer does not depend on
-    /// the machine. The ring is fitted from the seats in the level, which are identical in
-    /// every copy of the game, and divided by a player count everyone agrees on - so each
-    /// peer arrives at the same positions, and a client moving a body is moving it to where
-    /// the host has already put it.
+    /// the machine: the ring is fitted from seats laid out identically in every copy of the
+    /// game, and divided by <c>PlayerCount</c>, which reads the synced count precisely so
+    /// that peers cannot disagree about it. A client is then moving a body to the position
+    /// the host has already given it, so there is nothing to fight over.
+    ///
+    /// That last part is load-bearing. While the count came from the server-only roster, a
+    /// client fell back to a number the host was writing to a SyncVar's backing field and so
+    /// never sending - it laid out for four at a table of eight and parked the seats the
+    /// extra players were sitting in four metres under the floor.
     /// </summary>
     private static void Layout()
     {
@@ -109,8 +157,11 @@ internal static class SeatRing
             var slots = m.Slots;
             int n = Mathf.Min(players, slots.Count);
 
-            // fit the ring from the seats the game shipped with, so repeated rounds
-            // cannot drift as a result of seats this mod has already moved
+            // Fit the ring from the first four seats. They have already been moved - by the
+            // seat expansion at match start, and by this method on previous rounds - so these
+            // are not the positions the game shipped. It is stable anyway because the fit is a
+            // fixed point: four points taken off a circle fit that same circle, so re-fitting
+            // returns the same centre and radius every round rather than drifting.
             int baseCount = Mathf.Min(Limits.VanillaPlayers, slots.Count);
             var pts = new Vector2[baseCount];
             float y = 0f;
@@ -125,8 +176,8 @@ internal static class SeatRing
             _centre = c;
             _radius = r;
 
-            // The seats as the game shipped them, captured before anything is moved. The
-            // furniture check needs to look where the chairs are, not where this mod has
+            // Somewhere for the furniture list to look, captured the first time through. The
+            // check needs to look where the chairs are, not where this mod has
             // just put the seats.
             if (_vanilla == null)
             {
@@ -164,7 +215,11 @@ internal static class SeatRing
             // whole ring sank a metre a round at three players, two at two, taking the
             // players with it, and never recovered. At four and above the two ranges do not
             // meet and this changes nothing.
-            for (int i = Mathf.Max(n, baseCount); i < slots.Count; i++)
+            // ...and never a seat somebody is sitting in, whatever the count says. A count
+            // that arrives late or wrong is a cosmetic problem right up until it parks an
+            // occupied chair, at which point that player is under the floor.
+            int firstFree = Mathf.Max(n, baseCount, HighestOccupiedSlot(m) + 1);
+            for (int i = firstFree; i < slots.Count; i++)
             {
                 var t = slots[i];
                 if (t == null) continue;
@@ -248,6 +303,8 @@ internal static class SeatRing
 
     private static float _clientNext;
     private static int _clientLastCount = -1;
+    private static int _clientLastBodies = -1;
+    private static int _clientMatch;
 
     /// <summary>
     /// Lay the table out on a machine that is not the host.
@@ -256,33 +313,74 @@ internal static class SeatRing
     /// never runs it, so a client had nothing laying its table out at all. Once a second is
     /// plenty - and only when something has actually changed, so a settled table costs a
     /// comparison and nothing else.
+    ///
+    /// "Changed" has to mean the bodies as well as the count, not just the count. A client's
+    /// Manager arrives before the players do: laying out on the count alone ran the one and
+    /// only pass while the local player was the only body in the scene, moved that one, and
+    /// left everybody who spawned a few frames later standing at the shipped eight-seat
+    /// positions for the rest of the match - on that screen only, while the host's log
+    /// happily reported an even table.
     /// </summary>
     private static void KeepClientInStep()
     {
         try
         {
             var m = Manager.Instance;
-            if (m == null || m.Slots == null || m.Slots.Count == 0) { _clientLastCount = -1; return; }
+            if (m == null || m.Slots == null || m.Slots.Count == 0) { ForgetClientTable(); return; }
 
             bool server;
             try { server = m.isServer; } catch { return; }
             if (server) return;
 
+            // A second match in the same session gets a new Manager. Comparing identity
+            // rather than waiting for a null gap means the new table cannot inherit the old
+            // one's numbers and skip its own layout.
+            int id = m.GetInstanceID();
+            if (id != _clientMatch) { ForgetClientTable(); _clientMatch = id; }
+
             if (Time.time < _clientNext) return;
             _clientNext = Time.time + 1f;
+
+            if (!TableIsLive(m)) return;
 
             int players = PlayerCount();
             if (players < 2) return;
 
-            // Only when the table changes shape. Re-placing bodies every second would fight
-            // any animation that moves a player, and there is nothing to fix once it is right.
-            if (players == _clientLastCount) return;
+            int bodies = PlayersHere(m).Count;
+            if (players == _clientLastCount && bodies == _clientLastBodies) return;
             _clientLastCount = players;
+            _clientLastBodies = bodies;
 
-            Plugin.Log.LogInfo($"[seatring] laying this client's table out for {players} players");
+            Plugin.Log.LogInfo(
+                $"[seatring] laying this client's table out for {players} players ({bodies} in the scene)");
             Layout();
         }
         catch (Exception e) { Plugin.Log.LogWarning($"[seatring] client layout failed: {e.Message}"); }
+    }
+
+    private static void ForgetClientTable()
+    {
+        _clientLastCount = -1;
+        _clientLastBodies = -1;
+        _clientMatch = 0;
+    }
+
+    /// <summary>
+    /// Whether this is a table the host is also laying out.
+    ///
+    /// The host only re-spaces from <c>DeckGamePlayManager.ResetRound</c>, so it only ever
+    /// does so in the deck modes. A client that laid out regardless would re-space a Liar's
+    /// Dice table the host had left alone, and the two machines would show the same players
+    /// in different chairs. Agreeing to do nothing is as important as agreeing where to sit.
+    /// </summary>
+    private static bool TableIsLive(Manager m)
+    {
+        try
+        {
+            var deck = m.DeckGamePlayManager;
+            return deck != null && deck.gameObject != null && deck.gameObject.activeInHierarchy;
+        }
+        catch { return false; }
     }
 
     /// <summary>
@@ -350,7 +448,7 @@ internal static class SeatRing
     }
 
     /// <summary>
-    /// List the scenery standing at the seats the game shipped with, once per session.
+    /// List the scenery standing at the first four seat positions, once per session.
     ///
     /// Re-spacing moves a seat, and a seat is an invisible marker; the chair, the mat and
     /// whatever else is bolted to that spot in the level do not come with it. If that is
@@ -392,7 +490,7 @@ internal static class SeatRing
                     if (!seen.Add($"{s}:{key}:{t.name}")) continue;
 
                     Plugin.Log.LogInfo(
-                        $"[furniture] near vanilla seat {s} ({d:F2}m): '{t.name}' " +
+                        $"[furniture] near seat {s} ({d:F2}m): '{t.name}' " +
                         $"under '{key}' at {t.position.ToString("F2")}");
                     shown++;
                 }

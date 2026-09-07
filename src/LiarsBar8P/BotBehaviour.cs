@@ -163,6 +163,22 @@ internal static class BotBehaviour
             var deck = Dev.Deck;
             if (deck == null) return;
 
+            // The last call of a match does not resolve into a new round, because there is
+            // no new round - it resolves into somebody winning. This fired at exactly that
+            // moment and restarted the round anyway, dealing a fresh hand to a table with
+            // one player left and stepping on the victory screen. A won match is not a
+            // stalled one.
+            int alive = 0;
+            foreach (var p in Dev.TablePlayers())
+                if (p != null && !p.Dead) alive++;
+
+            if (alive < 2)
+            {
+                Dev.Log("bot", $"liar call did not start a new round, and should not have - " +
+                               $"{alive} player(s) left, so the match is over");
+                return;
+            }
+
             Dev.Warn("bot", "a liar call has not resolved after 30s - the round is stuck, " +
                             "restarting it. The trigger pull runs on the losing player's own " +
                             "machine and a bot has none.");

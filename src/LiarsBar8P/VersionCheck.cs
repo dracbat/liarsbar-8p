@@ -11,11 +11,15 @@ namespace LiarsBar8P;
 /// eight, corrupting shared state for the whole lobby. Finding it meant reading each
 /// person's log by hand.
 ///
-/// Each client publishes its mod version as Steam lobby member data, and the host audits
-/// every member. Steam member data rather than a Mirror message is deliberate: it works
-/// between mismatched builds, which is exactly when it is needed. Clients on a build
-/// predating this check publish nothing and are reported as unknown, which is the answer
-/// anyway.
+/// Each client publishes its mod version as Steam lobby member data, and *every* peer audits
+/// every member - not just the host. That is deliberate: a client on the wrong build is the
+/// one who most needs telling, and a host-only check would leave them waiting to be told over
+/// voice chat. It also means each loopback copy reports independently, which is the only
+/// per-instance version evidence those logs carry.
+///
+/// Steam member data rather than a Mirror message is deliberate: it works between mismatched
+/// builds, which is exactly when it is needed. Clients on a build predating this check
+/// publish nothing and are reported as unknown, which is the answer anyway.
 /// </summary>
 internal static class VersionCheck
 {
@@ -33,6 +37,35 @@ internal static class VersionCheck
             Plugin.Log.LogInfo($"[version] published mod version {Plugin.Version}");
         }
         catch (Exception e) { Plugin.Log.LogError($"[version] publish failed: {e.Message}"); }
+    }
+
+    /// <summary>
+    /// Drop the mismatch banner once the session it was raised for is over.
+    ///
+    /// The audit below only runs from <c>LobbyController.Update</c>, so the moment a match
+    /// starts there is nothing left to clear it. A warning raised in the lobby - naming a
+    /// player by name - then stayed burned across the top of every peer's screen for the
+    /// whole match and was still there back at the main menu, naming somebody who had left.
+    ///
+    /// Deliberately not cleared merely because the lobby has gone: a version mismatch is at
+    /// its most dangerous during the match, which is exactly when the lobby is not there.
+    /// It goes when there is neither a lobby nor a match left to warn about.
+    /// </summary>
+    internal static void ForgetWhenSessionEnds()
+    {
+        if (string.IsNullOrEmpty(VersionHud.Mismatch)) return;
+        try
+        {
+            if (Manager.Instance != null) return;                 // still playing
+            if (LobbyController.Instance != null) return;         // still in a lobby
+
+            var sl = SteamLobby.Instance;
+            if (sl != null && sl.CurrentLobbyID != 0) return;
+
+            VersionHud.Mismatch = null;
+            Plugin.Log.LogInfo("[version] session over - the mismatch banner is cleared");
+        }
+        catch { }
     }
 
     [HarmonyPostfix]

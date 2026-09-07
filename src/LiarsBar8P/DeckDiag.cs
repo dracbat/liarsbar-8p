@@ -50,13 +50,27 @@ internal static class DeckDiag
         catch (Exception e) { Plugin.Log.LogError($"[deckdiag] probe failed: {e.Message}"); }
     }
 
-    /// <summary>Report the deal's failure without letting it wedge the round.</summary>
+    /// <summary>
+    /// Report a failure in the round setup - the deal included - without letting it wedge
+    /// the round.
+    ///
+    /// This used to sit on <c>DealBasicOrDevil</c> itself, which was a mistake: DeckSizePatch
+    /// scans and rewrites the bytes of that method, and a Harmony finalizer detours it by
+    /// overwriting the bytes the scan reads. ResetRound is what calls the deal and nothing
+    /// scans it, so the same throw is still caught here.
+    ///
+    /// The difference is that whatever ResetRound would have done after the deal is skipped
+    /// rather than run. That is the right trade: the exception this was written for - the
+    /// deal indexing past the end of a four-player deck - was root-caused and fixed in the
+    /// deck size and seat cursor patches, so this is now a net rather than a crutch, and a
+    /// net that cannot corrupt the patch it sits next to is worth more than one that can.
+    /// </summary>
     [HarmonyFinalizer]
-    [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.DealBasicOrDevil))]
+    [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.ResetRound))]
     private static Exception Deal_Finalizer(Exception __exception, DeckGamePlayManager __instance)
     {
         if (__exception == null) return null;
-        Plugin.Log.LogWarning($"[deckdiag] DealBasicOrDevil threw: {__exception.Message}");
+        Plugin.Log.LogWarning($"[deckdiag] ResetRound threw: {__exception.Message}");
         Plugin.Log.LogWarning("[deckdiag]   " +
             Count("MasaCards", () => __instance.MasaCards.Count) + " " +
             Count("ResetCards", () => __instance.ResetCards.Count) + " " +

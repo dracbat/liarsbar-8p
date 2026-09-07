@@ -53,5 +53,11 @@ internal sealed class ModTicker : MonoBehaviour
 
         try { TurnPointer.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[arrow] tick failed: {e.Message}"); }
+
+        try { VersionCheck.ForgetWhenSessionEnds(); }
+        catch (Exception e) { Plugin.Log.LogError($"[version] banner check failed: {e.Message}"); }
+
+        try { DevLogging.PollClientState(); }
+        catch (Exception e) { Plugin.Log.LogError($"[seen] client poll failed: {e.Message}"); }
     }
 }

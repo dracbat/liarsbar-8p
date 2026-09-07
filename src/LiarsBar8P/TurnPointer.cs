@@ -31,34 +31,57 @@ internal static class TurnPointer
     private static Manager _match;
     private static Transform[] _groups;
     private static bool _said;
-    private static bool _broken;
+
+    /// <summary>
+    /// Consecutive failures in the current match, rather than a permanent latch.
+    ///
+    /// This was a bool, set on any exception and never cleared. One transient failure - a
+    /// stale reference caught during a scene change, say - switched the whole thing off for
+    /// the rest of the process, so every later match in that session showed the four shipped
+    /// chevrons on an eight seat table again. Those chevrons sit in front of every other
+    /// seat at eight players, so the one nearest whoever is playing belongs to their
+    /// neighbour: exactly the misreading this class exists to stop, silently back, with one
+    /// line in the log from an hour earlier as the only clue.
+    /// </summary>
+    private const int GiveUpAfter = 5;
+    private static int _failures;
 
     internal static void Tick()
     {
-        if (_broken) return;
-
         try
         {
             var m = Manager.Instance;
             if (m == null) { _match = null; _groups = null; return; }
 
+            // A new match gets a clean slate, failures included.
             if (!ReferenceEquals(m, _match))
             {
                 _match = m;
                 _groups = null;
                 _said = false;
+                _failures = 0;
             }
+
+            if (_failures >= GiveUpAfter) return;
 
             // Held off rather than switched off once. The first attempt cleared them at the
             // start of the match and they came back part way through - the game switches its
             // own markings on again as a round begins, so this has to keep up with it.
             if (_groups == null) _groups = FindGroups();
             Clear();
+            _failures = 0;
         }
         catch (Exception e)
         {
-            Plugin.Log.LogError($"[seatmark] could not clear the table markings: {e.Message}");
-            _broken = true;
+            _failures++;
+            _groups = null;      // most likely a stale reference; look them up again
+            Plugin.Log.LogError(
+                $"[seatmark] could not clear the table markings ({_failures}/{GiveUpAfter}): {e.Message}");
+            if (_failures >= GiveUpAfter)
+                Plugin.Log.LogWarning(
+                    "[seatmark] giving up for this match - the table's own seat markings will be " +
+                    "visible, and at more than four players they sit in front of every other seat, " +
+                    "so the marking nearest the player acting may belong to their neighbour");
         }
     }
 

@@ -48,12 +48,15 @@ Confirmed in `BepInEx/LogOutput.log` on a live host, current build:
   pointing at the person to the right" looks like. What actually shows whose turn it is has
   not been identified; `PlayerStats.SetEmissionByTurn` changes a *material* on the player,
   which no transform-and-active-state scan would ever have caught.
-- **Whether turns pass by themselves with real players.** In every bot run the watchdog has
-  to nudge each turn — but it does so at four players as well, where the game is otherwise
-  vanilla. Bots do not play through the game's own throw path (they clear `HaveTurn`
-  directly), so the game's pass-turn step is never triggered for them. This is most likely
-  an artefact of the bots rather than something a human table hits, and only real players
-  can settle it.
+- **Whether turns pass by themselves when a person presses the key.** Bots throw through
+  `RequestThrowCards`, the same entry point a person uses, and no longer clear `HaveTurn`
+  themselves — `AdvanceIfStuck` moves the turn on 2.5 s later instead. The pass still never
+  completes on its own for them, and cannot: it is a scheduled step that runs on the
+  throwing player's *own* machine, and a bot's object is never network-spawned, so no
+  targeted message reaches it. The loopback run has the same shape, because the host is
+  driving those seats server-side rather than each copy playing for itself. So the watchdog
+  spam in a test run is still an artefact of how the test drives play, and only a person at
+  a keyboard settles it.
 - **Liar's Dice, Chaos, Spin and Poker.** They share the turn-order and cap fixes, which
   are mode-independent, but no round has been played in them since.
 
@@ -62,5 +65,6 @@ Confirmed in `BepInEx/LogOutput.log` on a live host, current build:
 - Lobby podiums cannot be spawned through Mirror — a scene object has no build-time
   assetId. The mod uses copies with a fresh, never-spawned identity, which the networking
   layer ignores; their state is therefore filled in per machine rather than synced.
-- Every player must run the same version. The build is drawn top-left in game and the
-  host warns about mismatches, because mixed versions have corrupted whole sessions.
+- Every player must run the same version. The build is drawn top-left in game, and every
+  peer — not just the host — warns about mismatches, because mixed versions have corrupted
+  whole sessions.

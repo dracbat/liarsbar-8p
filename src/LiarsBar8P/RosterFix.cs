@@ -119,13 +119,25 @@ internal static class RosterFix
         catch (Exception e) { Plugin.Log.LogError($"[roster] restore failed: {e.Message}"); }
     }
 
+    /// <summary>
+    /// Correct the player count - through the SyncVar property, so the correction actually
+    /// leaves this machine.
+    ///
+    /// <c>StartPlayerCount</c> is the SyncVar's backing store. Writing it changed the number
+    /// on the host and told nobody, exactly as CompactSeatIndices below warns about, and
+    /// clients kept the stale four that Manager.StartGame managed to sync before it threw.
+    /// That number is what a client sizes its seat ring from, so a wrong one there does not
+    /// stay a cosmetic detail: it re-spaces the table for four and parks the seats real
+    /// players are sitting in four metres under the floor.
+    /// </summary>
     private static void CorrectPlayerCount(Manager m, int count)
     {
         if (m.StartPlayerCount == count) return;
         Plugin.Log.LogWarning(
             $"[roster] StartPlayerCount {m.StartPlayerCount} -> {count} " +
             "(it lags because Manager.StartGame throws; dealing loops over it)");
-        m.StartPlayerCount = count;
+        m.NetworkStartPlayerCount = count;
+        Plugin.Log.LogInfo($"[roster] StartPlayerCount now reads {m.StartPlayerCount} and is synced");
     }
 
     /// <summary>Renumber seats to 0..n-1, keeping the players' order around the table.</summary>

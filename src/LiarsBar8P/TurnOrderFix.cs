@@ -52,13 +52,67 @@ internal static class TurnOrderFix
     private const int Previous = 2;
     private const int Next = 3;
 
+    /// <summary>
+    /// How many are at the table, from a number every machine holds the same.
+    ///
+    /// This asked <c>Manager.Players</c>, which is the server's roster and is empty on a
+    /// client - so on a client the count came back zero, both prefixes below fell through to
+    /// the shipped four-by-four table, and it answered seat 0 for every seat above the third.
+    /// Host and client then disagreed about who was across from whom: the host aimed at seat
+    /// 4, the client watched the same player aim at seat 0.
+    ///
+    /// The synced count first, the roster only as a fallback while it is still zero.
+    /// </summary>
+    private static int Seated(Manager m)
+    {
+        try
+        {
+            if (m == null) return 0;
+            if (m.StartPlayerCount > 0) return m.StartPlayerCount;
+            return m.Players != null ? m.Players.Count : 0;
+        }
+        catch { return 0; }
+    }
+
+    /// <summary>
+    /// The player in a given seat, found in the scene rather than in the server's roster.
+    ///
+    /// Cached: this sits on an aiming path that can be asked every frame, and a full scene
+    /// scan four times a second would be bad enough - once a frame would be worse.
+    /// </summary>
+    private static readonly System.Collections.Generic.List<PlayerStats> _seated = new();
+    private static float _seatedAt = -999f;
+
+    private static PlayerStats InSeat(Manager m, int want)
+    {
+        try
+        {
+            if (m != null && m.Players != null)
+                foreach (var p in m.Players)
+                    if (p != null && p.Slot == want) return p;
+
+            if (UnityEngine.Time.time - _seatedAt >= 2f)
+            {
+                _seatedAt = UnityEngine.Time.time;
+                _seated.Clear();
+                var all = UnityEngine.Object.FindObjectsOfType<PlayerStats>();
+                if (all != null)
+                    for (int i = 0; i < all.Count; i++)
+                        if (all[i] != null) _seated.Add(all[i]);
+            }
+
+            for (int i = 0; i < _seated.Count; i++)
+                if (_seated[i] != null && _seated[i].Slot == want) return _seated[i];
+        }
+        catch { }
+        return null;
+    }
+
     [HarmonyPrefix]
     [HarmonyPatch(typeof(Manager), nameof(Manager.GetTargetSlot))]
     private static bool Neighbour(Manager __instance, int myslot, CharController.Targets targetdirection, ref int __result)
     {
-        int n;
-        try { n = __instance?.Players?.Count ?? 0; }
-        catch { return true; }
+        int n = Seated(__instance);
 
         // Below five players the shipped table is already correct; leave it alone.
         if (n <= Limits.VanillaPlayers) return true;
@@ -93,9 +147,7 @@ internal static class TurnOrderFix
                                         CharController.Targets targetdirection,
                                         ref PlayerStats __result)
     {
-        int n;
-        try { n = __instance?.Players?.Count ?? 0; }
-        catch { return true; }
+        int n = Seated(__instance);
 
         if (n <= Limits.VanillaPlayers) return true;      // the shipped table is right
         if (myslot < 0 || myslot >= n) { __result = null; return false; }
@@ -111,13 +163,7 @@ internal static class TurnOrderFix
         __result = null;
         if (want < 0) return false;
 
-        try
-        {
-            foreach (var p in __instance.Players)
-                if (p != null && p.Slot == want) { __result = p; break; }
-        }
-        catch { }
-
+        __result = InSeat(__instance, want);
         return false;
     }
 
