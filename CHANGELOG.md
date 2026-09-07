@@ -8,6 +8,17 @@ so far is below it. Versions that were once numbered 1.x and 2.x were folded int
 0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
 is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v0.26.1 — developer mode stops taking photographs
+
+- **Screenshots are off unless asked for.** Developer mode had begun taking a picture every
+  five seconds, which is right for an unattended test run and wrong for anybody actually
+  playing with the panel open: a few megabytes a shot and a visible pause each time. It is
+  now its own setting, `ScreenshotEverySeconds` under `[Developer]`, and it defaults to zero.
+  Set it to 5 when a run needs a picture record.
+
+Nothing else changed. Developer mode itself is still off by default, so a normal install is
+unaffected either way.
+
 ## v0.26.0 — every seat is dealt, and dealt a fair deck
 
 The night's work. Two constants found by reading the compiled deal account for most of what

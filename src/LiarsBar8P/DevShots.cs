@@ -26,8 +26,13 @@ internal static class DevShots
     private static float _next;
     private static string _pending;
 
-    /// <summary>Seconds between routine shots. Zero turns the timer off.</summary>
-    internal static float Every = 5f;
+    /// <summary>
+    /// Seconds between routine shots, from the config. Zero — the default — turns the timer
+    /// off, which is what it must be while somebody is actually playing: each shot is a few
+    /// megabytes and a visible pause. Only a deliberate test run wants a picture record.
+    /// </summary>
+    private static float Every =>
+        Plugin.DevShotSeconds != null ? Plugin.DevShotSeconds.Value : 0f;
 
     private static string Folder
     {
@@ -57,7 +62,10 @@ internal static class DevShots
     /// <summary>Take one now, tagged with what was happening.</summary>
     internal static void Take(string tag)
     {
-        if (!Dev.Enabled) return;
+        // Off unless a picture record was actually asked for. Developer mode is for playing
+        // with the panel and the log, and it should not start writing megabytes to disk and
+        // stuttering once a round just because it is on.
+        if (!Dev.Enabled || Every <= 0f) return;
         try
         {
             string dir = Folder;
