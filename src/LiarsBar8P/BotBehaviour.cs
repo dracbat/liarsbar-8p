@@ -42,6 +42,22 @@ internal static class BotBehaviour
     private static int _turnNo;
     private static int _lastActive = -1;
 
+    /// <summary>
+    /// Whether the round is in a state where nobody should be acting: a liar call being
+    /// resolved, or cards still being dealt. Both are periods the game itself will not take
+    /// input during.
+    /// </summary>
+    private static bool RoundIsResolving()
+    {
+        try
+        {
+            if (DealTrace.Dealing) return true;
+            var deck = Dev.Deck;
+            return deck != null && deck.LiarCalled;
+        }
+        catch { return false; }
+    }
+
     /// <summary>Notice the turn moving, and count it.</summary>
     private static void CountTurn(Manager m)
     {
@@ -64,6 +80,22 @@ internal static class BotBehaviour
         if (m == null || m.Players == null) return;
 
         CountTurn(m);
+
+        // Nobody plays while the round is resolving or still being dealt.
+        //
+        // A liar call stops play: the cards are revealed and somebody pulls a trigger, and
+        // nothing else is anyone's turn until that finishes. Without this the other seats
+        // carried on throwing cards over the top of it - and the same during the deal, before
+        // the hands had even arrived. The game blocks a person's input at these moments; it
+        // has no way to block a seat being played for from the host, so that is done here.
+        if (RoundIsResolving())
+        {
+            _advanceFrom = -1;          // whatever was pending belongs to the old round
+            _playAt.Clear();
+            RecoverStalledLiarCall();   // still watch for one that never finishes
+            return;
+        }
+
         AdvanceIfStuck(m);
         RecoverStalledLiarCall();
 
@@ -79,7 +111,12 @@ internal static class BotBehaviour
         // with bots, whose player objects are never network-spawned - every targeted message
         // to one is refused as "not spawned", the trigger pull among them. Bots can play a
         // round; only real connections can finish a match.
-        bool playEveryone = DevAutoTest.Active || Loopback.Mine == Loopback.Role.Host;
+        //
+        // Driving, not Active: "the option is switched on" stays true for the whole launch, so
+        // a host who ran one bot test and then invited friends over Steam had every friend's
+        // turn played for them a second after it arrived, with about every third forced move
+        // calling them a liar in their own name.
+        bool playEveryone = DevAutoTest.Driving || Loopback.Mine == Loopback.Role.Host;
 
         foreach (var p in Dev.TablePlayers())
         {

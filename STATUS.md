@@ -5,6 +5,27 @@ Target: 8 players, all modes. Priority: Liar's Deck, then Liar's Dice.
 `docs/PLAYER-LIMITS.md` is the map of every place the game assumes four players.
 `CHANGELOG.md` is what changed in each release, and why.
 
+## Verified with eight real connections
+
+Eight separate copies of the game, each with its own Mirror connection, played together on
+one machine through the loopback harness. Seating measured on **every** machine, not just
+the host:
+
+| Players | Gap between seats | Furthest anyone sat from their own seat |
+|---|---|---|
+| 5 | 72.0° | 0.01 m |
+| 6 | 60.0° | 0.01 m |
+| 7 | 51.4° | 0.00 m |
+| 8 | 45.0° | 0.00 m |
+
+Zero errors from the mod on any peer, at any size. Also played in **Liar's Dice** (six and
+eight) and **Liar's Poker** (seven).
+
+A copy of the game holds about 3 GB at steady state, so eight of them need roughly 24 GB -
+well within a 64 GB machine. An earlier note here said 8 GB a copy and concluded eight
+could never be tested; that measurement was taken from long-running copies with screenshots
+on, and it was wrong.
+
 ## Verified from a real run
 
 Confirmed in `BepInEx/LogOutput.log` on a live host, current build:
@@ -34,11 +55,6 @@ Confirmed in `BepInEx/LogOutput.log` on a live host, current build:
 
 ## Not yet proven
 
-- **A full round with eight people.** Everything above is either verified solo or
-  verified at five. Six, seven and eight have never been in one lobby. The loopback
-  harness cannot settle it either: a running copy of the game holds about 8 GB, so eight of
-  them want ~64 GB and this machine has exactly that with Windows already in it. Five fit
-  with room to spare; eight is a real table or nothing.
 - **What the "arrow" on the table actually is.** The group named `TurnArrows` holds four
   objects 90° apart, one per shipped seat — and at four players *all four are switched on at
   once, on every turn*. Nothing drawn on the tabletop changes angle when the turn moves, in
@@ -57,8 +73,16 @@ Confirmed in `BepInEx/LogOutput.log` on a live host, current build:
   driving those seats server-side rather than each copy playing for itself. So the watchdog
   spam in a test run is still an artefact of how the test drives play, and only a person at
   a keyboard settles it.
-- **Liar's Dice, Chaos, Spin and Poker.** They share the turn-order and cap fixes, which
-  are mode-independent, but no round has been played in them since.
+- **Liar's Chaos, Texas, Velvet Room and Arena.** Liar's Dice and Liar's Poker have now been
+  played beyond four; these four have not. They share the caps, the turn-order fix and the
+  seat ring, all of which are mode-independent, but that is reasoning rather than evidence.
+- **Liar's Spin (Slots).** The harness selects the mode and reports the match starting, and
+  then no game scene loads — it stays in the lobby. Not yet established whether that is the
+  harness's way of choosing a mode or something about the mode itself; nothing in the mod is
+  implicated either way, since it takes no part in mode selection.
+- **A real eight-person table.** Eight *connections* have been proven, all from one machine.
+  Eight people on eight machines, over Steam rather than loopback, is still untested — and
+  it is the only thing left before v1.0.0.
 
 ## Known structural limits
 

@@ -929,11 +929,17 @@ internal static class LobbyPodiums
     }
 
     /// <summary>
-    /// Keep the raised shot if the game puts the camera back where it started.
+    /// Hold the wider shot, every frame, for as long as the mod owns it.
     ///
-    /// Only a camera still standing at its lobby position is moved. If the game has taken
-    /// it somewhere else - a character close-up, a menu - that is a shot of its own and is
-    /// left alone.
+    /// This is not conditional and the summary used to claim it was - that only a camera
+    /// standing at its lobby position would be moved, and a shot the game had taken over
+    /// would be left alone. It re-poses the camera unconditionally, easing between the home
+    /// framing and the wanted one.
+    ///
+    /// That is deliberate, not an oversight: the Cinemachine virtual camera is switched off
+    /// while this holds the shot, so there is nothing else driving the camera and nobody to
+    /// defer to. Handing it back on a position comparison would mean float drift mid-blend
+    /// could release the shot to a disabled rig and freeze the framing where it stood.
     /// </summary>
     private static void HoldCamera()
     {
@@ -987,14 +993,29 @@ internal static class LobbyPodiums
     private static Quaternion _blendFromRot;
     private static float _blendFromFov;
 
-    /// <summary>Are there more people here than the lobby was built to show?</summary>
+    /// <summary>
+    /// Is anybody standing on a podium the shipped lobby shot cannot see?
+    ///
+    /// Asked as occupancy, not as a headcount. A podium belongs to a player for the life of
+    /// the lobby - nothing re-packs people into lower slots when somebody leaves - so "five
+    /// people are here" and "somebody is in the second row" are different questions, and the
+    /// headcount answered the wrong one. Five players, one of them on an added podium, then
+    /// somebody from the front row leaves: the count drops to four, the camera eased back to
+    /// the four-podium shot, and the player in the second row - who had not moved - was left
+    /// outside the frame on every screen for the rest of the lobby.
+    /// </summary>
     private static bool Crowded()
     {
         try
         {
             var nm = UnityEngine.Object.FindObjectOfType<CustomNetworkManager>();
-            int n = nm != null && nm.GamePlayers != null ? nm.GamePlayers.Count : 0;
-            return n > Limits.VanillaPlayers;
+            if (nm == null || nm.GamePlayers == null) return false;
+
+            foreach (var p in nm.GamePlayers)
+                if (p != null && !string.IsNullOrEmpty(p.SlotName) && p.SlotName.StartsWith(Prefix))
+                    return true;
+
+            return false;
         }
         catch { return false; }
     }

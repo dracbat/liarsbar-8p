@@ -36,6 +36,9 @@ internal static class DeckSizePatch
 
     private sealed class Target
     {
+        /// <summary>Whether the failure to find this operand has already been reported.</summary>
+        internal bool Warned;
+
         public string Method;
         public int VanillaDeck;      // the constant the game shipped with
         public int Current;          // what is written there now
@@ -146,15 +149,22 @@ internal static class DeckSizePatch
                 t.Site = FindOperand(code, t.Current == 0 ? t.VanillaDeck : t.Current);
                 if (t.Site == IntPtr.Zero)
                 {
-                    Plugin.Log.LogWarning(
-                        $"[decksize] could not locate the deck size inside {t.Method} - " +
-                        "the game may have updated; dealing is unchanged");
-                    t.Current = -1;   // stop retrying every round
+                    // Warn once per target, but keep looking on later rounds. The sentinel used
+                    // to go into Current, which did neither: Current is also the value the
+                    // scan searches for, so -1 meant every later round searched for an
+                    // operand that cannot exist, failed, and warned again - and a first
+                    // attempt made before the game is warm would have latched the deck at
+                    // its vanilla size for the whole process.
+                    if (!t.Warned)
+                    {
+                        t.Warned = true;
+                        Plugin.Log.LogWarning(
+                            $"[decksize] could not locate the deck size inside {t.Method} - " +
+                            "the game may have updated; dealing is unchanged");
+                    }
                     continue;
                 }
             }
-
-            if (t.Current == -1) continue;
 
             if (Write(t.Site, wanted))
             {

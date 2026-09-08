@@ -8,7 +8,35 @@ integrity of game files* undoes the install completely.
 
 **Everyone playing together must install this and run the same version.** A vanilla
 client in a modded lobby will desync. The version you are running is drawn in the
-top-left corner in game, and the host is warned when someone's build differs.
+top-left corner in game, and every player is warned when someone's build differs.
+
+---
+
+## What it looks like
+
+Eight players at a table built for four, sharing it evenly:
+
+![Eight players at the table](docs/images/table-8-players.jpg)
+
+The lobby puts the extra players in a second row and pulls the camera back so everyone is
+in frame:
+
+![The lobby, two rows](docs/images/lobby-two-rows.jpg)
+
+The table is divided by however many are actually playing, so five, six or seven sit
+evenly too rather than bunching along one side — here six in Liar's Dice, 60° apart:
+
+![Six players, Liar's Dice](docs/images/liars-dice-6-players.jpg)
+
+It is not only Liar's Deck. The seat ring, the caps and the turn order are shared across
+the modes — Liar's Dice at eight, and Liar's Poker at seven:
+
+![Eight players, Liar's Dice](docs/images/liars-dice-8-players.jpg)
+
+![Seven players, Liar's Poker](docs/images/liars-poker-7-players.jpg)
+
+*(Every screenshot is from the loopback test harness, where the players are named
+Player1–Player8.)*
 
 ---
 

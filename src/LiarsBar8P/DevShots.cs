@@ -78,19 +78,55 @@ internal static class DevShots
     /// </summary>
     private const int KeepRuns = 5;
 
+    /// <summary>Whether the joining copies of a loopback test should photograph themselves too.</summary>
+    private static bool ClientShotsWanted
+    {
+        get
+        {
+            try
+            {
+                string v = Environment.GetEnvironmentVariable("LIARSBAR8P_SHOTS_CLIENTS");
+                return !string.IsNullOrEmpty(v) && v != "0";
+            }
+            catch { return false; }
+        }
+    }
+
     private static void PruneOldRuns(System.IO.DirectoryInfo parent)
     {
         try
         {
             if (parent == null || !parent.Exists) return;
-            var runs = parent.GetDirectories();
-            if (runs.Length <= KeepRuns) return;
 
-            Array.Sort(runs, (a, b) => b.LastWriteTimeUtc.CompareTo(a.LastWriteTimeUtc));
-            for (int i = KeepRuns; i < runs.Length; i++)
+            // Only ever folders this class made, matched by the exact shape it names them.
+            // The screenshot root can be pointed anywhere by LIARSBAR8P_SHOTS, and deleting
+            // "the oldest directories next to it" would then recursively delete whatever else
+            // happened to be in that folder. A recursive delete has to be incapable of
+            // touching anything it did not create.
+            var runs = new System.Collections.Generic.List<System.IO.DirectoryInfo>();
+            foreach (var d in parent.GetDirectories())
+                if (IsRunFolder(d.Name)) runs.Add(d);
+
+            if (runs.Count <= KeepRuns) return;
+
+            runs.Sort((a, b) => b.LastWriteTimeUtc.CompareTo(a.LastWriteTimeUtc));
+            for (int i = KeepRuns; i < runs.Count; i++)
                 try { runs[i].Delete(true); } catch { }
         }
         catch { }
+    }
+
+    /// <summary>Exactly the shape <c>Folder</c> creates: yyyyMMdd-HHmmss-pid.</summary>
+    private static bool IsRunFolder(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return false;
+        var parts = name.Split('-');
+        if (parts.Length != 3) return false;
+        if (parts[0].Length != 8 || parts[1].Length != 6) return false;
+        foreach (var part in parts)
+            foreach (char ch in part)
+                if (!char.IsDigit(ch)) return false;
+        return parts[2].Length > 0;
     }
 
     /// <summary>Take one now, tagged with what was happening.</summary>
@@ -103,8 +139,13 @@ internal static class DevShots
 
         // In a loopback test the joining copies are 640x400 windows nobody is watching, and
         // they all read the same config - so without this, five copies photograph themselves
-        // at once. Only the host's view is worth keeping.
-        if (Loopback.Mine == Loopback.Role.Client) return;
+        // at once. Only the host's view is normally worth keeping.
+        //
+        // Except when what is being tested is what a *client* sees, which is where the seating
+        // bugs lived: the host's screen looked right for weeks while everyone else was looking
+        // at a table laid out for four. Set LIARSBAR8P_SHOTS_CLIENTS=1 to photograph the
+        // joining copies too - each writes to its own run folder, so they cannot collide.
+        if (Loopback.Mine == Loopback.Role.Client && !ClientShotsWanted) return;
 
         try
         {

@@ -59,5 +59,9 @@ internal sealed class ModTicker : MonoBehaviour
 
         try { DevLogging.PollClientState(); }
         catch (Exception e) { Plugin.Log.LogError($"[seen] client poll failed: {e.Message}"); }
+
+        // The automatic test stops driving seats the moment its match is over.
+        try { if (Manager.Instance == null) DevAutoTest.MatchEnded(); }
+        catch (Exception e) { Plugin.Log.LogError($"[auto] match-end check failed: {e.Message}"); }
     }
 }

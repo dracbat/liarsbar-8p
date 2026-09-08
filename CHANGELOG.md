@@ -8,6 +8,99 @@ so far is below it. Versions that were once numbered 1.x and 2.x were folded int
 0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
 is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v0.30.0 — eight players, and a table that stays a table
+
+**Eight players have now sat down together and played.** Eight real connections, every one
+of them a separate copy of the game with its own Mirror connection — not bots. All eight
+seated, dealt from a 56 card deck in vanilla proportions (16 Aces, 16 Kings, 16 Queens,
+8 Jokers), taking turns in order, with no errors from the mod on any of the eight machines.
+That is the thing this project exists for and it had never been done.
+
+Verified at **five, six, seven and eight**, on every machine in the game rather than just
+the host's: gaps of 72.0°, 60.0°, 51.4° and 45.0°, everybody within a centimetre of the
+seat their own slot maps to.
+
+### The seat ring, rebuilt
+
+Seats had been landing under the map and, after that was fixed, scattered metres across
+the bar. Both were the same underlying mistake, and two rules now make it impossible
+rather than merely avoided:
+
+**Every seat stays on the table's own circle.** Empty ones included. An empty seat is only
+empty until the player count this works from turns out to be wrong, and then somebody is
+standing wherever it was put — four metres down, or outside the ring. There was never
+anything to gain by moving one: the only thing hanging off a seat is a name plate, and
+those are now switched off for seats nobody is in. (They were not, on any machine but the
+host, which meant the rewrite briefly parked live name plates on the table between
+players.)
+
+**The table is measured once and never measured again.** The circle used to be re-fitted
+from the live seat transforms on every pass — which is fine until one of the seats it reads
+is one this code has already moved. Then each pass fits a bigger circle than the last: the
+table inflated by exactly the parking multiplier per round, 1.33 m to 3.19 to 7.66 to
+18.38, with the players strewn across the level and the check cheerfully reporting them
+"evenly spaced".
+
+Three more faults came out of testing each table size rather than reasoning about them:
+
+- **The ring was sized from a number the machines did not agree on.** It took the highest
+  seat index this machine could see, which is the server's roster on the host and a scene
+  scan on a client. One peer divided the table by six while another used seven.
+- **Clients lost a tug of war they were not aware of.** The host lays out at the round
+  reset, before the game seats anybody; a client has no such hook and lays out afterwards,
+  so the game put everyone straight back. The same four players were moved from the same
+  wrong places on every attempt. Clients now hold the arrangement for a few seconds, which
+  is long enough, and then check that it stayed.
+- **The check could never pass on a client.** It judged the table by the gaps between the
+  bodies it could see, and a client cannot see a bot at all — so a perfectly correct eight
+  player table measured as two players 45° apart and was called wrong. It now asks a
+  question that needs no agreement about population: is each player on the seat their own
+  slot maps to.
+
+### It is not only Liar's Deck any more
+
+The seat ring was a Liar's Deck feature by accident: its trigger was a patch on the deck
+manager's round reset, so Liar's Dice, Poker and the rest kept the shipped eight-seat
+arrangement and bunched five, six or seven players along one side. Every mode now counts,
+and both the host and the clients drive it from the same place, so the trigger no longer
+depends on which game is being played. Verified in Liar's Dice at six and eight and Liar's
+Poker at seven.
+
+### Things that would have hurt a real player
+
+- **The host was playing everyone's cards for them.** Running one bot test and then hosting
+  a lobby for friends in the same session meant every friend's turn was played for them a
+  second or two after it arrived — about every third of those forced moves calling them a
+  liar in their own name. "The test option is switched on" stays true for a whole launch;
+  it now tracks whether a test is actually driving a match.
+- **Nobody but the host could see whose turn it was.** The readout walked the server's
+  roster, so it was blank on every other machine — while the tabletop markings it replaced
+  are hidden on all of them. Other players had no indicator at all.
+- **Who is across from me** disagreed between machines for any seat above the third.
+- **The online installer removed the mod before checking it could download a replacement.**
+  Update with the connection down and the game still launches, looks perfectly normal, and
+  is silently vanilla — then desyncs in a friend's lobby.
+- **The uninstaller deleted the whole of BepInEx**, taking every other mod with it, while
+  its own header promised it only removed what it had added.
+- **Both deal methods were Harmony-patched *and* natively rewritten** — the one thing this
+  project's notes say never to do, because a detour overwrites the bytes the scan reads.
+- A release could publish a stale plugin under a new tag, and the "nothing sensitive"
+  check only looked at files already tracked by git, moments before committing everything
+  untracked and making the repository public.
+
+### Also
+
+- Screenshots go in a folder per run instead of overwriting the previous one, and the
+  pruner can no longer delete anything it did not create.
+- Ordinary players are no longer written a megabyte and a half of duplicate log per launch
+  into a folder nothing ever tidied.
+- One match produced 18,966 lines of elimination spam, because the game re-asserts the dead
+  flag constantly and every write was being logged.
+- The harness can pick a game mode (`LIARSBAR8P_MODE`), photograph the joining copies
+  (`LIARSBAR8P_SHOTS_CLIENTS`) and hide the developer overlay for clean captures
+  (`LIARSBAR8P_CLEAN_SHOTS`). It also names every copy Player1–PlayerN, the host included,
+  so no Steam persona ends up in a screenshot.
+
 ## v0.29.0 — a round that can actually end
 
 Bots could deal, sit down and take turns, but they could never *finish* a game, and three
