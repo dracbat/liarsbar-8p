@@ -140,7 +140,17 @@ internal static class DeckSizePatch
         foreach (var t in _targets)
         {
             int perPlayer = t.VanillaDeck / Limits.VanillaPlayers;      // 5 for basic, 7 for deck2
-            int wanted = perPlayer * players;
+
+            // Never smaller than the deck the game shipped with.
+            //
+            // Scaling strictly by head count reads as consistent and is wrong below four:
+            // this mod exists to let MORE than four people play, and a table of two or three
+            // is a game it has no business altering. A three player round was being dealt
+            // from fifteen cards - five Aces, four Kings, five Queens and a single Joker -
+            // where the game deals six, six, six and two. One joker instead of two is a
+            // different game, and it went out in a release and got played before anybody
+            // noticed, because every test this project runs is of five players or more.
+            int wanted = perPlayer * Math.Max(players, Limits.VanillaPlayers);
             if (t.Current == wanted) continue;
 
             if (t.Site == IntPtr.Zero)

@@ -96,7 +96,19 @@ internal static class VersionCheck
                 if (ver != Plugin.Version)
                 {
                     mismatched++;
-                    report.Append($"  {name}={ver}");
+
+                    // Both of these belong to somebody else. A persona name is whatever they
+                    // typed, and the version string is lobby member data - which any player in
+                    // the lobby can set to anything, at length. This text is handed to the
+                    // on-screen banner, and the banner measures it with CalcSize on every
+                    // frame it is shown: a few thousand characters of it, or a newline, is
+                    // enough to wreck the readout or the frame rate of everyone else in the
+                    // room. Nothing else in this mod takes a string from another player and
+                    // draws it, so this is the one place that has to be careful.
+                    if (mismatched <= MaxNamesShown)
+                        report.Append($"  {Safe(name, 24)}={Safe(ver, 16)}");
+                    else if (mismatched == MaxNamesShown + 1)
+                        report.Append("  ...");
                 }
             }
 
@@ -113,5 +125,25 @@ internal static class VersionCheck
             }
         }
         catch (Exception e) { Plugin.Log.LogError($"[version] audit failed: {e.Message}"); }
+    }
+
+    /// <summary>How many mismatched players to name before the banner just says "...".</summary>
+    private const int MaxNamesShown = 4;
+
+    /// <summary>
+    /// Make a string somebody else chose safe to put on our screen: one line, printable, and
+    /// short. Anything dropped is marked, so a truncated name does not read as the whole name.
+    /// </summary>
+    private static string Safe(string raw, int max)
+    {
+        if (string.IsNullOrEmpty(raw)) return "?";
+
+        var sb = new StringBuilder(Math.Min(raw.Length, max) + 1);
+        foreach (char c in raw)
+        {
+            if (sb.Length >= max) { sb.Append('~'); break; }
+            sb.Append(char.IsControl(c) ? ' ' : c);
+        }
+        return sb.ToString();
     }
 }

@@ -1,7 +1,15 @@
 <#
   Liar's Bar - 8 Player Mod installer.
-  Finds the game through Steam's own registry keys and library config, then copies
-  the loader and plugin in. Nothing in the game folder is modified or deleted.
+
+  Finds the game through Steam's own registry keys and library config, then copies the
+  loader and plugin in.
+
+  No file that belongs to the GAME is modified or deleted - Steam's "Verify integrity of
+  game files" removes this mod completely. It does remove a previous copy of THIS mod
+  first, which is a deletion and used to be described here as "nothing is deleted": this
+  script removes its own plugin and config from BepInEx before reinstalling, and it
+  overwrites the bundled BepInEx loader and dotnet runtime if they are already present.
+  Other mods' plugins are left alone.
 #>
 
 $ErrorActionPreference = 'Stop'

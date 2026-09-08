@@ -12,6 +12,28 @@ top-left corner in game, and every player is warned when someone's build differs
 
 ---
 
+## How this was made
+
+**This mod was written by an AI** — Claude, working from the game's decompiled code and
+directed by one person over a few days. It began as a for-fun experiment in how far that
+could be taken, and it is offered in that spirit rather than as a commercial product.
+
+That is a reason to read the limits below. It is not a reason to expect something flaky.
+Nothing here was shipped on the strength of "it should work": every fix was checked by
+running the game and reading what it did. Tables of five, six, seven and eight real
+networked clients, seats measured on **every** machine rather than just the host's, each
+mode's own mechanics watched actually firing — and, most importantly, **a full session
+played by five people on five PCs over Steam**, which is what a mod like this ultimately
+has to survive.
+
+Where a thing is untested, this project says so plainly instead of rounding it up. See
+**What works** below, and `STATUS.md` for the long version.
+
+No game files are changed on disk. Nothing phones home. The mod reads and writes only
+inside your Liar's Bar folder.
+
+---
+
 ## What it looks like
 
 Eight players at a table built for four, sharing it evenly:
@@ -133,6 +155,48 @@ deliberate: a stale setting once silently disabled a fix for a whole session.
 | `SelfTestAutoHostLobby` | `false` | Developer only. Leave off. |
 | `SelfTestForceSoloStart` | `false` | Developer only. Leave off. |
 | `SelfTestDeckSizePatch` | `false` | Developer only. Leave off. |
+
+## Testers wanted
+
+The single thing this mod cannot test on its own is **a full lobby of strangers on their own
+PCs**. Everything short of that has been done; eight *people* on eight *machines* has not.
+If you play a game with it — five, six, seven or eight — a log is genuinely useful, whether
+it went well or badly.
+
+Especially wanted:
+
+- **Eight players.** Nobody has done it outside a test rig.
+- **Modes other than Liar's Deck.** Dice, Texas and Poker are verified as far as dealing and
+  turn order; a full match with real people is another matter.
+- **Any bar other than the one you usually play in.** There are four, and the mod has only
+  ever been watched in one of them.
+- **Anything that looks wrong** — a player in the wrong seat, a hand that never arrives, a
+  name plate in the wrong place, a round that stops.
+
+### Sending a log
+
+There is one file, and **it is overwritten every time the game starts**, so copy it out
+before launching again.
+
+1. Play the game.
+2. Quit to the desktop.
+3. Open the game folder — in Steam, right-click **Liar's Bar → Manage → Browse local files**.
+4. Copy **`BepInEx\LogOutput.log`** somewhere safe.
+5. Open an issue at
+   [github.com/dracbat/liarsbar-8p/issues](https://github.com/dracbat/liarsbar-8p/issues) and
+   attach it, or post it on the Nexus Mods page.
+
+Tell us three things with it: **how many players**, **which mode**, and **what looked wrong**.
+The host's log is the most useful one, but a log from any player helps.
+
+> **Read it before you post it.** The log records the Steam names of everyone in your lobby,
+> because that is what the game calls them. It contains no passwords, keys or addresses — but
+> it does have your friends' names in it, so treat it the way you would a screenshot of your
+> friends list.
+
+What the log will already have told us, before you say a word: which of the mod's fixes
+applied, how many people were at the table, where everyone was sitting, what each seat was
+dealt, and the exact name of any networked call that failed.
 
 ## Uninstall
 
