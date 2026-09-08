@@ -94,6 +94,15 @@ internal static class BotBehaviour
         var m = Dev.Mgr;
         if (m == null || m.Players == null) return;
 
+        // Only the two games this understands. Everything below reaches for a hand of cards
+        // through TableHand, which exists on Liar's Deck and the Chaos deck and nowhere else -
+        // so in Liar's Dice or Texas every seat reached Play(), found no component, logged
+        // "has no gameplay component" and skipped its own turn. That is worse than doing
+        // nothing: it took the turn away from a mode that was perfectly capable of playing it.
+        // Those modes are ModePlay's.
+        var kind = TableHand.Playing();
+        if (kind != TableHand.Kind.Deck && kind != TableHand.Kind.ChaosDeck && kind != TableHand.Kind.None) return;
+
         CountTurn(m);
 
         // Nobody plays while the round is resolving or still being dealt.
