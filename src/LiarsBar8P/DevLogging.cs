@@ -219,16 +219,39 @@ internal static class DevLogging
 
     // ------------------------------------------------------------- eliminations
 
+    /// <summary>
+    /// Seats already reported as out, so an elimination is logged when it happens rather than
+    /// every time the flag is written.
+    ///
+    /// The game re-asserts the dead flag constantly - it is set again for every dead player on
+    /// every round reset and on every re-sync. Logging each write produced 18,966 lines in one
+    /// thirteen round match, which is most of the log file, drowns everything worth reading and
+    /// costs a roster walk each time. Only the change is news.
+    ///
+    /// Kept for the match rather than the round: being out lasts the whole match, so clearing
+    /// it each round would re-report every elimination on every deal.
+    /// </summary>
+    private static readonly System.Collections.Generic.HashSet<int> _reportedOut = new();
+    private static int _reportedFor;
+
     [HarmonyPostfix]
     [HarmonyPatch(typeof(PlayerStats), "set_NetworkDead")]
     private static void Died(PlayerStats __instance, bool value)
     {
-        if (!Dev.Enabled || !value) return;
+        if (!Dev.Enabled) return;
         try
         {
+            var m = Dev.Mgr;
+            int match = m != null ? m.GetInstanceID() : 0;
+            if (match != _reportedFor) { _reportedFor = match; _reportedOut.Clear(); }
+
+            int seat = __instance.Slot;
+            if (!value) { _reportedOut.Remove(seat); return; }
+            if (!_reportedOut.Add(seat)) return;          // already reported this one
+
             int alive = 0;
             foreach (var p in Dev.TablePlayers()) if (p != null && !p.Dead) alive++;
-            Dev.Log("dead", $"{__instance.PlayerName} is out (seat {__instance.Slot}); {alive} still in");
+            Dev.Log("dead", $"{__instance.PlayerName} is out (seat {seat}); {alive} still in");
         }
         catch { }
     }

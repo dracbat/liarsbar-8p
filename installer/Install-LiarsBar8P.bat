@@ -118,6 +118,14 @@ if (Get-Process -Name "Liar's Bar" -ErrorAction SilentlyContinue) {
 # survived an update and silently disabled a fix. Every install now starts from a
 # clean slate for this mod's own files. BepInEx's generated interop folder is left
 # alone on purpose - it is expensive to rebuild and is not ours.
+#
+# Defined here but NOT called until the replacement has been downloaded, extracted and
+# checked. It used to run before the download: a player updating with their connection
+# down had their plugin deleted, then "Could not reach GitHub", and was left with BepInEx
+# and no mod - a game that launches and looks completely normal while being, in effect, a
+# vanilla client. They would then join a friend's eight player lobby and desync, having
+# done nothing wrong. Never take the working copy away before the new one is in hand.
+function Remove-Previous {
 Say ""
 Say "Removing any previous install of this mod..."
 $gone = 0
@@ -146,6 +154,7 @@ foreach ($old in ($targets | Select-Object -Unique)) {
     }
 }
 if ($gone -eq 0) { Say "         nothing previous found - clean machine" Gray }
+}
 
 Say ""
 Say "Checking for the latest release..."
@@ -195,6 +204,10 @@ try {
         Bad "The downloaded package does not look right (no BepInEx folder)."
         exit 1
     }
+
+    # Only now, with a verified payload extracted and ready to copy, is it safe to take the
+    # previous install away. Inside the same try, so a failure lands in the catch below.
+    Remove-Previous
 
     Say ""
     Say "Installing fresh..."

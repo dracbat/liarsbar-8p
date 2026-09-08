@@ -37,6 +37,51 @@ internal static class Loopback
     internal static bool Active => _role != Role.Off;
     internal static Role Mine => _role;
 
+    /// <summary>
+    /// Pick the game mode for a harness run, from <c>LIARSBAR8P_MODE</c>.
+    ///
+    /// The mod's fixes are meant to be mode-independent - the caps, the turn order wrap and the
+    /// seat ring are all shared - but "meant to be" is not evidence, and every one of them has
+    /// only ever been watched in Liar's Deck. Naming a mode here is what lets the others be
+    /// played rather than reasoned about.
+    ///
+    /// Accepts a name or a number: LiarsDeck, LiarsDice, LiarsChaos, LiarsPoker, VelvetRoom,
+    /// LiarsTexas, LiarsSpin, Arena. Unset leaves whatever the lobby already had.
+    /// </summary>
+    private static void ChooseMode(LobbyController lobby)
+    {
+        try
+        {
+            string want = Environment.GetEnvironmentVariable("LIARSBAR8P_MODE");
+            if (string.IsNullOrEmpty(want)) return;
+
+            var names = new[] { "LiarsDeck", "LiarsDice", "LiarsChaos", "LiarsPoker",
+                                "VelvetRoom", "LiarsTexas", "LiarsSpin", "Arena" };
+
+            int index = -1;
+            if (!int.TryParse(want, out index))
+                for (int i = 0; i < names.Length; i++)
+                    if (string.Equals(names[i], want, StringComparison.OrdinalIgnoreCase)) index = i;
+
+            if (index < 0 || index >= names.Length)
+            {
+                Plugin.Log.LogWarning(
+                    $"[loopback] '{want}' is not a game mode - leaving the lobby on the one it has. " +
+                    $"Try one of: {string.Join(", ", names)}");
+                return;
+            }
+
+            // Through the game's own mode button rather than by writing the SyncVar. Writing
+            // NetworkMode directly looked like it worked - the field changed and the change
+            // synced - and the match still started Liar's Deck, because choosing a mode also
+            // sets up the sub-mode lists and whatever else the button does. Press the button.
+            lobby.ChangeGameMode(index);
+            Plugin.Log.LogWarning(
+                $"[loopback] game mode set to {names[index]} for this run (lobby now reports {lobby.Mode})");
+        }
+        catch (Exception e) { Plugin.Log.LogWarning($"[loopback] could not set the game mode: {e.Message}"); }
+    }
+
     /// <summary>Read the role once, from the environment or the command line.</summary>
     internal static void Configure()
     {
@@ -157,9 +202,18 @@ internal static class Loopback
             {
                 if (p == null) continue;
 
-                // The host keeps its own Steam name; the joiners are numbered after their
-                // connection, which is unique and already means something in the log.
-                if (p.ConnectionID == 0) continue;
+                // Everyone is numbered after their connection, which is unique and already
+                // means something in the log - the host included. The host used to keep its
+                // Steam persona, which is the one piece of real identity that ends up printed
+                // over somebody's head in every screenshot taken of a test. A harness has no
+                // use for it, and screenshots of a harness get shared.
+                //
+                // Bots are skipped, and not only for tidiness: BotManager recognises a bot at
+                // the table by its name, so renaming one makes it stop being a bot as far as
+                // the rest of the mod is concerned - it would no longer have its revolver
+                // loaded or its "holding cards" flag kept up. Bots also carry negative
+                // connection ids, which would collide with the numbering.
+                if (p.ConnectionID < 0 || BotManager.IsBot(p)) continue;
 
                 string want = $"Player{p.ConnectionID + 1}";
                 if (p.PlayerName == want) continue;
@@ -201,6 +255,19 @@ internal static class Loopback
             if (nm == null || nm.GamePlayers == null) return;
             if (nm.GamePlayers.Count < _expect) return;
 
+            // The mode first, before anybody is marked ready. Choosing it last looked right
+            // and did nothing: the call went through and the lobby still reported Liar's Deck,
+            // because by then everyone was ready and the lobby will not change mode under a
+            // ready table. It also needs a moment to reach the other copies before the match
+            // is started on top of it.
+            if (!_modeChosen)
+            {
+                _modeChosen = true;
+                ChooseMode(lobby);
+                _readyAt = 0f;
+                return;
+            }
+
             // Everyone ready, including the copies with nobody at the keyboard.
             int waiting = 0;
             foreach (var p in nm.GamePlayers)
@@ -221,7 +288,10 @@ internal static class Loopback
             if (Time.time - _readyAt < 3f) return;
 
             _matchStarted = true;
-            Plugin.Log.LogWarning($"[loopback] all {nm.GamePlayers.Count} copies are here and ready - starting the match");
+
+            Plugin.Log.LogWarning(
+                $"[loopback] all {nm.GamePlayers.Count} copies are here and ready - starting " +
+                $"a {lobby.Mode} match");
             lobby.StartGameOrReady();
         }
         catch (Exception e)
@@ -233,6 +303,7 @@ internal static class Loopback
 
     private static int _expect;
     private static bool _matchStarted;
+    private static bool _modeChosen;
     private static float _readyAt;
 
     /// <summary>

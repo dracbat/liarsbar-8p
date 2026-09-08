@@ -47,9 +47,30 @@ internal sealed class DevHud : MonoBehaviour
         catch (Exception e) { Dev.Warn("hud", $"input failed: {e.Message}"); }
     }
 
+    /// <summary>
+    /// Whether to draw nothing, so a capture shows what an ordinary player sees.
+    ///
+    /// Screenshots are a developer feature, so taking one normally means developer mode is on,
+    /// which puts developer furniture on screen - and a picture of the mod with a debug hint in
+    /// the corner is a picture of the wrong thing. Set LIARSBAR8P_CLEAN_SHOTS=1 to keep the
+    /// tools working while showing none of them.
+    /// </summary>
+    private static bool Hidden
+    {
+        get
+        {
+            try
+            {
+                string v = System.Environment.GetEnvironmentVariable("LIARSBAR8P_CLEAN_SHOTS");
+                return !string.IsNullOrEmpty(v) && v != "0";
+            }
+            catch { return false; }
+        }
+    }
+
     private void OnGUI()
     {
-        if (!Dev.Enabled) return;
+        if (!Dev.Enabled || Hidden) return;
         try
         {
             EnsureStyles();

@@ -123,7 +123,12 @@ Step "Checking nothing sensitive would be published"
 # still do not appear; the anchors work because these are clean paths, not porcelain status
 # lines with a two-character prefix.
 $candidates = git ls-files --cached --others --exclude-standard
-$bad = $candidates | Select-String -Pattern 'GameAssembly|global-metadata|\.exe$|members\.txt|ints\.txt|keywords\.txt|isil|cpp2il|\.log$|^backup/|^recon/'
+# Screenshots are blocked because a stray one dropped in for a bug report shows whatever was
+# on screen - a Steam name, a window title, a path. The documentation images are the deliberate
+# exception: they live in one known folder, and every one of them is a loopback capture where
+# the players are named Player1..Player8 and no persona appears.
+$candidates = $candidates | Where-Object { $_ -notmatch '^docs/images/' }
+$bad = $candidates | Select-String -Pattern 'GameAssembly|global-metadata|\.exe$|members\.txt|ints\.txt|keywords\.txt|isil|cpp2il|\.log$|\.png$|\.jpg$|\.jpeg$|^backup/|^recon/'
 if ($bad) {
     Bad "These must never be published:"
     $bad | ForEach-Object { Info $_ }

@@ -1,6 +1,6 @@
 ﻿<#
-  Removes the 8 Player mod and the BepInEx loader from Liar's Bar.
-  Only removes files the installer added; game files are never touched.
+  Removes the 8 Player mod from Liar's Bar, and the BepInEx loader with it if no other
+  mod is using it. Game files are never touched, and neither is anybody else's plugin.
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -33,8 +33,11 @@ function Get-SteamRoot {
 $steam = Get-SteamRoot
 $libs  = New-Object System.Collections.Generic.List[string]
 if ($steam) { $libs.Add($steam) }
-$vdf = Join-Path $steam 'steamapps\libraryfolders.vdf'
-if ($steam -and (Test-Path $vdf)) {
+# Join-Path throws on a null Path, and $steam is null when Steam is not in the registry -
+# so this died with a raw PowerShell error instead of reaching the "type the folder in
+# yourself" prompt. The same bug was fixed in both installers; it was left here.
+$vdf = if ($steam) { Join-Path $steam 'steamapps\libraryfolders.vdf' } else { $null }
+if ($vdf -and (Test-Path $vdf)) {
     foreach ($m in [regex]::Matches((Get-Content $vdf -Raw), '"path"\s+"([^"]+)"')) {
         $libs.Add(($m.Groups[1].Value -replace '\\\\', '\'))
     }
@@ -75,16 +78,42 @@ if (Get-Process -Name "Liar's Bar" -ErrorAction SilentlyContinue) {
 Say ""
 Say "Removing mod files..."
 
-# Only things the installer put there.
-$targets = @('BepInEx', 'dotnet', 'winhttp.dll', 'doorstop_config.ini',
-             '.doorstop_version', 'changelog.txt')
-
+# This mod's own files first.
 $removed = 0
-foreach ($t in $targets) {
-    $p = Join-Path $game $t
+foreach ($f in @('BepInEx\plugins\LiarsBar8P.dll',
+                 'BepInEx\config\liarsbar.eightplayers.cfg')) {
+    $p = Join-Path $game $f
     if (Test-Path $p) {
-        try { Remove-Item $p -Recurse -Force; Good "removed $t"; $removed++ }
-        catch { Bad "could not remove $t : $($_.Exception.Message)" }
+        try { Remove-Item $p -Force; Good "removed $(Split-Path $f -Leaf)"; $removed++ }
+        catch { Bad "could not remove $(Split-Path $f -Leaf) : $($_.Exception.Message)" }
+    }
+}
+
+# BepInEx itself is shared, so it only goes if nothing else is using it.
+#
+# This used to delete the whole BepInEx and dotnet trees unconditionally, while the header
+# promised it "only removes files the installer added". BepInEx is a loader other mods sit
+# in: uninstalling this one silently took every other mod in the plugins folder with it. If
+# somebody else's plugin is there, the loader stays and only this mod's own files go.
+$plugDir = Join-Path $game 'BepInEx\plugins'
+$others = @()
+if (Test-Path $plugDir) {
+    $others = @(Get-ChildItem $plugDir -File -Recurse -ErrorAction SilentlyContinue |
+                Where-Object { $_.Extension -eq '.dll' })
+}
+
+if ($others.Count -gt 0) {
+    Say ""
+    Say "Leaving BepInEx in place - $($others.Count) other plugin(s) are using it:" Yellow
+    $others | ForEach-Object { Say "         $($_.Name)" Gray }
+} else {
+    foreach ($t in @('BepInEx', 'dotnet', 'winhttp.dll', 'doorstop_config.ini',
+                     '.doorstop_version', 'changelog.txt')) {
+        $p = Join-Path $game $t
+        if (Test-Path $p) {
+            try { Remove-Item $p -Recurse -Force; Good "removed $t"; $removed++ }
+            catch { Bad "could not remove $t : $($_.Exception.Message)" }
+        }
     }
 }
 
@@ -93,7 +122,12 @@ if ($removed -eq 0) {
     Say "Nothing to remove - the mod was not installed." Yellow
 } else {
     Say "============================================" Green
-    Say "  Uninstalled. The game is back to vanilla." Green
+    if ($others.Count -gt 0) {
+        Say "  8 Player mod removed. BepInEx and your other" Green
+        Say "  mods were left alone." Green
+    } else {
+        Say "  Uninstalled. The game is back to vanilla." Green
+    }
     Say "============================================" Green
     Say ""
     Say "  Game files themselves were never modified, so Steam's" Gray
