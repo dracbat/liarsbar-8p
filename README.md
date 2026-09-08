@@ -1,5 +1,11 @@
 # Liar's Bar — 8 Player Mod
 
+> **Written by an AI.** Every line of this mod was produced by Claude, directed by one
+> person, as a for-fun experiment. It has been tested by running the game rather than by
+> reasoning about it, and played end to end by real people — see
+> [How this was made](#how-this-was-made) for exactly what that means and where the limits
+> are.
+
 Raises Liar's Bar from 4 players to 8 (configurable 2–16).
 
 Built with [BepInEx 6 (IL2CPP)](https://github.com/BepInEx/BepInEx) + Harmony. No game
