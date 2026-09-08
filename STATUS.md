@@ -20,6 +20,28 @@ the host:
 
 Zero errors from the mod on any peer, at any size.
 
+## Played with real people, on real machines
+
+**2026-09-08, v0.31.0: five people, five PCs, over Steam.** Not the loopback harness — five
+separate machines in a Steam lobby, playing Liar's Deck Basic to a winner. Confirmed from the
+host's log afterwards:
+
+| | |
+|---|---|
+| All five seated on the ring | 5 of 5, gaps 72.0–72.1°, nobody more than 0.00 m from their own seat |
+| All five dealt | five cards each, all holding them |
+| Rounds played | 35 round resets across the session, matches run to a winner |
+| Errors from the mod | **none** |
+| Remote calls that threw | **none** |
+| Deal routines patched | 7 of 7 |
+
+That is the first time this has been true of anything but a single machine talking to itself.
+**Eight people on eight machines is still the open question** — five proves the networking
+path, not the table size.
+
+> The log records real Steam names. Do not paste one into an issue or a screenshot without
+> reading it first.
+
 ## Verified per mode, at every size
 
 Each cell is a real table of that many separate copies of the game. "Dealt" means every seat

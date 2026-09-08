@@ -209,7 +209,16 @@ internal static class Loopback
 
             if (_role == Role.Host)
             {
-                Plugin.Log.LogWarning($"[loopback] hosting on 127.0.0.1:{_port}");
+                // Says what it actually does. Setting networkAddress only tells a CLIENT
+                // where to dial; Telepathy's listener takes a port and no address, so the
+                // socket is open on every interface, not just loopback. Printing
+                // "hosting on 127.0.0.1" was a reassurance the code could not back up, and
+                // this mode has no Steam and no authentication behind it - so anyone who can
+                // reach the port while a test is running can join as a client.
+                Plugin.Log.LogWarning(
+                    $"[loopback] hosting on port {_port} - the listener accepts connections on " +
+                    "every network interface, not only 127.0.0.1, and this mode has no Steam " +
+                    "and no authentication. Only run it on a machine you trust the network of.");
                 nm.StartHost();
             }
             else

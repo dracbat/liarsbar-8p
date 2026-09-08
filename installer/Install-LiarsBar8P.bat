@@ -185,7 +185,23 @@ $zip = Join-Path $tmp 'mod.zip'
 try {
     Say ""
     Say "Downloading..."
-    Invoke-WebRequest $asset.browser_download_url -OutFile $zip -UseBasicParsing
+
+    # Where the download may come from is decided here, not by the response.
+    #
+    # This script asks GitHub's API for the newest release and then downloads whatever URL
+    # comes back, as administrator, and installs it. That is fine right up until the answer
+    # is not GitHub's - so the answer is checked against the only hosts GitHub actually
+    # serves release assets from, and anything else stops the install rather than being
+    # fetched and run on somebody's machine.
+    $url = [uri]$asset.browser_download_url
+    $allowed = @('github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com')
+    if ($url.Scheme -ne 'https' -or $allowed -notcontains $url.Host) {
+        Bad "The download link points at $($url.Scheme)://$($url.Host), which is not GitHub."
+        Bad "Nothing has been downloaded or installed. Please report this."
+        exit 1
+    }
+
+    Invoke-WebRequest $url -OutFile $zip -UseBasicParsing
     Good "Downloaded $([math]::Round((Get-Item $zip).Length / 1MB, 1)) MB"
 
     Say ""
