@@ -1,0 +1,292 @@
+<#
+    Play one table per (mode, player count) and report what happened.
+
+    The old harness launched copies on a stopwatch - forty-five seconds for the host, thirty
+    for each joiner - which is most of five minutes before a table of eight even forms, and
+    is wrong in both directions: too long when the machine is quick, and not long enough when
+    it is busy. This waits for the log line that says the copy is actually ready, so a run
+    takes as long as it takes and no longer.
+
+    A "table" here is a game mode together with its deck or dice variant, because the lobby's
+    left and right arrows choose between genuinely different games - one of the deck variants
+    is dealt by an entirely separate manager with its own copy of the deal.
+
+    Each run gets its own folder of logs and a verdict drawn from them, so a matrix of tables
+    against sizes can be left to run and read afterwards.
+
+        .\tools\matrix-test.ps1                             every table, 5 to 8
+        .\tools\matrix-test.ps1 -Tables deck0 -Sizes 8      one table
+        .\tools\matrix-test.ps1 -PlaySeconds 240            give each round longer
+
+    Close everything with:  taskkill /IM "Liar's Bar.exe" /F
+#>
+param(
+    [string[]] $Tables = @('deck0', 'deck1', 'deck2', 'deck3', 'dice0', 'dice1', 'texas', 'spin', 'poker', 'chaos'),
+    [int[]]    $Sizes = @(5, 6, 7, 8),
+    [int]      $PlaySeconds = 120,
+    [int]      $LaunchTimeout = 180,
+    [string]   $Map = '',            # 0-3: the bar. Blank leaves whatever the machine last used.
+    [switch]   $TurnProbe,           # hand the turn round on purpose and report which seats it reached
+    [string]   $Results = "$env:LOCALAPPDATA\LiarsBar8P\matrix",
+    [switch]   $Append
+)
+
+$ErrorActionPreference = 'Stop'
+
+# name -> game mode, deck variant, dice variant. A blank variant leaves the lobby's own.
+$Catalogue = @{
+    deck0 = @{ Mode = 'LiarsDeck';  Deck = '0'; Dice = '' }
+    deck1 = @{ Mode = 'LiarsDeck';  Deck = '1'; Dice = '' }
+    deck2 = @{ Mode = 'LiarsDeck';  Deck = '2'; Dice = '' }
+    deck3 = @{ Mode = 'LiarsDeck';  Deck = '3'; Dice = '' }
+    dice0 = @{ Mode = 'LiarsDice';  Deck = '';  Dice = '0' }
+    dice1 = @{ Mode = 'LiarsDice';  Deck = '';  Dice = '1' }
+    texas = @{ Mode = 'LiarsTexas'; Deck = '';  Dice = '' }
+    spin  = @{ Mode = 'LiarsSpin';  Deck = '';  Dice = '' }
+    poker = @{ Mode = 'LiarsPoker'; Deck = '';  Dice = '' }
+    chaos = @{ Mode = 'LiarsChaos'; Deck = '';  Dice = '' }
+}
+
+$Game = "${env:ProgramFiles(x86)}\Steam\steamapps\common\Liar's Bar"
+$Exe  = "$Game\Liar's Bar.exe"
+$Logs = "$env:LOCALAPPDATA\LiarsBar8P\logs"
+
+if (-not (Test-Path $Exe)) { Write-Host "Game not found at $Game" -ForegroundColor Red; exit 1 }
+
+New-Item -ItemType Directory -Force -Path $Results | Out-Null
+
+function Stop-Copies {
+    # Stop-Process rather than taskkill: redirecting a native tool's stderr in Windows
+    # PowerShell turns "no such process" - the ordinary case - into a terminating error.
+    Get-Process -Name "Liar's Bar" -ErrorAction SilentlyContinue | ForEach-Object {
+        try { $_.Kill() } catch { }
+    }
+    $waited = 0
+    while ((Get-Process -Name "Liar's Bar" -ErrorAction SilentlyContinue) -and $waited -lt 30) {
+        Start-Sleep -Seconds 1; $waited++
+    }
+}
+
+# Wait for a line to appear in a copy's own log. Returns $true if it turned up in time.
+function Wait-ForLine {
+    param([string] $Path, [string] $Pattern, [int] $TimeoutSec, [int] $ProcId)
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSec)
+    while ((Get-Date) -lt $deadline) {
+        if ($ProcId -and -not (Get-Process -Id $ProcId -ErrorAction SilentlyContinue)) { return $false }
+        if (Test-Path $Path) {
+            if (Select-String -Path $Path -Pattern $Pattern -SimpleMatch -Quiet -ErrorAction SilentlyContinue) { return $true }
+        }
+        Start-Sleep -Milliseconds 750
+    }
+    return $false
+}
+
+function Start-Copy {
+    param([string] $Role, [string] $LoopbackRole, [int] $Expect, [hashtable] $Table, [switch] $Small)
+
+    $env:SteamAppId          = '3097560'
+    $env:LIARSBAR8P_PORT     = '7777'
+    $env:LIARSBAR8P_ROLE     = $Role
+    $env:LIARSBAR8P_LOOPBACK = $LoopbackRole
+    $env:LIARSBAR8P_MODE     = $Table.Mode
+    $env:LIARSBAR8P_DECKMODE = $Table.Deck
+    $env:LIARSBAR8P_DICEMODE = $Table.Dice
+    $env:LIARSBAR8P_MAP      = $Map
+    $env:LIARSBAR8P_EXPECT   = if ($Expect -gt 0) { "$Expect" } else { '' }
+
+    # Only the host drives the turn probe, and only when asked. A client running it would
+    # be talking to itself: the turn is the server's to give.
+    $env:LIARSBAR8P_TURNPROBE = if ($TurnProbe -and $LoopbackRole -eq 'host') { '1' } else { '' }
+
+    # ArgumentList refuses an empty collection, so the host is started without one at all.
+    if ($Small) {
+        return Start-Process -FilePath $Exe -WorkingDirectory $Game -PassThru `
+            -ArgumentList @('-screen-width', '640', '-screen-height', '400', '-screen-fullscreen', '0')
+    }
+    return Start-Process -FilePath $Exe -WorkingDirectory $Game -PassThru
+}
+
+# ---------------------------------------------------------------- reading a finished run
+
+function Read-Verdict {
+    param([string] $Folder, [string] $Name, [string] $Mode, [int] $Players)
+
+    $hostLog = Get-ChildItem "$Folder\host-*.log" -ErrorAction SilentlyContinue | Select-Object -First 1
+    $all     = @(Get-ChildItem "$Folder\*.log" -ErrorAction SilentlyContinue)
+
+    $r = [ordered]@{
+        Table = $Name; Mode = $Mode; Players = $Players; Peers = $all.Count
+        Ran = ''; Bar = ''; Started = $false; SceneLive = $false
+        Seated = 0; SeatGood = 0; SeatWrong = 0; WorstOffset = ''; Gap = ''
+        DealtSeats = 0; ShortSeats = 0
+        Turns = 0; Slots = 0; TurnRing = ''
+        Devils = 0; Chaos = 0; ChaosDone = 0
+        Exceptions = 0; Dropped = 0; ModErrors = 0; BadRpc = ''
+        Notes = ''
+    }
+
+    if (-not $hostLog) { $r.Notes = 'no host log'; return [pscustomobject]$r }
+    $h = @(Get-Content $hostLog.FullName -ErrorAction SilentlyContinue)
+    $joined = $h -join "`n"
+
+    if ($joined -match 'starting a (\w+) match') { $r.Started = $true }
+    if ($joined -match "the table running this match is ([^\r\n]+)") { $r.Ran = $Matches[1].Trim() }
+    # The scene the match itself loaded, not the lobby it left. There are four bars and the
+    # host's own saved choice decides which one, so a run's verdict has to say where it was.
+    $scenes = $h | Select-String -Pattern 'OnClientChangeScene[^:]*: (\S+) \(op=' -AllMatches |
+              ForEach-Object { $_.Matches } | ForEach-Object { $_.Groups[1].Value } |
+              Where-Object { $_ -notmatch 'SteamLobby' }
+    if ($scenes) { $r.Bar = @($scenes)[-1] }
+
+    # The census block where the most seats were holding cards, not the last one.
+    #
+    # The last block is whatever the table happened to look like when the run was killed,
+    # which is usually a round part-way through or hands already played out - so a mode that
+    # dealt all eight in perfectly reported "dealt 0/8" and looked broken. The question being
+    # asked is whether the deal ever reached every seat, and the best block answers it.
+    foreach ($census in ($h | Select-String -SimpleMatch '[census] ' | Where-Object { $_.Line -match 'at the table' })) {
+        $r.SceneLive = $true
+        if ($census.Line -match '\[census\] (\d+) at the table') { $seated = [int]$Matches[1] } else { continue }
+
+        $dealtHere = 0; $shortHere = 0
+        $from = $census.LineNumber
+        for ($i = $from; $i -lt [Math]::Min($from + 12, $h.Count); $i++) {
+            if ($h[$i] -notmatch 'seat \d+ (in |OUT)') { break }
+            # The card values are developer-only, so the seat line comes in two shapes. Matching
+            # only the one with values made a perfectly dealt table read back as "dealt 0/8".
+            if ($h[$i] -match '(\d+) dealt(?: \[[^\]]*\])?, (\d+) of (\d+) card objects') {
+                $dealt = [int]$Matches[1]; $out = [int]$Matches[2]
+                if ($dealt -gt 0) { $dealtHere++ }
+                if ($dealt -gt 0 -and $out -lt $dealt) { $shortHere++ }
+            }
+        }
+
+        if ($dealtHere -ge $r.DealtSeats) {
+            $r.DealtSeats = $dealtHere
+            $r.ShortSeats = $shortHere
+        }
+        if ($seated -gt $r.Seated) { $r.Seated = $seated }
+    }
+
+    # The mode's own mechanic, not just its deal: a variant that never puts its special card
+    # on the table has had everything except the thing that makes it a different game tested.
+    $r.Devils    = ($h | Select-String -SimpleMatch "DEVIL'S DEAL started").Count
+    $r.Chaos     = ($h | Select-String -SimpleMatch 'CHAOS thrown by').Count
+    $r.ChaosDone = ($h | Select-String -SimpleMatch 'chaos aim resolved').Count
+
+    if ($joined -match 'the turn reached all (\d+) seats') { $r.TurnRing = "all $($Matches[1])" }
+    elseif ($joined -match 'the turn reached only (\d+) of (\d+) seats') { $r.TurnRing = "ONLY $($Matches[1])/$($Matches[2])" }
+
+    $r.Turns = ($h | Select-String -SimpleMatch 'active slot ->').Count
+    $r.Slots = (($h | Select-String -Pattern 'active slot -> (\d+)' -AllMatches |
+                 ForEach-Object { $_.Matches } | ForEach-Object { $_.Groups[1].Value }) | Select-Object -Unique).Count
+
+    $worst = -1.0
+    foreach ($f in $all) {
+        $text = @(Get-Content $f.FullName -ErrorAction SilentlyContinue)
+        if ($text.Count -eq 0) { continue }
+
+        $seat = $text | Select-String -SimpleMatch '[seatcheck]' | Where-Object { $_.Line -match 'GOOD|WRONG' } | Select-Object -Last 1
+        if ($seat) {
+            $r.SceneLive = $true
+            if ($seat.Line -match '-> GOOD') { $r.SeatGood++ } else { $r.SeatWrong++ }
+            if ($seat.Line -match 'seat ([0-9.]+)m, from the table edge') {
+                $o = [double]$Matches[1]
+                if ($o -gt $worst) { $worst = $o }
+            }
+            if ($seat.Line -match 'gaps ([0-9.]+)\.\.([0-9.]+)deg') { $r.Gap = "$($Matches[1])-$($Matches[2])" }
+        }
+
+        # Only errors from the running game. BepInEx prints a page of TypeLoadException
+        # warnings from Harmony scanning Unity's own assemblies at every startup, and
+        # counting those made a clean run look like a broken one.
+        $r.Exceptions += ($text | Select-String -Pattern '\[Error\] Unity:.*(IndexOutOfRangeException|ArgumentOutOfRangeException|NullReferenceException|InvalidOperationException)').Count
+        $r.Dropped    += ($text | Select-String -SimpleMatch 'Disconnecting connection').Count
+        $r.ModErrors  += ($text | Select-String -Pattern "\[Error\].*Liar's Bar 8 Players").Count
+
+        $rpc = $text | Select-String -SimpleMatch '[rpc] ' | Select-Object -First 1
+        if ($rpc -and -not $r.BadRpc -and $rpc.Line -match '\[rpc\] (.+?) threw') { $r.BadRpc = $Matches[1] }
+    }
+    if ($worst -ge 0) { $r.WorstOffset = "{0:F2}" -f $worst }
+
+    if ($r.ShortSeats -gt 0) { $r.Notes = "$($r.ShortSeats) seat(s) dealt cards they never received" }
+    return [pscustomobject]$r
+}
+
+# ---------------------------------------------------------------------------- the matrix
+
+$csv = "$Results\summary.csv"
+$summary = @()
+if ($Append -and (Test-Path $csv)) { $summary = @(Import-Csv $csv) }
+
+$runNo = 0
+$total = $Tables.Count * $Sizes.Count
+
+foreach ($name in $Tables) {
+    if (-not $Catalogue.ContainsKey($name)) { Write-Host "unknown table '$name'" -ForegroundColor Red; continue }
+    $table = $Catalogue[$name]
+
+    foreach ($n in $Sizes) {
+        $runNo++
+        Write-Host ""
+        Write-Host "[$runNo/$total] $name ($($table.Mode)) with $n players ----------------" -ForegroundColor Cyan
+
+        Stop-Copies
+        Remove-Item "$Logs\*.log" -Force -ErrorAction SilentlyContinue
+
+        $ok = $true
+        $hostProc = Start-Copy -Role 'host' -LoopbackRole 'host' -Expect $n -Table $table
+        $hostLog = "$Logs\host-$($hostProc.Id).log"
+
+        if (-not (Wait-ForLine -Path $hostLog -Pattern '[loopback] hosting on' -TimeoutSec $LaunchTimeout -ProcId $hostProc.Id)) {
+            Write-Host "  host never reached its lobby" -ForegroundColor Red
+            $ok = $false
+        }
+
+        if ($ok) {
+            for ($i = 2; $i -le $n; $i++) {
+                $c = Start-Copy -Role "c$i" -LoopbackRole 'client' -Expect 0 -Table $table -Small
+                if (-not (Wait-ForLine -Path "$Logs\c$i-$($c.Id).log" -Pattern '[loopback] joining' -TimeoutSec $LaunchTimeout -ProcId $c.Id)) {
+                    Write-Host "  copy $i never connected" -ForegroundColor Red
+                    $ok = $false; break
+                }
+                Write-Host "  copy $i of $n in" -ForegroundColor DarkGray
+            }
+        }
+
+        if ($ok) {
+            if (Wait-ForLine -Path $hostLog -Pattern 'copies are here and ready' -TimeoutSec 150 -ProcId $hostProc.Id) {
+                Write-Host "  match started" -ForegroundColor Green
+            } else {
+                Write-Host "  the match never started" -ForegroundColor Yellow
+            }
+            # Eight copies take much longer to load the bar than five do - long enough that a
+            # run once reported "the table never came up" when the table simply had not
+            # finished arriving. Bigger tables get proportionally longer.
+            $play = $PlaySeconds + 30 * [Math]::Max(0, $n - 5)
+            Start-Sleep -Seconds $play
+        }
+
+        Stop-Copies
+
+        $folder = Join-Path $Results ("{0}-{1}p" -f $name, $n)
+        if (Test-Path $folder) { Remove-Item $folder -Recurse -Force }
+        New-Item -ItemType Directory -Force -Path $folder | Out-Null
+        Copy-Item "$Logs\*.log" $folder -ErrorAction SilentlyContinue
+
+        $v = Read-Verdict -Folder $folder -Name $name -Mode $table.Mode -Players $n
+        $summary += $v
+
+        Write-Host ("  ran on '{0}'  seats {1} good / {2} wrong  dealt {3}/{4}  short {5}  ring {6}  devil {7}  chaos {8}/{9}  exc {10}  modErr {11}" -f `
+            $v.Ran, $v.SeatGood, $v.SeatWrong, $v.DealtSeats, $v.Seated, $v.ShortSeats, $v.TurnRing,
+            $v.Devils, $v.ChaosDone, $v.Chaos, $v.Exceptions, $v.ModErrors) -ForegroundColor Gray
+
+        $summary | Export-Csv $csv -NoTypeInformation -Force
+    }
+}
+
+Write-Host ""
+Write-Host "==================== matrix complete ====================" -ForegroundColor Cyan
+$summary | Format-Table Table, Players, Ran, Seated, SeatGood, SeatWrong, WorstOffset, DealtSeats, ShortSeats, TurnRing, Devils, Chaos, ChaosDone, Exceptions, Dropped, ModErrors -AutoSize
+Write-Host "Logs and summary.csv: $Results"

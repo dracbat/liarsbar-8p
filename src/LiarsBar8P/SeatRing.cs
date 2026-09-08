@@ -580,6 +580,8 @@ internal static class SeatRing
             if (Alive(m.ChaosDeckGame)) return true;
             if (Alive(m.BlorfGame)) return true;
             if (Alive(m.BlorfGameMatchMaking)) return true;
+            if (Alive(m.SpinGame)) return true;
+            if (Alive(m.RouletteGame)) return true;
         }
         catch { }
         return false;

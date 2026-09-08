@@ -52,8 +52,7 @@ internal static class BotBehaviour
         try
         {
             if (DealTrace.Dealing) return true;
-            var deck = Dev.Deck;
-            return deck != null && deck.LiarCalled;
+            return TableHand.LiarCallInFlight();
         }
         catch { return false; }
     }
@@ -67,9 +66,25 @@ internal static class BotBehaviour
         _turnNo++;
     }
 
-    /// <summary>Varied per bot without a random number generator, which the log needs stable.</summary>
-    private static float ThinkTime(int seat) =>
-        MinThinkSeconds + ((seat * 7 % 5) / 4f) * (MaxThinkSeconds - MinThinkSeconds);
+    /// <summary>
+    /// Varied per bot without a random number generator, which the log needs stable.
+    ///
+    /// Cut short at a table that plays itself. The Chaos deck throws for a player who does
+    /// not act quickly enough, and it does so well inside the one to three seconds a seat was
+    /// taking to decide - so every turn was thrown by the game's timer before the seat got to
+    /// it, and a four minute round produced three deliberate plays and not one chaos card.
+    /// Deciding in under half a second is not a realistic player, and is not meant to be: it
+    /// is what puts the choice of card back in the test's hands.
+    /// </summary>
+    private static float ThinkTime(int seat)
+    {
+        float min = MinThinkSeconds, max = MaxThinkSeconds;
+        if (AutoThrows()) { min = 0.2f; max = 0.5f; }
+        return min + ((seat * 7 % 5) / 4f) * (max - min);
+    }
+
+    /// <summary>Whether the table being played takes the turn away from a slow player.</summary>
+    private static bool AutoThrows() => TableHand.Playing() == TableHand.Kind.ChaosDeck;
 
     internal static void Tick()
     {
@@ -178,6 +193,7 @@ internal static class BotBehaviour
         _advanceFrom = -1;
         _lastThrower = -1;
         _calledAt = 0f;
+        _rarity.Clear();
     }
 
     /// <summary>
@@ -335,7 +351,7 @@ internal static class BotBehaviour
     {
         try
         {
-            var gp = p.GetComponent<DeckGameplay>();
+            var gp = TableHand.For(p);
             if (gp == null)
             {
                 Dev.Warn("bot", $"{p.PlayerName} has no gameplay component - passing the turn instead");
@@ -343,7 +359,7 @@ internal static class BotBehaviour
                 return;
             }
 
-            var hand = gp.cardTypes;
+            var hand = gp.Cards;
             if (hand == null || hand.Count == 0)
             {
                 Dev.Warn("bot", $"{p.PlayerName} has no cards - passing the turn instead");
@@ -351,17 +367,24 @@ internal static class BotBehaviour
                 return;
             }
 
-            int type = hand[0];
+            // Which card to throw is the front of the hand, except where a rarer card is
+            // sitting in it - then that one goes first. A deck's special cards are the whole
+            // point of the variant it belongs to, and throwing off the front meant a run
+            // could go its whole length without one ever reaching the table, so the mechanic
+            // that makes the mode a different game was never once exercised.
+            int pick = Special(hand);
+            int type = hand[pick];
+
             var thrown = new Il2CppSystem.Collections.Generic.List<int>();
             thrown.Add(type);
 
             bool emptied = hand.Count <= 1;
-            hand.RemoveAt(0);
+            hand.RemoveAt(pick);
 
-            Dev.Log("bot", $"{p.PlayerName} (seat {p.Slot}) throws 1 card, {hand.Count} left" +
+            Dev.Log("bot", $"{p.PlayerName} (seat {p.Slot}) throws a {type}, {hand.Count} left" +
                            (emptied ? " - hand empty" : ""));
 
-            gp.RequestThrowCards(thrown, emptied);
+            gp.Throw(thrown, emptied);
             _lastThrower = p.Slot;
 
             // Throwing does not end a bot's turn on its own: the game ends it from a
@@ -411,12 +434,88 @@ internal static class BotBehaviour
     /// call already in flight. Chosen is every third move, which eliminates players at a
     /// watchable rate while still letting most hands get played out.
     /// </summary>
+    /// <summary>
+    /// Which card in hand to lead with: the one the table has fewest of.
+    ///
+    /// What makes a deck variant a different game is its special card, and a run that never
+    /// puts one on the table has tested everything except the difference. Which value that
+    /// card has is not something this should need to know - and guessing was worse than
+    /// useless: "the highest value in hand" was tried first, on the reasoning that a deck is
+    /// built by mapping a range of numbers onto faces in order, and it turns out the devil
+    /// card is <c>-1</c>. The heuristic was not merely unhelpful, it actively avoided the one
+    /// card the test existed to play.
+    ///
+    /// Counting them answers it without guessing. A deck of forty deals twelve each of three
+    /// faces, four jokers and eight devils, so the special card is by construction the rarest
+    /// thing on the table, whatever number it happens to carry.
+    ///
+    /// Every other move rather than always, so ordinary cards still get played and a round
+    /// does not become nothing but special cards.
+    /// </summary>
+    private static int Special(Il2CppSystem.Collections.Generic.List<int> hand)
+    {
+        if (hand == null || hand.Count <= 1) return 0;
+
+        // Every move, not every other one. A forty card deck puts about one devil card into
+        // play at a time, so it sits in exactly one hand - and that seat has to get a turn
+        // and choose to throw before the round ends. Holding it back on half of the moves
+        // meant three rounds went by without the card ever reaching the table.
+        if (_rarity.Count == 0) CountTheDeck();
+
+        int best = 0, fewest = int.MaxValue;
+        for (int i = 0; i < hand.Count; i++)
+        {
+            if (!_rarity.TryGetValue(hand[i], out int n) || n <= 0) n = 1;   // never seen: rare
+            if (n < fewest) { fewest = n; best = i; }
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// How many of each card value are in play, counted across every hand at the table.
+    ///
+    /// Taken once a round, from the server's own view of everybody's cards - which is a thing
+    /// no player can see and this is not pretending to be one. It drives nothing but which
+    /// card a test throws first.
+    /// </summary>
+    private static void CountTheDeck()
+    {
+        try
+        {
+            foreach (var p in Dev.TablePlayers())
+            {
+                var hand = TableHand.For(p);
+                var cards = hand != null ? hand.Cards : null;
+                if (cards == null) continue;
+
+                for (int i = 0; i < cards.Count; i++)
+                {
+                    _rarity.TryGetValue(cards[i], out int n);
+                    _rarity[cards[i]] = n + 1;
+                }
+            }
+
+            if (_rarity.Count > 0)
+            {
+                var sb = new System.Text.StringBuilder();
+                foreach (var kv in _rarity)
+                {
+                    if (sb.Length > 0) sb.Append(", ");
+                    sb.Append($"{kv.Value} x {kv.Key}");
+                }
+                Dev.Log("bot", $"cards in play this round: {sb}");
+            }
+        }
+        catch (Exception e) { Dev.Warn("bot", $"could not count the deck: {e.Message}"); }
+    }
+
+    private static readonly System.Collections.Generic.Dictionary<int, int> _rarity = new();
+
     private static bool WantsLiar(PlayerStats p)
     {
         try
         {
-            var deck = Dev.Deck;
-            if (deck == null || deck.LiarCalled) return false;
+            if (TableHand.LiarCallInFlight()) return false;
 
             // Who to challenge is tracked here rather than read from the game's own
             // LastBetPlayer. That field is filled in by the announcing side of a claim,
@@ -425,11 +524,16 @@ internal static class BotBehaviour
             // The last throw is something this already knows for certain.
             if (_lastThrower < 0 || _lastThrower == p.Slot) return false;
 
-            var gp = p.GetComponent<DeckGameplay>();
-            bool empty = gp == null || gp.cardTypes == null || gp.cardTypes.Count == 0;
+            var gp = TableHand.For(p);
+            bool empty = gp == null || gp.Count == 0;
 
             // With nothing left to throw, calling is the only move there is.
-            return empty || (_moves % 3) == 0;
+            //
+            // Every fifth move rather than every third. A call ends the round, and at eight
+            // players every third move meant two cards on the table and then a call - so a
+            // round was over before most seats had played at all, and a mechanic that needs
+            // its card thrown *and then* challenged had almost no room to happen.
+            return empty || (_moves % 5) == 0;
         }
         catch { return false; }
     }
@@ -447,13 +551,12 @@ internal static class BotBehaviour
     {
         try
         {
-            var gp = p.GetComponent<DeckGameplay>();
+            var gp = TableHand.For(p);
             if (gp == null) { Play(p); return; }
 
-            var deck = Dev.Deck;
-            Dev.Log("bot", $"{p.PlayerName} (seat {p.Slot}) calls LIAR on seat {_lastThrower}" +
-                           (deck != null ? $" (cards on table {deck.CardsOnTable})" : ""));
-            gp.RequestCallLiar();
+            Dev.Log("bot", $"{p.PlayerName} (seat {p.Slot}) calls LIAR on seat {_lastThrower} " +
+                           $"(cards on table {TableHand.CardsOnTable()})");
+            gp.CallLiar();
             _calledAt = Time.time;
         }
         catch (Exception e)

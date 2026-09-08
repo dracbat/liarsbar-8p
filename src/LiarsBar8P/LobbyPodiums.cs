@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using HarmonyLib;
 using UnityEngine;
@@ -66,6 +66,8 @@ internal static class LobbyPodiums
         _pulledBack = false;
         _blendStarted = 0f;
         _plateHome.Clear();
+        _designReach = 0f;
+        _designScale = Vector3.zero;
 
         // The sweep's back-off is part of "nothing learned about the last lobby", and was
         // the one thing left out of it. A failure at the end of one lobby pushes this thirty
@@ -697,7 +699,7 @@ internal static class LobbyPodiums
     /// Take the lobby shot away from Cinemachine.
     ///
     /// The lobby camera carries a <c>CinemachineBrain</c>, and a brain re-poses its camera
-    /// every frame in LateUpdate from whichever virtual camera is live — long after anything
+    /// every frame in LateUpdate from whichever virtual camera is live â€” long after anything
     /// here runs. That is why raising the camera changed the numbers in the log and nothing
     /// on the screen: the move was real, and then it was overwritten before the frame was
     /// drawn. Moving the camera under a live brain is not possible.
@@ -795,7 +797,11 @@ internal static class LobbyPodiums
                 if (s == null || s.transform == null) continue;
                 var at = s.transform.position;
                 marks.Add(at + Vector3.up * 0.1f);
-                marks.Add(at + Vector3.up * HeadHeight);
+
+                // The name plate, not the head. The shot used to be framed to the tops of
+                // everybody's heads, which left the plate above the outermost player hanging
+                // over the edge of the picture with half their name cut off.
+                marks.Add(at + Vector3.up * PlateHeight);
                 if (s.gameObject.name.StartsWith(Prefix)) back.Add(at); else front.Add(at);
             }
             if (marks.Count == 0) return;
@@ -981,7 +987,16 @@ internal static class LobbyPodiums
             // Once home again, the shot belongs to the game.
             if (!_pulledBack && k >= 1f) RestoreRig();
         }
-        catch { _camHolding = false; }
+        catch
+        {
+            // Give the shot back AND drop the claim that it is pulled back. Clearing only the
+            // first left the name plates believing the wide shot was still up, so they stayed
+            // lifted above the podiums and scaled up over a camera that had gone home - and
+            // nothing ever put them back, because the flag that would have is only reconsidered
+            // by the method that just stopped running.
+            _camHolding = false;
+            _pulledBack = false;
+        }
     }
 
     /// <summary>How long the camera takes to move between the two shots.</summary>
@@ -1120,7 +1135,7 @@ internal static class LobbyPodiums
 
                 if (!_plateHome.TryGetValue(id, out var home))
                 {
-                    home = (plate.position, plate.rotation);
+                    home = (plate.position, plate.rotation, plate.localScale);
                     _plateHome[id] = home;
                 }
 
@@ -1128,36 +1143,187 @@ internal static class LobbyPodiums
                 {
                     plate.position = home.Pos;
                     plate.rotation = home.Rot;
+                    plate.localScale = home.Scale;
                     continue;
                 }
 
-                // Turned to face the camera, and left exactly where the game put it.
+                // Lifted to above the head of the podium it belongs to, turned to face the
+                // camera, and scaled to stay the size it reads at.
                 //
-                // Moving them was a mistake. This group is not only a name - it holds the
-                // character-select panel a player clicks to change who they are - so moving
-                // it moves the thing you click. From the raised shot they ended up over the
-                // characters' own bodies and nobody could find them. The game already places
-                // each group beside the podium it belongs to, which is the right place; all
-                // it needed was to be turned to be readable from a different angle.
-                plate.position = home.Pos;
+                // Leaving them where the game put them does not work, and this is the second
+                // time that has been established. The shipped positions hang low beside a
+                // podium, which is right for the tight shot the lobby was built around and
+                // wrong for one that is metres further back and higher up: from there they
+                // land around the characters' knees, several drop off the bottom of the
+                // screen, and two of eight cannot be seen at all.
+                //
+                // The reason they were put back last time was that this group is not only a
+                // name - it carries the character-select panel a player clicks - and an
+                // earlier attempt left that somewhere nobody could find. Above the player's
+                // own head is not that place: it is the one spot that is unambiguously
+                // theirs, always in shot, and never behind anybody.
+                var podium = s.transform != null ? s.transform : plate;
+                Vector3 want = podium.position + Vector3.up * PlateHeight;
 
-                var toCam = _cam.transform.position - plate.position;
-                if (toCam.sqrMagnitude < 0.01f) continue;
-                plate.rotation = Quaternion.LookRotation(-toCam.normalized, Vector3.up);
+                // Turned first, then placed, and placed by where the *text* lands rather than
+                // where the group's pivot goes.
+                //
+                // Both halves of that were got wrong in turn. Putting the pivot at head
+                // height wrote everybody's name across their chest, because the name is a
+                // child sitting at its own offset inside the group. Correcting for that with
+                // a world-space offset then made the names wander off across the bar: the
+                // offset depends on which way the group is facing, and the group was being
+                // turned immediately afterwards, so every frame corrected for the way it had
+                // been pointing the frame before.
+                var toCam = _cam.transform.position - want;
+                float far = toCam.magnitude;
+                if (far < 0.01f) continue;
+                plate.rotation = Quaternion.LookRotation(-(toCam / far), Vector3.up);
+
+                // Text laid out to be read from three metres is small from seven, and the two
+                // rows are not the same distance away - so without this the back row's names
+                // come out visibly smaller than the front's. One design distance for all of
+                // them, measured off the shipped plates: scaling each against its own gave
+                // every plate a different answer and one of them grew to fill the screen.
+                // Sized from one shared baseline, not from each plate's own. What decides how
+                // big a name looks is its scale divided by its distance, so plates that ship
+                // at different scales come out different sizes even after both are corrected
+                // for distance - which is why one name filled the corner of the screen while
+                // another was half the size across the room.
+                float reach = DesignReach(lobby);
+                float grow = reach > 0.01f ? Mathf.Clamp(far / reach, 1f, 2.5f) : 1f;
+                plate.localScale = DesignScale(lobby, home.Scale) * grow;
+
+                // Placed by where the writing actually appears, which is not where the text
+                // object's own transform sits: a text box is anchored and pivoted inside its
+                // group, so its position can be a corner of a box the words are nowhere near.
+                // Aiming with the transform put every name high and to the left of the player
+                // it belongs to, and further out the larger it was drawn - which is exactly
+                // what an uncorrected pivot looks like. The four corners of the laid-out box
+                // give the middle of the words themselves, whatever the anchoring.
+                //
+                // Taken after the scale and the turn are settled, and only a move is left to
+                // do, so the offset it measures is still true when it is used.
+                Vector3 centre = Middle(s.NameText.transform);
+                plate.position = want + (plate.position - centre);
             }
         }
         catch (Exception e) { Plugin.Log.LogWarning($"[podium] could not place the name plates: {e.Message}"); }
     }
 
     /// <summary>How far above a podium a name plate hangs when the shot is pulled back.</summary>
-    private const float PlateHeight = 2.35f;
+    private const float PlateHeight = HeadHeight + 0.45f;
 
-    private static readonly Dictionary<int, (Vector3 Pos, Quaternion Rot)> _plateHome = new();
+    /// <summary>
+    /// The middle of the words themselves, in world space.
+    ///
+    /// Three quantities look interchangeable here and are not. The transform's position is
+    /// the rect's pivot, which can be a corner. The rect's own middle is the middle of the
+    /// *box* the text is laid out in, and that box is much wider than a short name, so a
+    /// left-aligned "Player1" sits well off to one side of it - which is exactly the offset
+    /// that survived one rewrite and then a second, each time putting every name up and to
+    /// the left of the player it belongs to.
+    ///
+    /// What is wanted is the third: the bounds of the glyphs that were actually drawn, which
+    /// the text component works out for itself. Everything else here is a fallback for a
+    /// build where it does not.
+    /// </summary>
+    private static Vector3 Middle(Transform t)
+    {
+        try
+        {
+            var text = t.GetComponent<TMPro.TMP_Text>();
+            if (text != null)
+            {
+                var b = text.textBounds;
+                if (b.size.sqrMagnitude > 0.0001f) return t.TransformPoint(b.center);
+            }
+
+            var rect = t.TryCast<RectTransform>();
+            if (rect == null) return t.position;
+
+            var corners = new Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<Vector3>(4);
+            rect.GetWorldCorners(corners);
+            return (corners[0] + corners[2]) * 0.5f;
+        }
+        catch { return t.position; }
+    }
+
+    /// <summary>
+    /// How far from the camera the lobby's own name plates were meant to be read.
+    ///
+    /// Taken from the shipped four and their shipped camera, so it is the game's own answer
+    /// rather than a number picked to look right, and it is one number for all of them - the
+    /// point is that every name comes out the same size on screen, which measuring each plate
+    /// against itself is exactly the wrong way to get.
+    /// </summary>
+    private static float DesignReach(LobbyController lobby)
+    {
+        if (_designReach > 0f) return _designReach;
+
+        try
+        {
+            float total = 0f;
+            int n = 0;
+            foreach (var s in lobby.SpawnSlots)
+            {
+                if (s == null || s.NameText == null || s.gameObject.name.StartsWith(Prefix)) continue;
+                var plate = s.NameText.transform.parent;
+                if (plate == null) continue;
+                if (!_plateHome.TryGetValue(plate.GetInstanceID(), out var home)) continue;
+                total += Vector3.Distance(_camHome, home.Pos);
+                n++;
+            }
+
+            // All four shipped plates, or none. This memoises its first answer for the life of
+            // the lobby, and it is first asked from inside the per-plate loop - so an answer
+            // taken while only one plate had been seen would have sized every name in the
+            // lobby off that one plate, permanently.
+            if (n < Limits.VanillaPlayers) return 0f;
+            _designReach = total / n;
+            Plugin.Log.LogInfo($"[podium] the lobby's name plates are laid out to be read from {_designReach:F2}m");
+            return _designReach;
+        }
+        catch { return 0f; }
+    }
+
+    private static float _designReach;
+
+    /// <summary>The size the lobby's own plates are drawn at, averaged over the shipped four.</summary>
+    private static Vector3 DesignScale(LobbyController lobby, Vector3 fallback)
+    {
+        if (_designScale != Vector3.zero) return _designScale;
+
+        try
+        {
+            Vector3 total = Vector3.zero;
+            int n = 0;
+            foreach (var s in lobby.SpawnSlots)
+            {
+                if (s == null || s.NameText == null || s.gameObject.name.StartsWith(Prefix)) continue;
+                var plate = s.NameText.transform.parent;
+                if (plate == null) continue;
+                if (!_plateHome.TryGetValue(plate.GetInstanceID(), out var home)) continue;
+                total += home.Scale;
+                n++;
+            }
+
+            // Same rule as the reach above: one plate is not a baseline for eight.
+            if (n < Limits.VanillaPlayers) return fallback;
+            _designScale = total / n;
+            return _designScale;
+        }
+        catch { return fallback; }
+    }
+
+    private static Vector3 _designScale;
+
+    private static readonly Dictionary<int, (Vector3 Pos, Quaternion Rot, Vector3 Scale)> _plateHome = new();
 
     /// <summary>
     /// What is actually driving the lobby camera.
     ///
-    /// The camera was moved, the log agreed it had moved, and the picture did not change —
+    /// The camera was moved, the log agreed it had moved, and the picture did not change â€”
     /// which means something puts it back after this does. The likely culprit is a rig
     /// rather than the camera itself: this game has objects named "..._Camera/cm", and a
     /// virtual-camera brain re-poses the real camera every frame in LateUpdate, long after
@@ -1263,11 +1429,27 @@ internal static class LobbyPodiums
                     ? Vector3.Distance(p.transform.position, podium.transform.position)
                     : -1f;
 
+                // Where the name plate actually ends up, next to where the player is. Two
+                // rewrites of the placement changed the picture hardly at all, which is the
+                // point at which guessing from screenshots has to stop and the numbers have
+                // to be printed.
+                string plateAt = "no plate";
+                if (podium != null && podium.NameText != null)
+                {
+                    var pl = podium.NameText.transform.parent;
+                    var mid = Middle(podium.NameText.transform);
+                    var pv = _cam.WorldToViewportPoint(mid);
+                    plateAt = $"plate=({pv.x:F2},{pv.y:F2}) text{mid.ToString("F2")} " +
+                              $"pivot{(pl != null ? pl.position.ToString("F2") : "-")} " +
+                              $"podium{podium.transform.position.ToString("F2")}";
+                }
+
                 sb.AppendLine(
                     $"  '{p.PlayerName}' podium={p.SlotName} " +
                     $"screen=({v.x:F2},{v.y:F2}) depth={v.z:F1} " +
                     (onScreen ? "on screen" : "OFF SCREEN") +
-                    (adrift > 0.5f ? $"  !! standing {adrift:F2} from their podium" : ""));
+                    (adrift > 0.5f ? $"  !! standing {adrift:F2} from their podium" : "") +
+                    $"  {plateAt}");
             }
 
             Dev.Log("podium", sb.ToString().TrimEnd());

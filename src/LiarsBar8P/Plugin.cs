@@ -10,7 +10,7 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "liarsbar.eightplayers";
-    public const string Version = "0.30.0";
+    public const string Version = "0.31.0";
 
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
@@ -97,6 +97,9 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(TableFill),      "seat everyone StartGame missed");
         Apply(harmony, typeof(DealTrace),      "deal trace");
         Apply(harmony, typeof(DevLogging),     "developer logging");
+        Apply(harmony, typeof(RpcTrace),       "naming a remote call that throws");
+        Apply(harmony, typeof(ResetAnimFix),   "reset animation beyond four seats");
+        Apply(harmony, typeof(MechanicsTrace),  "devil and chaos mechanics trace");
 
         // Only does anything when the loopback harness is running.
         if (Loopback.Active) Apply(harmony, typeof(LoopbackSteamStub), "loopback steam stub");

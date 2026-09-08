@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>LiarsBar8P</AssemblyName>
-    <Version>0.30.0</Version>
+    <Version>0.31.0</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -48,6 +48,8 @@
     <!-- Developer screenshots only. Present in every Unity build of this game. -->
     <Reference Include="UnityEngine.ScreenCaptureModule"><HintPath>$(Interop)\UnityEngine.ScreenCaptureModule.dll</HintPath></Reference>
     <Reference Include="Unity.TextMeshPro"><HintPath>$(Interop)\Unity.TextMeshPro.dll</HintPath></Reference>
+    <!-- AnimationClip, for the per-seat round-reset animations. -->
+    <Reference Include="UnityEngine.AnimationModule"><HintPath>$(Interop)\UnityEngine.AnimationModule.dll</HintPath></Reference>
   </ItemGroup>
 
   <ItemGroup>

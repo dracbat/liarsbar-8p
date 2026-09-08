@@ -39,6 +39,38 @@ internal static class RosterFix
     private static readonly System.Collections.Generic.List<UnityEngine.Transform> _parkedSeats = new();
     private static readonly System.Collections.Generic.List<TMPro.Examples.WarpTextExample> _parkedPlates = new();
 
+    /// <summary>
+    /// The same start-of-round housekeeping, for the Chaos deck's round.
+    ///
+    /// Everything that resets between rounds hung off <c>DeckGamePlayManager.ResetRound</c>,
+    /// which the Chaos deck never calls - it has a manager and a round of its own. So in that
+    /// variant nothing was ever reset: who threw last carried over from the previous round,
+    /// so a seat could be called a liar for a claim made before the cards were re-dealt, and
+    /// the count of what was in play went stale after the first deal.
+    ///
+    /// Only the parts that are about the round rather than about the deck. Growing the deck's
+    /// own per-player lists belongs to the manager that owns them, and the Chaos deck's are
+    /// not the same lists.
+    /// </summary>
+    [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
+    [HarmonyPatch(typeof(ChaosDeckGamePlayManager), nameof(ChaosDeckGamePlayManager.ResetRound))]
+    private static void ChaosRoundStarting()
+    {
+        try
+        {
+            var m = Manager.Instance;
+            if (m == null || m.Players == null) return;
+
+            TurnKickstart.RoundStarting();
+            BotBehaviour.RoundStarting();
+            DealFallback.RoundStarting();
+            DevShots.Take("chaos_round_start");
+            TableFill.EnsureEveryoneSeated(m);
+        }
+        catch (Exception e) { Plugin.Log.LogWarning($"[roster] chaos round start: {e.Message}"); }
+    }
+
     [HarmonyPrefix]
     [HarmonyPriority(Priority.First)]   // must run before the deck and seat logic read these
     [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.ResetRound))]
