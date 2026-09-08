@@ -113,6 +113,39 @@ developer solo-test hook.
 | Steam lobby `maxMembers` | 4 | 8 | **Steam API** `GetLobbyMemberLimit` = 8 |
 | `LobbyController.SpawnSlots` | 4 | — | runtime count |
 
+## Things that are not obvious and cost a day each
+
+- **Every mode's manager object is awake in the scene, whatever is being played.** So
+  `manager.SomeGame != null && activeInHierarchy` identifies *nothing*. The only reliable
+  discriminator is the gameplay component bolted onto the players — exactly one of
+  `DeckGameplay`, `ChaosDeckGameplay`, `PokerGamePlay`, `TexasGamePlay`, … is added, and it
+  is the mode. `TableHand.Playing()` is the single place that decides this; nothing else
+  should ask the question its own way. It was got wrong four separate times before that rule
+  existed.
+
+- **The deal is not mode-independent.** Seven managers each carry their own copy of the
+  card-handout coroutine, each with its own `new PlayerStats[4]` and its own four-seat
+  cursor. See `docs/PLAYER-LIMITS.md` §4b. The caps, the turn order and the seat ring *are*
+  mode-independent, and that fact was over-generalised into "so is everything else".
+
+- **The lobby's deck arrow picks a game, not a ruleset.** `DeckMode 2` is dealt by
+  `ChaosDeckGamePlayManager`, a different manager with a different round, which never calls
+  `DeckGamePlayManager.ResetRound` — so anything hung off that hook simply does not happen
+  there. Three variants are reachable: Basic, Devil, Chaos Deck.
+
+- **The devil card's type value is `-1`,** not a value above the ordinary faces. Any
+  "special cards come last" reasoning is backwards.
+
+- **The venue is a host setting remembered in PlayerPrefs (`CurrentMap`), not a default.**
+  There are four bars — `Game`, `Game_JaponBarı`, `Game_CinBarı`, `RusBari` — with four
+  different rooms, and a test runs in whichever one that machine last played in.
+
+- **This build ships colliding two-byte Mirror RPC hashes.** Mirror warns about one pair at
+  startup, and the Chaos deck makes every client throw handling remote calls that arrive on
+  the wrong component. It reproduces at four players: it is the game's, not this mod's.
+  `RpcTrace` names the offending call and keeps the connection rather than letting Mirror
+  drop everybody.
+
 ## Known constraints
 
 1. **Every player must run the mod, with the same `MaxPlayers` value.** Mirror

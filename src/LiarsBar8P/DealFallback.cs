@@ -117,8 +117,13 @@ internal static class DealFallback
 
             if (waiting.Count == 0)
             {
-                // The game managed it by itself; nothing to do, and worth knowing.
-                Plugin.Log.LogInfo($"[dealcards] all {holding} hands arrived on their own");
+                // Every hand physically arrived; nothing had to be handed over. Counting only
+                // the ones that also had the flag set read as "all 0 hands arrived on their
+                // own" directly under five lines saying five hands had arrived, which is the
+                // sort of line that makes a good round look like a broken one.
+                Plugin.Log.LogInfo(
+                    $"[dealcards] all {holding + flagOnly.Count} hands arrived on their own" +
+                    (flagOnly.Count > 0 ? $" ({flagOnly.Count} needed the holding flag set)" : ""));
                 return;
             }
 

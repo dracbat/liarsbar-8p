@@ -59,6 +59,21 @@ internal static class TurnKickstart
                 return;
             }
 
+            // Only the tables this understands. Everything below reads DeckGameplay, and its
+            // record of who has been dealt this round is cleared from the deck managers' own
+            // round reset - which no other mode calls. Play a round of Liar's Deck and then
+            // switch to Poker or Texas in the same launch and that record is still populated
+            // with the old seats, so seats holding no cards were counted as dealt and the
+            // watchdog could decide a perfectly healthy round had stalled and hand somebody
+            // the turn in the middle of it.
+            var kind = TableHand.Playing();
+            if (kind != TableHand.Kind.Deck && kind != TableHand.Kind.ChaosDeck)
+            {
+                _stalledSince = 0f;
+                _dealtThisRound.Clear();
+                return;
+            }
+
             bool anyoneHasTheTurn = false;
             bool everyoneIsHolding = true;
             int dealt = 0;

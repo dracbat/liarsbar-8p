@@ -78,8 +78,57 @@ internal static class Loopback
             lobby.ChangeGameMode(index);
             Plugin.Log.LogWarning(
                 $"[loopback] game mode set to {names[index]} for this run (lobby now reports {lobby.Mode})");
+
+            ChooseSubMode(lobby);
         }
         catch (Exception e) { Plugin.Log.LogWarning($"[loopback] could not set the game mode: {e.Message}"); }
+    }
+
+    /// <summary>
+    /// Pick the deck or dice variant, from <c>LIARSBAR8P_DECKMODE</c> / <c>LIARSBAR8P_DICEMODE</c>.
+    ///
+    /// The lobby's left and right arrows are not a decoration on top of the game mode: they
+    /// choose between genuinely different tables. Liar's Deck has four of them and Liar's Dice
+    /// two, and they are not the same game - one of the deck variants is dealt by an entirely
+    /// separate manager with its own copy of the deal. Testing "Liar's Deck" and stopping there
+    /// leaves most of what a player can actually sit down to untested.
+    ///
+    /// Set through the game's own arrow, pressed until the variant comes up, for the same
+    /// reason the mode is: the button does more than assign the number.
+    /// </summary>
+    private static void ChooseSubMode(LobbyController lobby)
+    {
+        Step("LIARSBAR8P_DECKMODE", "deck", 4, () => lobby.DeckMode, () => lobby.ChangeGameModeDeckRight());
+        Step("LIARSBAR8P_DICEMODE", "dice", 2, () => lobby.DiceMode, () => lobby.ChangeGameModeDiceRight());
+
+        // The bar, from LIARSBAR8P_MAP. There are four of them and they are four different
+        // rooms with four different tables - and every test this mod has ever run happened in
+        // whichever one the machine last played in, because the choice is remembered in
+        // PlayerPrefs rather than defaulting. The seat ring measures the table it finds rather
+        // than assuming one, so it ought not to care; "ought not to" is the reason to check.
+        Step("LIARSBAR8P_MAP", "bar", 4, () => lobby.CurrentMap, () => lobby.ChangeMap());
+    }
+
+    private static void Step(string variable, string what, int count, Func<int> read, Action next)
+    {
+        try
+        {
+            string want = Environment.GetEnvironmentVariable(variable);
+            if (string.IsNullOrEmpty(want)) return;
+            if (!int.TryParse(want, out int target) || target < 0 || target >= count)
+            {
+                Plugin.Log.LogWarning($"[loopback] '{want}' is not a {what} variant - there are {count}, numbered from 0");
+                return;
+            }
+
+            // Pressing the arrow rather than writing the number, and never more times than
+            // there are variants, so a variant that will not take cannot spin forever.
+            for (int i = 0; i < count && read() != target; i++) next();
+
+            if (read() == target) Plugin.Log.LogWarning($"[loopback] {what} variant set to {target} for this run");
+            else Plugin.Log.LogWarning($"[loopback] the {what} variant would not move to {target} - it is on {read()}");
+        }
+        catch (Exception e) { Plugin.Log.LogWarning($"[loopback] could not set the {what} variant: {e.Message}"); }
     }
 
     /// <summary>Read the role once, from the environment or the command line.</summary>

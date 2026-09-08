@@ -8,6 +8,232 @@ so far is below it. Versions that were once numbered 1.x and 2.x were folded int
 0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
 is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v0.31.0 — every mode except Liar's Deck was dealing to nobody
+
+v0.30.0 signed off Liar's Dice at six and eight and Liar's Poker at seven. The seating was
+right. **Nobody was dealt a hand.** Every mode except Liar's Deck stopped on the first step of
+its deal, silently, and the only thing watching a deal read Liar's Deck's own component — so
+there was nothing to notice. Liar's Poker at five players did worse than fail to deal: it
+dropped every connection in the game.
+
+### What was actually played this time
+
+Each of these is a real table of that many separate copies of the game, each with its own
+Mirror connection, on the build being released. "Dealt" means every seat holding the cards it
+was dealt; "turn ring" means the turn was handed round on purpose and reached every seat still
+in the game.
+
+| Table | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|
+| **Liar's Deck — Basic** | ✅ | ✅ | ✅ | ✅ |
+| **Liar's Deck — Devil** | ✅ | ✅ | ✅ · devil's deal fired | ✅ |
+| **Chaos Deck** | ✅ · chaos thrown | ✅ · chaos thrown | ✅ · chaos thrown | ✅ · chaos thrown |
+| **Liar's Dice** | ✅ | ✅ | ⚠️ turn ring | ⚠️ turn ring |
+
+Seats correct on **every machine**, not just the host's, at every size; nobody more than a
+centimetre from the seat their own slot maps to. Liar's Texas at eight and Liar's Poker at
+five were verified separately earlier in the same day's work.
+
+Two things that table does not say:
+
+- **Liar's Dice's turn ring is unresolved.** At seven and eight the probe reached five of
+  seven and seven of eight seats. It hands the turn on with the generic method, and Dice may
+  not use it — so this is as likely to be the wrong question as a wrong answer. It is written
+  down rather than explained away.
+- The lobby's deck arrow has **three** variants that can be reached reliably — Basic, Devil
+  and Chaos Deck. A fourth position exists in the game's cycling code; runs asking for it
+  landed on one of the other three, so whatever is there is untested and unnamed.
+
+### One deal, seven copies of it, one of them patched
+
+The routine that physically hands cards out builds a player array sized for four seats,
+indexes it by seat number, and deals one seat at a time until a cursor reaches four. Both
+numbers are constants compiled into machine code, so both are rewritten in memory. That has
+been true since v0.20.0 — for Liar's Deck.
+
+There are **seven copies of that routine**, one per mode family, each with its own four:
+
+| Routine | Mode |
+|---|---|
+| `DeckGamePlayManager.GiveCardsVisualRoutine` | Liar's Deck |
+| `ChaosDeckGamePlayManager.GiveCardsVisualRoutine` | the Chaos deck |
+| `PokerGamePlayManager.GiveCardPlayer` | Liar's Poker |
+| `TexasGamePlayManager.GiveCardPlayer` | Liar's Texas |
+| `ChaosGamePlayManager.GiveCardPlayer` | Liar's Chaos |
+| `BlorfGamePlayManager.GiveCardPlayer` | Blorf |
+| `BlorfMatchMakingGamePlayManager.GiveCardPlayer` | Blorf, matchmade |
+
+Only the first was ever patched. The second was named as a target and refused every launch —
+one warning line in a log with hundreds. The other five were never targeted at all, because
+"the caps, the turn order and the seat ring are mode-independent" was taken to cover the deal.
+It does not. Above four players each threw `IndexOutOfRangeException` on the coroutine's first
+step, Unity swallowed it without a word, and the round went quiet with the cards recorded as
+dealt and nobody holding any.
+
+The compiler emitted the two sites three different ways across the seven, which is why
+matching bytes literally found one of them:
+
+- the array length is followed straight by the call in four copies and separated from it by
+  the element type load in the other three;
+- the seat cursor's compare sits after its store in some and before it in others, and Texas
+  puts two unrelated instructions between them;
+- the loop jump goes **forwards**. A coroutine's "go round again" is a jump on to the next
+  handout's setup, not a loop back to the top — and assuming it went backwards made the
+  rewritten matcher find nothing at all on its first attempt, Liar's Deck included, where it
+  had been working for ten releases.
+
+Both matchers now describe the shape rather than the byte string, each site must still be the
+only one of its shape inside the method, and the scan is bounded by the padding between
+methods so "the only one" means something. **All fourteen sites now patch.**
+
+### One missing animation clip ended the whole game
+
+Five of the seven modes play a per-seat round-reset animation as part of dealing:
+
+```
+PlayResetAnim(player.Slot)          // a ClientRpc
+if (slot >= clips.Length) throw     // four clips shipped
+```
+
+Seat four throws — and because it throws inside a remote call, Mirror's answer is to drop the
+connection. So a five player table of Liar's Texas did not get a missing animation: it got
+*"Disconnecting connection … caused an Exception"* on all five copies inside the same tenth of
+a second, and the game was over. Liar's Poker did the same.
+
+Liar's Deck and the Chaos deck are the only two modes that never call it, which is exactly why
+this survived every eight-player test ever run here — the one mode under test is one of the
+two that cannot reach it.
+
+The fix has to go on the **receiving** end. Texas and Chaos call the sending method for real,
+but Poker and both Blorf tables have it inlined into their deal, so there is no call site to
+patch and a fix there would silently do nothing — the same trap `ToCardTypeBasic` falls into.
+Seats now share the clips that exist, dividing the ring evenly, so at eight players each of the
+four serves two neighbouring seats. At four or fewer nothing is translated and the game behaves
+exactly as it shipped.
+
+### The log now names the call that broke the game, and the game survives it
+
+Mirror's account of the above is one line that does not say which call, on which component, in
+which mode: it addresses remote calls by a two-byte hash and writes the message before turning
+the hash back into a name. It will hand the name over if asked, so the mod asks — and prints
+`ClientRpc PlayResetAnim__Int32 on TexasGamePlayManager threw`. That one line is the whole
+distance between "the mod broke Texas" and a method to go and read, and it is what found this.
+
+**It also keeps everybody connected.** Dropping eight people to the main menu because one seat
+had no animation clip is not a graceful failure, so a remote call that throws is now logged and
+survived rather than fatal. This is the one place in the mod that deliberately swallows an
+error; it is paired with an unmissable line naming the call, and anything found this way still
+gets fixed at its source.
+
+It immediately earned that twice. The Chaos deck makes every client throw a
+`NullReferenceException` handling `ChangeRoundCardMesh` and `ShowSlotOk` — and **the same
+faults appear at four players**, a table size this mod changes nothing about. That is the
+game's, not the mod's; Mirror also warns at startup that this build ships colliding two-byte
+remote-call hashes. Without this class those faults end the session; with it they are noise in
+a log.
+
+### The lobby name plates
+
+At five players and up the plates hung at the height the lobby laid them out for while the
+camera moved back and up to fit everybody in — so the names landed around the players' knees,
+several dropped off the bottom of the screen, and two of eight could not be seen at all.
+
+They are now lifted above the head of the podium they belong to, turned to face the camera, and
+scaled from one shared baseline so a name is the same size in the back row as the front. The
+shot is framed to the plates rather than to the tops of people's heads, or the outermost name
+hangs over the edge of the picture.
+
+Three attempts, and the two failures are worth recording because each looked right:
+
+- Aiming the group's pivot at head height wrote every name across its player's chest. The name
+  is a child sitting at its own offset inside the group.
+- Correcting that with a world-space offset sent the names wandering off across the bar: the
+  offset depends on which way the group is facing, and the group was being turned immediately
+  afterwards, so each frame corrected for the way it had pointed the frame before.
+- Correcting with the rect's own middle barely moved them. A text box is far wider than a short
+  name, so a left-aligned "Player1" sits well off to one side of its own box.
+
+What works is the bounds of the glyphs the text component actually drew, which it will report
+if asked. Two rewrites went by on guesswork before the numbers were printed instead.
+
+### The deck arrow picks a game, not a ruleset
+
+`DeckMode 2` is dealt by an entirely separate manager with its own copy of everything, so
+"tested Liar's Deck" left part of that menu untried — and untestable: everything that drove a
+seat went through `DeckGameplay` directly, and in the Chaos deck that component is not there,
+so every seat quietly did nothing. Seats are now driven through whichever component the mode
+uses, and each run records the variant it actually ran on.
+
+Two things about those variants that only turned up by playing them:
+
+- **The Chaos deck plays itself**, throwing for anyone too slow — well inside the one to three
+  seconds a test seat took to decide, so every turn was taken by the game's timer and a four
+  minute round produced three deliberate plays and not one chaos card.
+- **The devil card is `-1`.** The first attempt at making a seat lead with its special card
+  picked the highest value in hand, on the reasoning that a deck is built by mapping numbers
+  onto faces in order. That did not merely fail to help: it actively avoided the one card the
+  test existed to play. Seats now lead with whatever the table has fewest of, which needs no
+  guess about what the special card is.
+
+The Chaos deck also never got a start-of-round reset, because all of that hung off Liar's
+Deck's own round start. Who threw last carried over between rounds, so a seat could be called a
+liar for a claim made before the cards were re-dealt.
+
+### One mistake, made four times
+
+Every mode's manager object is awake in the scene whatever is being played, so "is this
+manager active" identifies nothing at all. That was found once, fixed in the census — and then
+written again in three more places, each looking perfectly reasonable: the turn probe handed
+the turn on with Texas's method during a Liar's Deck round and filled the log with exceptions,
+the bots decided in half a second at tables that do not take the turn away, and the liar-call
+check consulted the wrong manager. One place now decides which mode is running, from the
+component bolted onto the players, and everything else asks it.
+
+### Caught by reviewing this release before shipping it
+
+- **The reset-animation fix sized the ring from a server-only list.** `Manager.Players` is
+  empty on every client — a rule this project has written down three times and this broke
+  anyway. The mapping happens on each machine, so the host divided the ring by the real
+  number and every client divided it by the fallback of eight, and the same seat played a
+  different animation on different screens. At four players it was worse: the host passed the
+  seat through as shipped while the clients remapped it. It now reads the SyncVar every peer
+  agrees on.
+- **Everyone's exact cards were being written to the host's log,** on by default, in a game
+  whose entire subject is not knowing what anybody else is holding. A host who opened their
+  own log mid-game could read the table. The counts stay — they are what makes a bad round
+  diagnosable and they give nothing away — and the values are now developer-only.
+- **The seat cursor could be raised when the array had not grown.** The two writes were
+  independent, so a future game update that moved one pattern and not the other would leave
+  the deal walking eight seats into an array holding four — the exact failure this release
+  removes, reintroduced at every table size including four. Both, or neither.
+- **The turn watchdog could reach into other modes.** Its record of who has been dealt is
+  cleared from the deck managers' round reset, which no other mode calls, so playing Liar's
+  Deck and then switching to Poker or Texas in the same launch left it populated with the old
+  seats — and it could decide a healthy round had stalled and hand somebody the turn in the
+  middle of it.
+- `deploy.ps1` **copied the plugin even when the build had failed**, and said "Deployed". That
+  is how a version bump got tested against the build before it.
+
+### Also
+
+- A **mode-agnostic census** reports one line per seat in any mode: what it was dealt, the
+  card values, how much of it reached the player, and whether the game thinks they are holding
+  it. The old account was Liar's Deck only, which is precisely why the broken modes had nothing
+  watching them.
+- A **turn-ring probe** hands the turn round on purpose and writes down which seats it reached,
+  so `GiveTurnTexas` and `GiveTurnSpin` can be checked without anyone at a keyboard.
+- The harness reaches the deck and dice **variants** and the **bar** — there are four bars,
+  chosen by a host setting remembered in PlayerPrefs, and every test this project had ever run
+  happened in whichever one the machine last played in.
+- Runs wait for the log line that says a copy is ready instead of a fixed forty-five seconds
+  plus thirty a joiner, and for the host's roster rather than the connection — a lobby of eight
+  was once photographed with seven people in it and the mod blamed for the missing plate.
+- `[dealcards] all 0 hands arrived on their own`, printed directly under five lines saying five
+  hands had arrived, counted only the hands that also had their flag set.
+- The seat ring's list of live tables was missing Liar's Spin and Roulette and now has them. No
+  claim that this fixed anything — the same list is satisfied by the deck manager, which is
+  awake in every mode, so the gate was probably already open.
+
 ## v0.30.0 — eight players, and a table that stays a table
 
 **Eight players have now sat down together and played.** Eight real connections, every one

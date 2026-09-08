@@ -18,8 +18,10 @@ Eight players at a table built for four, sharing it evenly:
 
 ![Eight players at the table](docs/images/table-8-players.jpg)
 
-The lobby puts the extra players in a second row and pulls the camera back so everyone is
-in frame:
+The lobby puts the extra players in a second row, pulls the camera back so everyone is in
+frame, and lifts each name plate above the player it belongs to — the plates hang low beside
+a podium in the shot the lobby was built for, which from further back leaves them around
+everybody's knees:
 
 ![The lobby, two rows](docs/images/lobby-two-rows.jpg)
 
@@ -42,19 +44,33 @@ Player1–Player8.)*
 
 ## What works
 
-| | |
-|---|---|
-| Steam lobby of 8 | ✅ Steam's own API reports the raised member limit |
-| Connections beyond the 4th and the 5th | ✅ Three separate caps, all confirmed raised at host time |
-| Lobby podiums and name plates for 8 | ✅ Built and confirmed present; **not yet seen with 8 real people** |
-| Turn order visiting every seat | ✅ All five wrap-around sites rewritten, confirmed in the log |
-| Dealing to more than four | ✅ The deal's deck size is rewritten; 5 players get 25 cards, 8 get 40 |
-| In-game seat ring and nameplates | ✅ Confirmed with real players |
-| Liar's Dice, Chaos, Spin, Poker | ⚠️ The shared turn-order and cap fixes apply; not separately tested |
+Every row below was played at **five, six, seven and eight** — a real table of that many
+separate copies of the game, each with its own Mirror connection, seats measured on every
+machine rather than only the host's.
 
-The caps and the patches are verified from a real launch. What has **not** happened yet
-is a full round with eight people at the table — so treat the first eight-player game as
-the test it is, and read `BepInEx/LogOutput.log` afterwards if something looks wrong.
+| Table | Status |
+|---|---|
+| **Liar's Deck — Basic** | ✅ 5, 6, 7, 8. Everyone seated, dealt, and taking turns in order |
+| **Liar's Deck — Devil** | ✅ 5, 6, 7, 8, and a devil's deal seen to fire at seven |
+| **Chaos Deck** | ✅ 5, 6, 7, 8, with a chaos card thrown and resolved at every size |
+| **Liar's Dice** | ✅ seated and playing at 5, 6, 7, 8 · ⚠️ the turn ring is unconfirmed at 7 and 8 |
+| **Liar's Texas** | ✅ eight players seated, dealt and taking turns |
+| **Liar's Poker** | ✅ five players seated, dealt and taking turns |
+| **Liar's Spin** | ❔ not yet started from the test harness — untested, not known broken |
+| Steam lobby of 8 | ✅ Steam's own API reports the raised member limit |
+| Lobby podiums and name plates for 8 | ✅ Each name above its own player, at every size |
+
+**What has still never happened is eight people on eight different machines, over Steam.**
+Every table above is eight copies of the game talking to each other on one PC, which
+exercises every message that crosses between machines but is not the same as eight of you in
+a lobby. Treat the first real eight-player game as the test it is, and keep
+`BepInEx/LogOutput.log` if something looks wrong — it now names the exact call behind a
+failure rather than leaving you guessing.
+
+A note on the Chaos deck: it makes every client log a `NullReferenceException` handling two of
+the game's own remote calls. That is not this mod — **the identical faults appear at four
+players**, which is the game as shipped. They used to end the session for everybody; the mod
+now logs them and plays on.
 
 `docs/PLAYER-LIMITS.md` maps every place the game assumes four players, and what was
 done about each.
@@ -98,7 +114,11 @@ To confirm it worked, look at the top-left corner in game, or open
 [cap] maxConnections 4 -> 8
 [transport] server maxConnections 4 -> 8
 [turn] GiveTurn: wraps at seat 3 -> 7
+[dealarray] DeckGamePlayManager.GiveCardsVisualRoutine: the deal now walks 8 seats rather than 4
 ```
+
+That last line should appear **seven times**, once per mode — if one of them says it was
+left as shipped, that mode will deal to the first four seats and go quiet.
 
 ## Configure
 

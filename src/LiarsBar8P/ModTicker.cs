@@ -33,6 +33,15 @@ internal sealed class ModTicker : MonoBehaviour
         try { DealFallback.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[dealcards] tick failed: {e.Message}"); }
 
+        try { RoundCensus.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[census] tick failed: {e.Message}"); }
+
+        try { RpcTrace.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[rpc] tick failed: {e.Message}"); }
+
+        try { TurnRingProbe.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[turnring] tick failed: {e.Message}"); }
+
         try { TurnKickstart.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[turnstart] tick failed: {e.Message}"); }
 
@@ -61,7 +70,7 @@ internal sealed class ModTicker : MonoBehaviour
         catch (Exception e) { Plugin.Log.LogError($"[seen] client poll failed: {e.Message}"); }
 
         // The automatic test stops driving seats the moment its match is over.
-        try { if (Manager.Instance == null) DevAutoTest.MatchEnded(); }
+        try { if (Manager.Instance == null) { DevAutoTest.MatchEnded(); MechanicsTrace.MatchOver(); } }
         catch (Exception e) { Plugin.Log.LogError($"[auto] match-end check failed: {e.Message}"); }
     }
 }

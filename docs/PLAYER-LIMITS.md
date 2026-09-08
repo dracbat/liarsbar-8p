@@ -144,18 +144,101 @@ exists or appears in a later build; it is not what makes the mix correct today.
 `Manager.StartPlayerCount` lagging at four also dealt to only four people; corrected since
 v0.12.0 (`RosterFix`).
 
+### The deal's own four, once per mode
+
+The routine that physically hands the cards out does two things sized for four seats:
+
+```
+new PlayerStats[4]            // mov edx,4 ; call SzArrayNew
+array[player.Slot] = player   // bounds-checked against a length of four
+
+seatCursor++                  // deal one seat, then re-launch for the next
+cmp seatCursor, 4 ; jl ...    // stop after four
+```
+
+Both are immediate operands, so both are rewritten in memory (`DealArrayPatch`). Neither
+can be reached by a Harmony patch, and the routine must never be patched with one either —
+a detour would move the bytes this reads.
+
+**There are seven copies of that routine, one per mode family, and each has its own four:**
+
+| Routine | Mode |
+|---|---|
+| `DeckGamePlayManager.GiveCardsVisualRoutine` | Liar's Deck |
+| `ChaosDeckGamePlayManager.GiveCardsVisualRoutine` | the Chaos deck variant |
+| `PokerGamePlayManager.GiveCardPlayer` | Liar's Poker |
+| `TexasGamePlayManager.GiveCardPlayer` | Liar's Texas |
+| `ChaosGamePlayManager.GiveCardPlayer` | Liar's Chaos |
+| `BlorfGamePlayManager.GiveCardPlayer` | Blorf |
+| `BlorfMatchMakingGamePlayManager.GiveCardPlayer` | Blorf, matchmade |
+
+Until v0.31.0 only the first was actually patched, and that was not obvious: the mod
+listed two targets and reported the second one refused, one warning line among hundreds.
+The other five were never targeted at all, on the reasoning that the caps, the turn order
+and the seat ring are mode-independent — which is true, and beside the point. **The deal
+is not mode-independent.** Above four players every mode other than Liar's Deck stopped in
+exactly the way Liar's Deck used to: the coroutine threw `IndexOutOfRangeException` on its
+first step, Unity swallowed it, and the round went quiet with the cards recorded as dealt
+and nobody holding any.
+
+The compiler did not emit the two sites identically across the seven, which is why
+matching bytes literally found one of them:
+
+- the array length is followed straight by the call in four copies, and separated from it
+  by the element type load (`mov rcx,[rip+disp32]`) in the other three;
+- the seat cursor's compare sits after its store in some and before it in others, and
+  Texas puts two unrelated instructions in between;
+- the loop jump is **forwards**, not backwards — a coroutine's "go round again" is a jump
+  on to the next handout's setup block, not a loop back to the top.
+
+Both matchers now describe the shape rather than the byte string, and each site must still
+be the only one of its shape inside the method — bounded by the int3 padding between
+methods — or nothing is written.
+
 `DeckGamePlayManager.AddCards(List<int>)` is **not** part of dealing — its only callers are
 `DeckGameplay.ServerThrowCards` and the pending-table-cards paths, i.e. a player putting
 cards down. A patch that scaled that list to the player count shipped from v0.1.0 to
 v0.20.2; above four players it would have turned a two-card play into a whole deck. Removed
 in v0.21.0.
 
+## 4b. Per-seat scene lists, and why one of them ended whole sessions
+
+A manager's inspector lists are sized for the seats the game shipped with. Most are only
+decoration; one is not.
+
+`PlayResetAnim(int clip)` is a ClientRpc every deck-like mode sends once per player as part
+of dealing, and it is sent with `player.Slot`:
+
+```
+if (slot >= clips.Length) throw     // clips: four AnimationClips
+ResetAnim.clip = clips[slot];
+```
+
+Seat four throws — **inside a remote call**, and Mirror's answer to an exception while
+handling one is to disconnect. So this is not a missing animation: it is every peer printing
+*"Disconnecting connection … caused an Exception"* in the same tenth of a second and the game
+ending. Fixed in v0.31.0 (`ResetAnimFix`) by dividing the clips evenly across the ring.
+
+Two details worth keeping:
+
+- **Liar's Deck and the Chaos deck never call it**, which is exactly why this survived every
+  eight-player test: the one mode under test is one of the two that cannot reach it.
+- **The fix has to go on the receiving end.** Texas and Chaos call the sending method for
+  real; Poker and both Blorf tables have it inlined into their deal, so there is no call site
+  to patch — the same trap `ToCardTypeBasic` falls into. Every peer runs the receiver.
+
+`devilsDealEffects` is a list of four on the same manager and has the same shape. It has not
+been shown to be indexed by seat and is left alone until it is.
+
 ## 5. In-game seats
 
 `Manager.Slots` (List<Transform>) and `Manager.NameTexts` ship with four entries. Both are
 plain lists and are extended by this mod (`SeatExpansion`), spaced for the players actually
 present (`SeatRing`) and trimmed back to the roster so nothing walks an empty chair
-(`RosterFix`). Character prefabs are not a constraint — the game ships eleven.
+(`RosterFix`). Character prefabs are not a seat constraint: they are a list per mode,
+indexed by the player's chosen character rather than by their seat, and the game ships
+eleven of them for every mode except Liar's Poker, which ships seven. Counted at runtime
+on a live host, so these are the real numbers rather than inferred ones.
 
 ## 6. Where a four still legitimately appears
 
