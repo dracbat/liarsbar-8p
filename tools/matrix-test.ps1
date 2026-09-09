@@ -344,7 +344,11 @@ foreach ($name in $Tables) {
         }
 
         if ($ok) {
-            if (Wait-ForLine -Path $hostLog -Pattern 'copies are here and ready' -TimeoutSec 150 -ProcId $hostProc.Id) {
+            # Generous, because this is eight copies of an HDRP game settling on one machine and
+            # the readiness handshake is the last thing to happen. At 150 seconds the eight
+            # player cells were reporting "the match never started" and then going on to play a
+            # perfectly good round anyway, which is a harness that cries wolf.
+            if (Wait-ForLine -Path $hostLog -Pattern 'copies are here and ready' -TimeoutSec 260 -ProcId $hostProc.Id) {
                 Write-Host "  match started" -ForegroundColor Green
             } else {
                 Write-Host "  the match never started" -ForegroundColor Yellow
