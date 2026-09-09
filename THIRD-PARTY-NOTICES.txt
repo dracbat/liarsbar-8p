@@ -1,0 +1,131 @@
+Liar's Bar - 8 Player Mod
+THIRD PARTY NOTICES
+==============================================================================
+
+The mod's own code - BepInEx/plugins/LiarsBar8P.dll, built from the source at
+https://github.com/dracbat/liarsbar-8p - is licensed under the MIT License. See
+LICENSE.
+
+Everything else in this download is somebody else's work, redistributed
+unmodified so that you do not have to install a loader separately. Each
+component is listed below with its upstream project and its licence. Full
+licence texts are in the licenses/ folder next to this file.
+
+Liar's Bar itself is the property of Curve Animation. This mod is unofficial
+and is not affiliated with or endorsed by them. No game files are modified or
+redistributed.
+
+------------------------------------------------------------------------------
+COPYLEFT COMPONENTS - please read
+------------------------------------------------------------------------------
+
+BepInEx                                                          LGPL-2.1
+  Files: BepInEx/core/BepInEx.Core.dll
+         BepInEx/core/BepInEx.Preloader.Core.dll
+         BepInEx/core/BepInEx.Unity.Common.dll
+         BepInEx/core/BepInEx.Unity.IL2CPP.dll
+  https://github.com/BepInEx/BepInEx
+  Copyright (C) 2020 BepInEx Team
+  Licence text: licenses/LGPL-2.1.txt
+
+  Notice, as LGPL-2.1 requires: this product uses the BepInEx library, and
+  BepInEx and its use are covered by the GNU Lesser General Public License
+  version 2.1. BepInEx is redistributed here unmodified. Its complete
+  corresponding source is available from the project page above.
+
+UnityDoorstop                                                    LGPL-2.1
+  Files: winhttp.dll, doorstop_config.ini, .doorstop_version
+  https://github.com/NeighTools/UnityDoorstop
+  Licence text: licenses/LGPL-2.1.txt
+
+  Redistributed unmodified. Source available from the project page above.
+
+Il2CppInterop                                                    LGPL-3.0
+  Files: BepInEx/core/Il2CppInterop.Common.dll
+         BepInEx/core/Il2CppInterop.Generator.dll
+         BepInEx/core/Il2CppInterop.HarmonySupport.dll
+         BepInEx/core/Il2CppInterop.Runtime.dll
+  https://github.com/BepInEx/Il2CppInterop
+  Licence text: licenses/LGPL-3.0.txt  (which incorporates licenses/GPL-3.0.txt)
+
+  Note this is LGPL version 3, not 2.1 - a different and stricter licence from
+  BepInEx's, despite shipping alongside it. Redistributed unmodified. Source
+  available from the project page above.
+
+Dobby                                                            Apache-2.0
+  Files: BepInEx/core/dobby.dll
+  https://github.com/BepInEx/Dobby  (fork of https://github.com/jmpews/Dobby)
+  Licence text: licenses/Apache-2.0.txt
+
+------------------------------------------------------------------------------
+PERMISSIVE COMPONENTS
+------------------------------------------------------------------------------
+
+All of the following are MIT licensed. Their copyright notices and the MIT
+licence text are reproduced in licenses/MIT-components.txt.
+
+HarmonyX                            BepInEx/core/0Harmony.dll
+  https://github.com/BepInEx/HarmonyX
+  A fork of Harmony by Andreas Pardeike - https://github.com/pardeike/Harmony
+
+MonoMod                             BepInEx/core/MonoMod.RuntimeDetour.dll
+  https://github.com/MonoMod/MonoMod    BepInEx/core/MonoMod.Utils.dll
+
+Cpp2IL                              BepInEx/core/Cpp2IL.Core.dll
+  https://github.com/SamboyCoding/Cpp2IL   BepInEx/core/LibCpp2IL.dll
+                                      BepInEx/core/StableNameDotNet.dll
+                                      BepInEx/core/WasmDisassembler.dll
+
+AsmResolver                         BepInEx/core/AsmResolver.dll
+  https://github.com/Washi1337/AsmResolver  BepInEx/core/AsmResolver.DotNet.dll
+                                      BepInEx/core/AsmResolver.PE.dll
+                                      BepInEx/core/AsmResolver.PE.File.dll
+
+AssetRipper                         BepInEx/core/AssetRipper.CIL.dll
+  https://github.com/AssetRipper         BepInEx/core/AssetRipper.Primitives.dll
+
+Mono.Cecil                          BepInEx/core/Mono.Cecil*.dll
+  https://github.com/jbevain/cecil
+  Copyright (C) Jb Evain
+
+Iced                                BepInEx/core/Iced.dll
+  https://github.com/icedland/iced
+
+Capstone.NET                        BepInEx/core/Gee.External.Capstone.dll
+  https://github.com/9ee1/Capstone.NET
+  A .NET binding for the Capstone disassembly engine
+
+Disarm                              BepInEx/core/Disarm.dll
+  https://github.com/SamboyCoding/Disarm
+
+SemanticVersioning                  BepInEx/core/SemanticVersioning.dll
+  https://github.com/adamreeve/semver.net
+
+------------------------------------------------------------------------------
+.NET RUNTIME
+------------------------------------------------------------------------------
+
+The dotnet/ folder is the .NET 6 runtime, redistributed by BepInEx so that the
+loader can run inside an IL2CPP game.
+
+  https://github.com/dotnet/runtime
+  Copyright (c) .NET Foundation and Contributors
+
+  The runtime is MIT licensed, but some redistributable components carry the
+  separate Microsoft .NET Library License rather than MIT. See:
+  https://github.com/dotnet/core/blob/main/license-information-windows.md
+  Licence text: licenses/dotnet-runtime.txt
+
+------------------------------------------------------------------------------
+GETTING THE SOURCE
+------------------------------------------------------------------------------
+
+The LGPL components above are redistributed unmodified. Their complete
+corresponding source can be obtained from the project pages listed for each.
+
+If you would rather have it from us: open an issue at
+https://github.com/dracbat/liarsbar-8p/issues and we will provide the exact
+source archives matching the binaries shipped in this release.
+
+If anything in this file is wrong or incomplete, please say so on the issue
+tracker - it will be corrected.
