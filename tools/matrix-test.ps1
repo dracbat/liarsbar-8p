@@ -383,7 +383,11 @@ foreach ($name in $Tables) {
 
         Stop-Copies
 
-        $folder = Join-Path $Results ("{0}-{1}p" -f $name, $n)
+        # The bar goes in the name. Without it, running the same table and size in a second
+        # bar deleted the first bar's logs and wrote its own over them - so a sweep across
+        # four bars finished holding one bar's evidence and four bars' worth of summary rows,
+        # and the rows are the half you cannot go back and re-read.
+        $folder = Join-Path $Results ("{0}-{1}p{2}" -f $name, $n, $(if ($Map -ne '') { "-bar$Map" } else { '' }))
         if (Test-Path $folder) { Remove-Item $folder -Recurse -Force }
         New-Item -ItemType Directory -Force -Path $folder | Out-Null
         Copy-Item "$Logs\*.log" $folder -ErrorAction SilentlyContinue
