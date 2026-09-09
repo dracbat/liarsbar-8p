@@ -27,10 +27,15 @@ and every player is warned when somebody's build differs.
 Eight players at a table built for four, evenly spaced, each with their name above them and
 whose turn it is in the corner.
 
-The lobby puts the extra four on a second row, pulls the camera back so everyone is in frame,
-and lifts each name plate above the player it belongs to:
+The lobby puts the extra players on a second row, pulls the camera back so everyone is in
+frame, and lifts each name plate above the player it belongs to — the plates hang low beside a
+podium in the shot the lobby was built for, which from further back would leave them around
+everybody's knees:
 
-![The lobby, eight players in two rows](docs/images/lobby-8-players.jpg)
+![The lobby, filling up across two rows](docs/images/lobby-two-rows.jpg)
+
+*(Seven in, waiting on the eighth — the lobby only holds a full table for a few seconds before
+the match starts.)*
 
 It is not only Liar's Deck. The seat ring, the caps, the turn order and the deal are fixed for
 every mode the lobby can reach.
@@ -49,7 +54,15 @@ every mode the lobby can reach.
 
 **The Chaos deck** — where a chaos card stops the round and everyone picks somebody to shoot:
 
-![Eight players in the Chaos deck](docs/images/chaos-deck-8-players.jpg)
+![A chaos card called at eight players](docs/images/chaos-deck-8-players.jpg)
+
+And this is the fix this release exists for. Before it, at eight players, the revolver could
+only be pointed at three fixed chairs — and if you were sitting in seat four or later you could
+not aim at anybody at all. Now every seat can choose any other, and because the game only has
+three aiming animations and never turns anyone to face a particular chair, the mod tells you
+who you have actually picked:
+
+![Aiming at a named player at a table of eight](docs/images/aiming-at-eight.jpg)
 
 *(Every screenshot is from the test harness, where the players are named Player1–Player8.)*
 
