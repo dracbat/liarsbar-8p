@@ -57,6 +57,9 @@ internal sealed class ModTicker : MonoBehaviour
         try { SpinBidCap.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[spin] tick failed: {e.Message}"); }
 
+        try { DiceLists.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[dicelists] tick failed: {e.Message}"); }
+
         try { SeatRing.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[seatring] tick failed: {e.Message}"); }
 

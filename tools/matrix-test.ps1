@@ -21,7 +21,7 @@
     Close everything with:  taskkill /IM "Liar's Bar.exe" /F
 #>
 param(
-    [string[]] $Tables = @('deck0', 'deck1', 'deck2', 'deck3', 'dice0', 'dice1', 'texas', 'spin', 'poker', 'chaos'),
+    [string[]] $Tables = @('deck0', 'deck1', 'deck2', 'dice0', 'dice1', 'texas', 'spin', 'poker', 'chaos'),
     [int[]]    $Sizes = @(5, 6, 7, 8),
     [int]      $PlaySeconds = 120,
     [int]      $LaunchTimeout = 180,
@@ -39,7 +39,10 @@ $Catalogue = @{
     deck0 = @{ Mode = 'LiarsDeck';  Deck = '0'; Dice = '' }
     deck1 = @{ Mode = 'LiarsDeck';  Deck = '1'; Dice = '' }
     deck2 = @{ Mode = 'LiarsDeck';  Deck = '2'; Dice = '' }
-    deck3 = @{ Mode = 'LiarsDeck';  Deck = '3'; Dice = '' }
+    # There is no deck3. The lobby reports four deck variants and the arrow cycles three of
+    # them: ChangeGameModeDeckRight increments, then resets to zero the moment the value
+    # reaches 3. A cell asking for it silently played Basic a second time and was filed as a
+    # fourth variant, which is a row of results about a table that does not exist.
     dice0 = @{ Mode = 'LiarsDice';  Deck = '';  Dice = '0' }
     dice1 = @{ Mode = 'LiarsDice';  Deck = '';  Dice = '1' }
     texas = @{ Mode = 'LiarsTexas'; Deck = '';  Dice = '' }
@@ -55,8 +58,7 @@ $Catalogue = @{
 # the players what they are actually holding, and checking it against what was asked for, is
 # the only way to know a cell tested the mode it is filed under.
 $Expected = @{
-    deck0 = "Liar's Deck, 0 variant"; deck1 = "Liar's Deck, 1 variant"
-    deck2 = 'Chaos Deck';             deck3 = "Liar's Deck, 3 variant"
+    deck0 = 'Basic variant'; deck1 = 'Devil variant'; deck2 = 'Chaos Deck'
     dice0 = 'Dice';  dice1 = 'Dice';  texas = 'Texas'
     spin  = 'Spin';  poker = 'Poker'; chaos = 'Chaos Deck'
 }
@@ -326,11 +328,28 @@ foreach ($name in $Tables) {
             } else {
                 Write-Host "  the match never started" -ForegroundColor Yellow
             }
-            # Eight copies take much longer to load the bar than five do - long enough that a
-            # run once reported "the table never came up" when the table simply had not
-            # finished arriving. Bigger tables get proportionally longer.
-            $play = $PlaySeconds + 30 * [Math]::Max(0, $n - 5)
-            Start-Sleep -Seconds $play
+            # Play time is counted from when the round starts, not from when the match does.
+            #
+            # Those are three and a half minutes apart at eight players: "starting a match"
+            # means the host pressed start, and then eight copies of an HDRP game each load
+            # the bar on one PC. Sleeping a fixed time from the earlier of the two spent
+            # almost all of it on the loading screen - a 260 second window left about 35
+            # seconds of actual play, and one cell managed a single turn before it was killed.
+            # Every large cell in every matrix before this one was measuring a minute of a
+            # game it claimed to have played for four.
+            #
+            # The census prints the table's name from the players' own components as soon as
+            # there are players holding cards, so it is the first thing that is true only once
+            # the round is really under way.
+            $ready = Wait-ForLine -Path $hostLog -Pattern 'the table running this match is' `
+                                  -TimeoutSec 300 -ProcId $hostProc.Id
+            if ($ready) {
+                Write-Host "  round under way" -ForegroundColor Green
+            } else {
+                Write-Host "  the round never started - playing the clock out anyway" -ForegroundColor Yellow
+            }
+
+            Start-Sleep -Seconds $PlaySeconds
         }
 
         Stop-Copies
