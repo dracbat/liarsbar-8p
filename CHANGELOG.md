@@ -3,10 +3,18 @@
 Every player in a lobby must run the **same version**. The running version is shown in
 the top-left corner in game, and every player is warned when someone's build differs.
 
-**v1.0.0 is reserved for the first release proven to work with eight people.** Everything
-so far is below it. Versions that were once numbered 1.x and 2.x were folded into the same
-0.x line to make room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order
-is unchanged: what was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
+**What v1.0.0 means here.** It was going to be reserved for the first release proven with
+eight people in a Steam lobby. It is not that, and saying so plainly is better than quietly
+moving the goalposts: eight people on eight machines has still never happened. What it does
+mean is that every mode a player can choose has been played through at every table size from
+one to eight, in every bar, by eight separate copies of the game holding eight real network
+connections — and that the mechanics inside those modes, not merely the seating and the
+dealing, were watched doing their job. Five real people on five real machines played this
+build's predecessor over Steam. The eight-machine test comes next, with the people it needs.
+
+Versions that were once numbered 1.x and 2.x were folded into the same 0.x line to make
+room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order is unchanged: what
+was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
 ## v0.31.0 — every mode except Liar's Deck was dealing to nobody
 

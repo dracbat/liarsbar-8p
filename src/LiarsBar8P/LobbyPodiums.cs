@@ -699,7 +699,7 @@ internal static class LobbyPodiums
     /// Take the lobby shot away from Cinemachine.
     ///
     /// The lobby camera carries a <c>CinemachineBrain</c>, and a brain re-poses its camera
-    /// every frame in LateUpdate from whichever virtual camera is live â€” long after anything
+    /// every frame in LateUpdate from whichever virtual camera is live — long after anything
     /// here runs. That is why raising the camera changed the numbers in the log and nothing
     /// on the screen: the move was real, and then it was overwritten before the frame was
     /// drawn. Moving the camera under a live brain is not possible.
@@ -1323,7 +1323,7 @@ internal static class LobbyPodiums
     /// <summary>
     /// What is actually driving the lobby camera.
     ///
-    /// The camera was moved, the log agreed it had moved, and the picture did not change â€”
+    /// The camera was moved, the log agreed it had moved, and the picture did not change —
     /// which means something puts it back after this does. The likely culprit is a rig
     /// rather than the camera itself: this game has objects named "..._Camera/cm", and a
     /// virtual-camera brain re-poses the real camera every frame in LateUpdate, long after
