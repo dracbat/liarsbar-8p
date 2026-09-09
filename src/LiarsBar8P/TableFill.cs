@@ -103,16 +103,27 @@ internal static class TableFill
             int players = ExpectedPlayers(__instance);
             if (players <= Limits.VanillaPlayers) return;
 
+            // Every mode's manager, not just the ordinary deck's. Which mode is about to be
+            // played is not known yet at this point - the players do not exist to be asked -
+            // so all of them are readied. A manager that is not used has simply had a list
+            // lengthened that nothing will read.
             var d = __instance != null ? __instance.DeckGamePlayManager : null;
-            if (d == null) return;
+            if (d != null)
+            {
+                int before = d.OrderSprtes != null ? d.OrderSprtes.Count : -1;
+                DeckFix.GrowPerPlayerLists(d, players);
+                int after = d.OrderSprtes != null ? d.OrderSprtes.Count : -1;
 
-            int before = d.OrderSprtes != null ? d.OrderSprtes.Count : -1;
-            DeckFix.GrowPerPlayerLists(d, players);
-            int after = d.OrderSprtes != null ? d.OrderSprtes.Count : -1;
+                Plugin.Log.LogInfo(
+                    $"[tablefill] readying the per-player lists for {players} before seating " +
+                    $"(turn-order icons {before} -> {after})");
+            }
 
-            Plugin.Log.LogInfo(
-                $"[tablefill] readying the per-player lists for {players} before seating " +
-                $"(turn-order icons {before} -> {after})");
+            try { DeckFix.GrowChaosDeckLists(__instance.ChaosDeckGame, players); }
+            catch (Exception e) { Plugin.Log.LogWarning($"[tablefill] chaos deck lists: {e.Message}"); }
+
+            try { DeckFix.GrowTexasLists(__instance.TexasGame, players); }
+            catch (Exception e) { Plugin.Log.LogWarning($"[tablefill] texas lists: {e.Message}"); }
         }
         catch (Exception e)
         {
