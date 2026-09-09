@@ -60,6 +60,26 @@ internal static class DealArrayPatch
         (typeof(ChaosGamePlayManager), "GiveCardPlayer"),
         (typeof(BlorfGamePlayManager), "GiveCardPlayer"),
         (typeof(BlorfMatchMakingGamePlayManager), "GiveCardPlayer"),
+
+        // Liar's Dice does not deal cards, so these are not deals - but they hold a four
+        // player array for exactly the same reason, and it is rewritten the same way.
+        //
+        // Resolving a liar call above four players threw IndexOutOfRangeException and killed
+        // the reveal coroutine, which ends the round: no dice shown, no loser chosen, nobody
+        // given the turn. Measured clean at four and broken at five, six and eight, which puts
+        // the array at four entries exactly. Nothing on any of the dice classes is four long -
+        // the array is built inside the routine, which is why looking for it from outside
+        // found nothing, and why the decompiler was no help either: it gives up at the state
+        // machine's switch and emits no body at all for these four methods.
+        //
+        // That is the same shape as the deals above, in the same kind of place, and it is
+        // reachable the same way: the array size is an immediate in the compiled code, so it
+        // is rewritten rather than patched. Harmony could not have helped here in any case -
+        // a coroutine's MoveNext must not be detoured.
+        (typeof(DiceGamePlayManager), "ShowPlayer"),
+        (typeof(DiceGamePlayManager), "ShowPlayerSpotOn"),
+        (typeof(DiceGamePlayManager), "WaitforShowings"),
+        (typeof(DiceGamePlayManager), "CallSpotOnWaitforShowings"),
     };
 
     internal static void Install()
@@ -87,9 +107,20 @@ internal static class DealArrayPatch
         {
             // The routine's code lives on the compiler-generated state machine, not on the
             // method that returns it. Its name is mangled, so it is found by search.
+            // Matched on the angle brackets the compiler puts round the original name, not on
+            // the name alone. "ShowPlayer" is a prefix of "ShowPlayerSpotOn", so a substring
+            // match would take whichever of the two the reflection order happened to offer
+            // first - and would then rewrite one routine twice and the other never, silently.
             Type state = null;
+            string want_ = "<" + routine + ">";
             foreach (var nested in owner.GetNestedTypes(AccessTools.all))
-                if (nested.Name.Contains(routine)) { state = nested; break; }
+                if (nested.Name.Contains(want_)) { state = nested; break; }
+
+            // Older names in this table predate the brackets being required; fall back to the
+            // looser match rather than quietly stop patching a deal that has always worked.
+            if (state == null)
+                foreach (var nested in owner.GetNestedTypes(AccessTools.all))
+                    if (nested.Name.Contains(routine)) { state = nested; break; }
 
             if (state == null)
             {
