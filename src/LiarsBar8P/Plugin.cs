@@ -76,9 +76,12 @@ public class Plugin : BasePlugin
         // Said plainly and early, because a test run with this off drives nobody and reports
         // zeroes that look exactly like a mode with nothing wrong with it.
         if (Dev.Enabled)
+        {
             Log.LogWarning("  DEVELOPER MODE IS ON" +
                            (Dev.FromHarness ? " (LIARSBAR8P_DEV is set - this is a test run)"
                                             : " (DeveloperMode in the config file)"));
+            AskForStackTraces();
+        }
         else
             Log.LogInfo("  developer mode off - normal play");
 
@@ -129,6 +132,35 @@ public class Plugin : BasePlugin
         SpawnHud();
 
         Log.LogInfo("=== Liar's Bar 8P loaded ===");
+    }
+
+    /// <summary>
+    /// Ask Unity to say where an exception came from.
+    ///
+    /// This build logs exceptions as a single line - "IndexOutOfRangeException: Index was
+    /// outside the bounds of the array" - and nothing else. Which array, in which method, in
+    /// which of eight copies, is left to be guessed at, and guessing is how a day gets spent
+    /// on the wrong candidate: the one that stopped Liar's Dice from resolving a liar call
+    /// above four players was hunted through six collections before this was tried.
+    ///
+    /// Stack traces are a Unity setting, not a build-time one, so they can simply be asked
+    /// for. Only in developer mode: they cost something to collect, and a player has no use
+    /// for them.
+    /// </summary>
+    private static void AskForStackTraces()
+    {
+        try
+        {
+            UnityEngine.Application.SetStackTraceLogType(
+                UnityEngine.LogType.Exception, UnityEngine.StackTraceLogType.ScriptOnly);
+            UnityEngine.Application.SetStackTraceLogType(
+                UnityEngine.LogType.Error, UnityEngine.StackTraceLogType.ScriptOnly);
+            Log.LogInfo("  exceptions will be logged with a stack trace");
+        }
+        catch (System.Exception e)
+        {
+            Log.LogWarning($"  could not turn stack traces on: {e.Message}");
+        }
     }
 
     /// <summary>

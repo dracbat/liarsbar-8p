@@ -61,9 +61,20 @@ handed round deliberately and reached every seat still in the game.
 eight. The probe hands the turn on with the generic method and Dice may not use it, so this is
 as likely to be the wrong question as a wrong answer. Unresolved either way.
 
-The deck arrow reaches **three** variants reliably — Basic, Devil, Chaos Deck. A fourth
-position exists in the game's own cycling code; runs asking for it landed on one of the other
-three, so whatever is there is untested.
+> **Both of those Dice warnings turned out to be about the test rig, and a real fault was
+> hiding behind them.** The turn was reaching few seats because the harness treated
+> `TotalCount` — how many of one face showed at the last reveal — as the number of dice on
+> the table, so the second bid of every round looked impossible and the table called liar
+> three moves in. With that corrected the bidding runs properly, and what it runs into is an
+> `IndexOutOfRangeException` when a liar call is resolved above four players: the reveal
+> coroutine dies part way through and the round stops. That is a real eight-player defect in
+> Liar's Dice, and it is what v1.0.0 had to deal with rather than sign off around.
+
+**There is no fourth deck variant** — settled, rather than left open. The lobby reports four
+and the arrow cycles three: `ChangeGameModeDeckRight` increments the value and then resets it
+to zero the moment it reaches 3, so Basic, Devil and Chaos Deck are the whole menu. Runs
+asking for a fourth had been quietly playing Basic a second time and filing the result under a
+table that does not exist.
 
 > **That sign-off was too generous, and v0.31.0 says how.** It also claimed Liar's Dice at
 > six and eight and Liar's Poker at seven, on the strength of the seating being right and no
