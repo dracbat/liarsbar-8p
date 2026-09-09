@@ -149,7 +149,7 @@ function Read-Verdict {
         Aims = 0; AimBad = 0; Shots = 0; ShotsLost = 0
         Raises = 0; Folds = 0; Claims = 0
         AimRing = ''; Driving = $false; ModeOk = $true
-        Exceptions = 0; Dropped = 0; ModErrors = 0; BadRpc = ''
+        Exceptions = 0; Dropped = 0; ModErrors = 0; BadRpc = ''; FirstError = ''
         Notes = ''
     }
 
@@ -271,6 +271,23 @@ function Read-Verdict {
         $r.Exceptions += ($text | Select-String -Pattern '\[Error\] Unity:.*(IndexOutOfRangeException|ArgumentOutOfRangeException|NullReferenceException|InvalidOperationException)').Count
         $r.Dropped    += ($text | Select-String -SimpleMatch 'Disconnecting connection').Count
         $r.ModErrors  += ($text | Select-String -Pattern "\[Error\].*Liar's Bar 8 Players").Count
+
+        # The first real exception, and the first frame of wherever it came from. A count on
+        # its own says a cell went wrong and nothing about how, so every count above zero has
+        # meant opening eight log files by hand to find one line. Developer mode asks Unity
+        # for stack traces, so when there is one the method is right there.
+        if (-not $r.FirstError) {
+            $hit = $text | Select-String -Pattern '\[Error\] Unity:.*(IndexOutOfRangeException|ArgumentOutOfRangeException|NullReferenceException|InvalidOperationException)' |
+                   Select-Object -First 1
+            if ($hit) {
+                $msg = ($hit.Line -replace '^.*\[Error\] Unity: ', '').Trim()
+                $at  = ''
+                for ($k = $hit.LineNumber; $k -lt [Math]::Min($hit.LineNumber + 8, $text.Count); $k++) {
+                    if ($text[$k] -match '^\s*at ([^\r\n]+)') { $at = $Matches[1].Trim(); break }
+                }
+                $r.FirstError = if ($at) { "$msg | $at" } else { $msg }
+            }
+        }
 
         $rpc = $text | Select-String -SimpleMatch '[rpc] ' | Select-Object -First 1
         if ($rpc -and -not $r.BadRpc -and $rpc.Line -match '\[rpc\] (.+?) threw') { $r.BadRpc = $Matches[1] }
