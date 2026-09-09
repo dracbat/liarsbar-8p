@@ -1,4 +1,15 @@
-# Liar's Bar — 8 Player Mod
+<p align="center">
+  <img src="docs/images/hero.png" alt="Liar's Bar — 8 Player Mod" width="100%">
+</p>
+
+<h1 align="center">Liar's Bar — 8 Player Mod</h1>
+
+<p align="center">
+  <a href="../../releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/dracbat/liarsbar-8p?style=flat-square&color=e03131&label=release"></a>
+  <img alt="Players" src="https://img.shields.io/badge/players-8-e03131?style=flat-square">
+  <img alt="Loader" src="https://img.shields.io/badge/BepInEx-6%20IL2CPP-444?style=flat-square">
+  <img alt="Licence" src="https://img.shields.io/badge/licence-MIT-444?style=flat-square">
+</p>
 
 > **Written by an AI.** Every line of this mod was produced by Claude, directed by one person,
 > as a for-fun experiment. Nothing here shipped on the strength of "it should work" — see
