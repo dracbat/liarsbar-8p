@@ -129,6 +129,10 @@ public class Plugin : BasePlugin
         TurnOrderFix.Install();
         DealArrayPatch.Install();
 
+        // Watches the log for the fault that kills a Liar's Dice reveal above four players.
+        // Not a developer tool: the bug reaches players, so the recovery has to as well.
+        DiceRevealGuard.Listen();
+
         SpawnHud();
 
         Log.LogInfo("=== Liar's Bar 8P loaded ===");
