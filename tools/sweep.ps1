@@ -4,12 +4,17 @@
 # to eight, and then the same thing again in each of the other three bars. One results file,
 # appended to as it goes, so a sweep that is stopped half way is still worth reading.
 #
-# The order is deliberate. The big tables come first because that is where this mod is
-# different from the game, and a night that only gets half way through should have spent that
-# half on the sizes nobody has played. Small tables come second: below five players the mod is
-# supposed to stay out of the way, and the question there is whether it does. The bars come
-# last, because the bar changes where the chairs are and nothing else - every run already
-# measures the seat ring, so a wrong table would have shown up in the first two phases as well.
+# The order is deliberate, and it is by table size rather than by mode. A cell takes about ten
+# minutes, so a sweep that ran every size of one mode before starting the next would not reach
+# Liar's Spin at all until five hours in - and if something there is broken at eight players,
+# five hours is a long time to have been finding out. Size first means every mode is seen at
+# eight players inside the first hour, which is where this mod differs from the game and where
+# a problem is most likely to be waiting.
+#
+# Big tables before small ones for the same reason: below five players the mod is supposed to
+# stay out of the way, and that is a weaker claim to test than the one it exists to make. The
+# bars come last, because the bar changes where the chairs are and nothing else - every run
+# already measures the seat ring, so a wrong table would have shown up earlier as well.
 #
 # Poker and the standalone Chaos mode are not here. The lobby's mode arrows cycle Liar's Deck,
 # Texas, Dice and Spin and nothing else, so neither is reachable by a player; the harness can
@@ -59,17 +64,23 @@ function Phase {
 $first = $true
 
 if (-not $SkipBig) {
-    # Bar 0, five to eight players: the sizes the game was never built for.
-    Phase -What 'five to eight players, bar 0' -Tables $All -Sizes @(8, 7, 6, 5) `
-          -Seconds 170 -Map '0' -First:$first
-    $first = $false
+    # Bar 0, the sizes the game was never built for - every mode at each size before moving
+    # down, so a mode that is broken at eight says so in the first hour rather than the fifth.
+    foreach ($n in 8, 7, 6, 5) {
+        Phase -What "$n players, every mode, bar 0" -Tables $All -Sizes @($n) `
+              -Seconds 170 -Map '0' -First:$first
+        $first = $false
+    }
 }
 
 if (-not $SkipSmall) {
-    # Bar 0, one to four players: the mod should be invisible here, and that is the claim.
-    Phase -What 'one to four players, bar 0' -Tables $All -Sizes @(4, 3, 2, 1) `
-          -Seconds 110 -Map '0' -First:$first
-    $first = $false
+    # Bar 0, one to four players: here the mod is supposed to be invisible, and that is the
+    # claim being tested rather than the one it exists to make.
+    foreach ($n in 4, 3, 2, 1) {
+        Phase -What "$n player(s), every mode, bar 0" -Tables $All -Sizes @($n) `
+              -Seconds 110 -Map '0' -First:$first
+        $first = $false
+    }
 }
 
 if (-not $SkipBars) {

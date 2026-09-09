@@ -31,8 +31,10 @@ namespace LiarsBar8P;
 /// The target rotates by seat and by round so that a match works its way round the whole
 /// table rather than shooting the same neighbour every time.
 ///
-/// This is a test instrument. It runs only in developer mode, only on the server, and only
-/// while the harness is standing in for every player. In a real game it does nothing.
+/// This is a test instrument, and it does nothing at all outside developer mode. Taking a
+/// seat's shot needs the server and needs the harness to be standing in for everybody;
+/// measuring the ring runs on every machine, because whether the peers agree about who an
+/// aim points at is half the question.
 /// </summary>
 internal static class AimDrive
 {
@@ -54,16 +56,31 @@ internal static class AimDrive
 
     internal static void Tick()
     {
-        if (!Dev.Enabled || !Dev.IsServer) return;
-        if (!(DevAutoTest.Driving || Loopback.Mine == Loopback.Role.Host)) return;
+        if (!Dev.Enabled) return;
 
         var m = Dev.Mgr;
-        if (m == null || m.Players == null || !m.GameStarted) { _wasAiming = false; _probed = null; return; }
+        if (m == null || !m.GameStarted) { _wasAiming = false; _probed = null; return; }
 
         int n = AimRing.Seats(m);
         if (n < 2) return;
 
+        // The measurement runs on every machine, not only the server.
+        //
+        // Which seat an aim points at is worked out separately by every peer - the shooter
+        // computes it to send the shot, the server computes it again to resolve it - so the
+        // question is not only "can a seat reach everybody" but "does every machine agree
+        // about who it reached". That distinction has already cost this project once: the
+        // turn order's neighbour table read a roster that is empty on a client, so the host
+        // aimed at seat 4 while every client watched the same player aim at seat 0, and
+        // nothing on the host could have shown it. Asking only the host would be making the
+        // same mistake in a different place.
         Probe(m, n);
+
+        // Driving a seat is the server's business, and only while the harness stands in for
+        // everybody.
+        if (!Dev.IsServer) return;
+        if (!(DevAutoTest.Driving || Loopback.Mine == Loopback.Role.Host)) return;
+        if (m.Players == null) return;
 
         // A new phase begins when somebody starts aiming and nobody was. Counting phases is
         // what lets the choice move round the table between chaos cards instead of every
@@ -141,18 +158,33 @@ internal static class AimDrive
         }
         if (Time.time < _probeAt) return;
 
+        // Found in the scene rather than in Manager.Players, because Players is the server's
+        // own roster and is empty on a client until something happens to refresh it - and a
+        // probe that quietly measured nothing on every machine but the host would report
+        // agreement it had never checked.
+        var seated = new List<PlayerStats>();
+        try
+        {
+            var all = UnityEngine.Object.FindObjectsOfType<PlayerStats>();
+            if (all != null)
+                for (int i = 0; i < all.Count; i++)
+                    if (all[i] != null) seated.Add(all[i]);
+        }
+        catch { return; }
+
         // The seats that are actually in - the same filter the game uses when it decides
         // whether an aim points at anybody.
         var live = new List<int>();
-        foreach (var p in m.Players)
+        foreach (var p in seated)
             if (p != null && !p.Dead && !p.Fnished) live.Add(p.Slot);
 
         if (live.Count < 2) return;
 
         bool asked = false;
         int bad = 0;
+        string where = Dev.IsServer ? "host" : "this client";
 
-        foreach (var p in m.Players)
+        foreach (var p in seated)
         {
             if (p == null || p.Dead || p.Fnished) continue;
 
@@ -183,13 +215,13 @@ internal static class AimDrive
 
             if (missed.Count == 0)
                 Plugin.Log.LogWarning(
-                    $"[aimring] {who} (seat {p.Slot}) can aim at all {live.Count - 1} of the others - " +
-                    $"seats {string.Join(", ", reached)}");
+                    $"[aimring] on {where}, {who} (seat {p.Slot}) can aim at all {live.Count - 1} of the " +
+                    $"others - seats {string.Join(", ", reached)}");
             else
             {
                 bad++;
                 Plugin.Log.LogError(
-                    $"[aimring] {who} (seat {p.Slot}) can aim at only {reached.Count} of " +
+                    $"[aimring] on {where}, {who} (seat {p.Slot}) can aim at only {reached.Count} of " +
                     $"{live.Count - 1} - never {string.Join(", ", missed)} - reaches {string.Join(", ", reached)}");
             }
         }
@@ -198,9 +230,9 @@ internal static class AimDrive
 
         _probed = m;
         if (bad == 0)
-            Plugin.Log.LogWarning($"[aimring] every seat at this table of {n} can point at every other");
+            Plugin.Log.LogWarning($"[aimring] on {where}, every seat at this table of {n} can point at every other");
         else
-            Plugin.Log.LogError($"[aimring] {bad} seat(s) at this table of {n} cannot reach the whole table");
+            Plugin.Log.LogError($"[aimring] on {where}, {bad} seat(s) at this table of {n} cannot reach the whole table");
     }
 
     private static Manager _probeFor;
