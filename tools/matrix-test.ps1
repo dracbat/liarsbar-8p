@@ -147,7 +147,7 @@ function Read-Verdict {
         Turns = 0; Slots = 0; TurnRing = ''
         Devils = 0; Chaos = 0; ChaosDone = 0; Bids = 0; DiceCalls = 0
         Aims = 0; AimBad = 0; Shots = 0; ShotsLost = 0
-        Raises = 0; Folds = 0; Claims = 0
+        Raises = 0; Folds = 0; Claims = 0; DiceSaves = 0
         AimRing = ''; Driving = $false; ModeOk = $true
         Exceptions = 0; Dropped = 0; ModErrors = 0; BadRpc = ''; FirstError = ''
         Notes = ''
@@ -223,6 +223,10 @@ function Read-Verdict {
     $r.Raises    = ($h | Select-String -Pattern 'TEXAS (call|all in) by').Count
     $r.Folds     = ($h | Select-String -SimpleMatch 'TEXAS fold by').Count
     $r.Claims    = ($h | Select-String -SimpleMatch 'SPIN claim of').Count
+    # How often the Liar's Dice reveal had to be put back on its feet. Not an error:
+    # it is the mod catching a fault the game has above four players, and a cell where
+    # it fired and the bidding carried on is the recovery working.
+    $r.DiceSaves = ($h | Select-String -SimpleMatch 'round recovered').Count
     $r.ChaosDone = ($h | Select-String -SimpleMatch 'chaos aim resolved').Count
 
     # Who a seat chose to shoot, and who the game then shot. Two numbers, because the aim
@@ -379,12 +383,12 @@ foreach ($name in $Tables) {
         $v = Read-Verdict -Folder $folder -Name $name -Mode $table.Mode -Players $n
         $summary += $v
 
-        Write-Host ("  ran on '{0}'  seats {1} good / {2} wrong  dealt {3}/{4}  short {5}  ring {6} aimring {19}  devil {7}  chaos {8}/{9}  bids {10}  calls {11}  texas {20}/{21}  spin {22}  aim {12}/{13} bad {14}  shots {15} lost {16}  exc {17}  modErr {18}" -f `
+        Write-Host ("  ran on '{0}'  seats {1} good / {2} wrong  dealt {3}/{4}  short {5}  ring {6} aimring {19}  devil {7}  chaos {8}/{9}  bids {10}  calls {11}  texas {20}/{21}  spin {22}  dicesaves {23}  aim {12}/{13} bad {14}  shots {15} lost {16}  exc {17}  modErr {18}" -f `
             $v.Ran, $v.SeatGood, $v.SeatWrong, $v.DealtSeats, $v.Seated, $v.ShortSeats, $v.TurnRing,
             $v.Devils, $v.ChaosDone, $v.Chaos, $v.Bids, $v.DiceCalls,
             $v.Aims, ($v.Aims + $v.AimBad), $v.AimBad, $v.Shots, $v.ShotsLost,
             $v.Exceptions, $v.ModErrors, $(if ($v.Driving) { $v.AimRing } else { 'NOT DRIVEN' }),
-            $v.Raises, $v.Folds, $v.Claims) -ForegroundColor Gray
+            $v.Raises, $v.Folds, $v.Claims, $v.DiceSaves) -ForegroundColor Gray
 
         $summary | Export-Csv $csv -NoTypeInformation -Force
     }
