@@ -6,36 +6,38 @@ using UnityEngine;
 namespace LiarsBar8P;
 
 /// <summary>
-/// Puts a round of Liar's Dice back on its feet when the reveal after a liar call dies.
+/// A backstop for a round of Liar's Dice whose reveal never finishes.
 ///
-/// Above four players, resolving a liar call throws <c>IndexOutOfRangeException</c> inside
-/// <c>DiceGamePlayManager.ShowPlayer</c>, and that is the end of the round: the coroutine stops
-/// where it threw, so the dice are never shown, the loser is never chosen, nobody is given the
-/// turn, and the table sits there. Measured at four, six and eight players - clean at four, dead
-/// at six and eight, on the first liar call every time.
+/// <b>The fault this was written for is fixed.</b> Above four players, resolving a liar call
+/// used to throw <c>IndexOutOfRangeException</c> part way through
+/// <c>DiceGamePlayManager.ShowPlayer</c>, and that ended the round: the coroutine stopped where
+/// it threw, so no dice were shown, no loser was chosen, nobody was given the turn, and the
+/// table sat there. The cause was a four-player array built inside the routine, and it is now
+/// rewritten along with the seven deals in <see cref="DealArrayPatch"/> - measured at zero
+/// faults across a round of liar calls and spot-on calls at five players, where before every
+/// single call killed the table.
 ///
-/// <b>Why this recovers rather than fixes.</b> The fault is inside a coroutine, and this project
-/// does not patch a coroutine's <c>MoveNext</c> - doing so breaks the state machine that resumes
-/// it. Reading the method is not possible either: the decompiler gives up at its state switch
-/// and emits no body, and this build of the game logs exceptions without a stack. So the faulting
-/// line is not available to be corrected, and a fix invented without it would be a guess dressed
-/// up as a repair. What is available is the game's own answer to a reveal that cannot finish:
-/// <c>StopRevealFlowAndRecoverRound</c>, which the game itself calls when somebody leaves in the
-/// middle of one. It stops the coroutines, clears the liar and spot-on flags, resets the dice
-/// panel, re-rolls, hands the turn on and restarts the countdown.
+/// This is kept because it is not the same thing as knowing the reveal can never stop again.
+/// It is a coroutine several minutes of animation long, running on the machine that is also
+/// hosting seven other copies of the game, and it is reached through Mirror; a mod cannot
+/// promise it will always complete. What a mod can do is notice when it has not and put the
+/// round back on its feet, which costs nothing while everything is working.
 ///
-/// So the round continues, and what is lost is the reveal animation for that call - the dice are
-/// re-rolled rather than shown. That is a real cost and it is not pretended otherwise; it is
-/// smaller than a table that stops dead on the first liar call anyone makes.
+/// The recovery is the game's own: <c>StopRevealFlowAndRecoverRound</c>, which it calls itself
+/// when somebody leaves in the middle of a reveal. It stops the coroutines, clears the liar and
+/// spot-on flags, resets the dice panel, re-rolls, hands the turn on and restarts the countdown.
+/// The round continues and what is lost is that call's reveal - the dice are re-rolled rather
+/// than shown, so nobody is punished for that particular lie. A poor outcome, and a much better
+/// one than a table nobody can leave except by quitting.
 ///
-/// <b>How it knows.</b> Two ways, and the first is the one that normally fires. BepInEx sees
-/// every line the game logs, so the exception itself is the trigger - the round is recovered
-/// within a tick of it being thrown, rather than after a wait. The second is a timeout, for a
-/// reveal that stops for any other reason: it is set well above how long a healthy reveal takes
-/// (about fifty-five seconds at four players, measured, and longer with more people to show), so
-/// it will not cut a working one short.
+/// <b>How it knows.</b> Two ways. BepInEx sees every line the game logs, so an array fault
+/// during a reveal is caught within a tick of being thrown. A timeout backs that up for a
+/// reveal that stops without saying anything, set well above how long a healthy reveal takes -
+/// about fifty-five seconds at four players, measured, and longer with more people to show - so
+/// it cannot cut a working one short.
 ///
-/// This is not a developer tool. It runs for everybody, because the bug does.
+/// This is not a developer tool, and it is not off in a release. It has nothing to do when the
+/// game is behaving, and the day it does have something to do is the day somebody is mid-match.
 /// </summary>
 internal static class DiceRevealGuard
 {
