@@ -362,8 +362,15 @@ internal static class ModePlay
                 return;
             }
 
+            // The bid keys clamp against the mode's own ceiling and wrap round at the top, so
+            // this does the same. Sending a number a player could not have dialled in would be
+            // testing something nobody can do.
+            int ceiling = SpinBidCap.Ceiling();
             int count = last + 1;
-            Dev.Log("play", $"{p.PlayerName} (seat {p.Slot}) claims {count}");
+            if (ceiling > 0 && count > ceiling) count = 0;
+
+            Dev.Log("play", $"{p.PlayerName} (seat {p.Slot}) claims {count}" +
+                            (ceiling > 0 ? $" (the highest allowed is {ceiling})" : ""));
 
             try
             {
