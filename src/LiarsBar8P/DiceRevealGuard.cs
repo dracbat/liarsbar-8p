@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using BepInEx.Logging;
 using HarmonyLib;
 using UnityEngine;
@@ -149,9 +149,58 @@ internal static class DiceRevealGuard
                     : $"[dicefix] the reveal has been going {waited:F0}s at a table of {seats} and " +
                       "nothing has moved - putting the round back on its feet");
 
+            if (threw) Describe(m, d);
             Recover(d);
         }
         catch (Exception e) { Plugin.Log.LogError($"[dicefix] tick failed: {e.Message}"); }
+    }
+
+    /// <summary>
+    /// Everything the reveal could have been indexing, at the moment it stopped.
+    ///
+    /// The faulting line cannot be read, so the next best thing is a picture of the table taken
+    /// the instant it broke: how many players the roster holds, what the synced count says, each
+    /// seat's number and whether it is out, and how many dice each seat is holding. An array
+    /// index that ran off the end ran off the end of one of these, and having them written down
+    /// side by side is what turns the next attempt at this from guesswork into arithmetic.
+    ///
+    /// Developer mode only. A player has no use for it and it is several lines per fault.
+    /// </summary>
+    private static bool _described;
+
+    private static void Describe(Manager m, DiceGamePlayManager d)
+    {
+        if (!Dev.Enabled || _described) return;
+        _described = true;                       // once a session: it is the same every time
+
+        try
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"roster={(m.Players != null ? m.Players.Count : -1)}");
+            sb.Append($" startCount={m.StartPlayerCount}");
+            sb.Append($" activeSlot={m.ActivePlayerSlot}");
+            try { sb.Append($" lastCount={d.LastCount} lastDice={d.LastDice} total={d.TotalCount} max={d.MaxCount}"); }
+            catch { }
+
+            Plugin.Log.LogWarning($"[dicefix] when it broke: {sb}");
+
+            if (m.Players == null) return;
+            foreach (var p in m.Players)
+            {
+                if (p == null) continue;
+                int dice = -1;
+                try
+                {
+                    var gp = p.GetComponent<DiceGamePlay>();
+                    if (gp != null && gp.DiceValues != null) dice = gp.DiceValues.Count;
+                }
+                catch { }
+
+                Plugin.Log.LogWarning(
+                    $"[dicefix]   seat {p.Slot} '{p.PlayerName}' dead={p.Dead} finished={p.Fnished} dice={dice}");
+            }
+        }
+        catch (Exception e) { Plugin.Log.LogWarning($"[dicefix] could not describe the table: {e.Message}"); }
     }
 
     /// <summary>
@@ -185,5 +234,9 @@ internal static class DiceRevealGuard
         catch (Exception e) { Plugin.Log.LogError($"[dicefix] the recovery itself failed: {e.Message}"); }
     }
 
-    internal static void MatchOver() => _recovered = 0;
+    internal static void MatchOver()
+    {
+        _recovered = 0;
+        _described = false;
+    }
 }
