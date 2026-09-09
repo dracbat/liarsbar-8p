@@ -325,3 +325,32 @@ scale anything proportionally:
 
 These are deliberately *not* driven by `Limits.Max`: they are facts about the game, and
 tying them to a setting would silently change the deck's composition.
+
+## 7. How the rest of them were looked for
+
+Every entry above was found by reading code that something had already gone wrong in. That
+finds a four *after* it has cost a session, which is a poor way to find the next one — the
+aim table sat there through every release of this mod because nothing had ever exercised the
+aiming phase, and it would still be there if a player had not asked whether they could shoot
+the fifth person at the table.
+
+So the shipped code was swept for the shapes a four-player assumption takes, rather than
+waited on. Each of these was run across the whole of `Assembly-CSharp`:
+
+| Shape | What it finds | Result |
+|---|---|---|
+| `cmp r32, 3` then a short conditional jump | a seat index wrapping at the last of four | `GiveTurn`, `GiveTurnSpin`, `GiveTurnTexas` — all patched |
+| `mov r32, 3` before a loop | the same wrap, backwards | `BackGiveTurn`, `findbackplayer` — patched |
+| `and r32, 0x80000003` with its negative fix-up | a ring whose modulus is a mask, not a division | `GiveTurnSkippingLeaver`, `GiveTurnSpinDeadSpinMoment` — patched |
+| `new PlayerStats[4]` | a deal that can only hold four hands | seven deal routines — patched |
+| three or more `cmp [obj+0x78], 0..3` in one method | a hand-written table keyed on a seat number | `GetTargetSlot`, `GetTargetPlayer`, `GetAimTargetSlot`, `ChaosGamePlay.GetAim`, `PokerGamePlay.GetAim`, `GetFirstAim` — patched |
+| `cmp r32, 4` then a backwards jump | a loop that visits four of something | only the rings already listed, plus `TexasGamePlay.RoyalFlush` (four cards, not four seats) and one method in Blorf |
+
+What that leaves is honest rather than complete. A bound held in a field, a length baked into
+scene data, or a four written as something other than an immediate would not show up in any
+of those, and the sweep only covers modes a player can reach — `RouletteGameManager
+.LookToInfoPlayer` and two Blorf methods carry four-seat tables of their own, and are left
+alone because the lobby's mode arrows cycle Liar's Deck, Texas, Dice and Spin and nothing
+else. `PokerGamePlay.UpdateCall` picks a per-seat position offset from a four-entry table and
+falls back to zero above the third; Liar's Poker is not reachable from the lobby either, and
+that one is a cosmetic offset rather than a rule.
