@@ -128,6 +128,58 @@ internal static class DeckFix
         GrowSyncInts(d.LastRoundSpotOn, players, "LastRoundSpotOn");
     }
 
+    /// <summary>
+    /// The same lists again, on the manager the Chaos deck actually uses.
+    ///
+    /// The Chaos deck is dealt and run by <c>ChaosDeckGamePlayManager</c>, a separate class
+    /// with its own copy of these collections - and only the ordinary deck's were ever grown.
+    /// Measured at seven and eight players, its <c>CardIcons</c> was still four entries long
+    /// while everything around it had been widened, which is exactly the shape that ends a
+    /// coroutine part way through and leaves a round looking as though it simply went quiet.
+    ///
+    /// It was found by asking rather than by breaking: the per-seat collections of every mode
+    /// are now measured against the size of the table at the start of each match, and this one
+    /// answered four.
+    /// </summary>
+    internal static void GrowChaosDeckLists(ChaosDeckGamePlayManager c, int players)
+    {
+        if (c == null || players < 1) return;
+        GrowSprites(c.CardIcons, players, "ChaosDeck.CardIcons");
+        GrowSyncInts(c.LastRound, players, "ChaosDeck.LastRound");
+    }
+
+    /// <summary>
+    /// Liar's Texas keeps a per-player list of its own, and an index into it.
+    ///
+    /// <c>WinStats</c> ships with four entries and sits beside a field called
+    /// <c>winstatslot</c>; above four players the index runs past the end and throws
+    /// <c>ArgumentOutOfRangeException</c> as the round sets itself up. It is not fatal - the
+    /// round played on - but it is a four-player assumption sitting in the middle of a mode
+    /// this release claims works at eight, and it costs one line to stop it happening.
+    ///
+    /// Padded by repeating what is already there rather than by cloning scene objects. Two
+    /// seats sharing a display slot is a cosmetic wrong; instantiating UI whose layout is not
+    /// understood is how a cosmetic wrong becomes a broken one.
+    /// </summary>
+    internal static void GrowTexasLists(TexasGamePlayManager t, int players)
+    {
+        if (t == null || players < 1) return;
+        GrowList(t.WinStats, players, "Texas.WinStats");
+    }
+
+    private static void GrowList<T>(Il2CppSystem.Collections.Generic.List<T> list, int need, string label)
+        where T : Il2CppSystem.Object
+    {
+        try
+        {
+            if (list == null || list.Count == 0 || list.Count >= need) return;
+            int start = list.Count;
+            while (list.Count < need) list.Add(list[list.Count % start]);
+            Plugin.Log.LogInfo($"[deckfix]   {label}: {start} -> {list.Count}");
+        }
+        catch (Exception e) { Plugin.Log.LogWarning($"[deckfix] {label} skipped: {e.Message}"); }
+    }
+
     private static void GrowSprites(Il2CppSystem.Collections.Generic.List<Sprite> list, int need, string label)
     {
         try
