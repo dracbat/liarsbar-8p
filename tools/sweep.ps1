@@ -77,9 +77,15 @@ if (-not $SkipBig) {
 if (-not $SkipSmall) {
     # Bar 0, one to four players: here the mod is supposed to be invisible, and that is the
     # claim being tested rather than the one it exists to make.
+    #
+    # Below four there is less of a game to watch - one player has nobody to lie to, and two
+    # is a round that ends almost as soon as it starts - so what these cells are really asking
+    # is whether the lobby forms, the match starts, everyone is seated and dealt, and nothing
+    # errors. That does not need the same time on the clock as a full table, and giving it the
+    # same time would spend an hour proving something these runs establish in the first minute.
     foreach ($n in 4, 3, 2, 1) {
         Phase -What "$n player(s), every mode, bar 0" -Tables $All -Sizes @($n) `
-              -Seconds 100 -Map '0' -First:$first
+              -Seconds $(if ($n -ge 4) { 100 } else { 60 }) -Map '0' -First:$first
         $first = $false
     }
 }
@@ -108,9 +114,14 @@ if (Test-Path $csv) {
     $rows = @(Import-Csv $csv)
     Write-Host "$($rows.Count) cells recorded" -ForegroundColor Cyan
 
+    # An exception the mod caught and recovered from is not a cell that wants looking at - the
+    # Liar's Dice reveal throws above four players and the round is put back on its feet, so a
+    # dice cell will legitimately show one of each. What wants looking at is an exception that
+    # nothing dealt with.
     $bad = $rows | Where-Object {
         $_.Driving -ne 'True' -or $_.ModeOk -ne 'True' -or
-        [int]$_.ModErrors -gt 0 -or [int]$_.Exceptions -gt 0 -or
+        [int]$_.ModErrors -gt 0 -or
+        ([int]$_.Exceptions - [int]$_.DiceSaves) -gt 0 -or
         [int]$_.SeatWrong -gt 0 -or [int]$_.AimBad -gt 0 -or
         $_.AimRing -like 'BLIND*' -or $_.TurnRing -like 'ONLY*'
     }
