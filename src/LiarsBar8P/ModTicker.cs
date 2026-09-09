@@ -51,6 +51,12 @@ internal sealed class ModTicker : MonoBehaviour
         try { ModePlay.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[play] tick failed: {e.Message}"); }
 
+        try { AimDrive.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[aim] tick failed: {e.Message}"); }
+
+        try { SpinBidCap.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[spin] tick failed: {e.Message}"); }
+
         try { SeatRing.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[seatring] tick failed: {e.Message}"); }
 

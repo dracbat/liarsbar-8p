@@ -31,8 +31,34 @@ internal static class DevShots
     /// off, which is what it must be while somebody is actually playing: each shot is a few
     /// megabytes and a visible pause. Only a deliberate test run wants a picture record.
     /// </summary>
-    private static float Every =>
-        Plugin.DevShotSeconds != null ? Plugin.DevShotSeconds.Value : 0f;
+    private static float Every
+    {
+        get
+        {
+            // The harness asks out of band, for the same reason it asks for developer mode
+            // that way: the config file is rewritten to its shipped defaults by an install,
+            // and a run that quietly took no pictures looks exactly like one that did.
+            if (_asked == null)
+            {
+                _asked = 0f;
+                try
+                {
+                    string raw = Environment.GetEnvironmentVariable("LIARSBAR8P_SHOTSEVERY");
+                    if (!string.IsNullOrEmpty(raw) &&
+                        float.TryParse(raw, System.Globalization.NumberStyles.Float,
+                                       System.Globalization.CultureInfo.InvariantCulture, out float v) &&
+                        v > 0f)
+                        _asked = v;
+                }
+                catch { }
+            }
+
+            if (_asked.Value > 0f) return _asked.Value;
+            return Plugin.DevShotSeconds != null ? Plugin.DevShotSeconds.Value : 0f;
+        }
+    }
+
+    private static float? _asked;
 
     private static string Folder
     {

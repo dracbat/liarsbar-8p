@@ -1,4 +1,4 @@
-<#
+﻿<#
     Play one table per (mode, player count) and report what happened.
 
     The old harness launched copies on a stopwatch - forty-five seconds for the host, thirty
@@ -26,6 +26,7 @@ param(
     [int]      $PlaySeconds = 120,
     [int]      $LaunchTimeout = 180,
     [string]   $Map = '',            # 0-3: the bar. Blank leaves whatever the machine last used.
+    [int]      $Shots = 0,           # seconds between screenshots on the host; 0 takes none
     [switch]   $TurnProbe,           # hand the turn round on purpose and report which seats it reached
     [string]   $Results = "$env:LOCALAPPDATA\LiarsBar8P\matrix",
     [switch]   $Append
@@ -85,6 +86,14 @@ function Wait-ForLine {
 function Start-Copy {
     param([string] $Role, [string] $LoopbackRole, [int] $Expect, [hashtable] $Table, [switch] $Small)
 
+    # The developer tools drive every seat, and they live behind a BepInEx config setting that
+    # a release build rewrites to its shipped default. A run with them off throws no cards,
+    # takes no turns and reports zeroes in every column - which is indistinguishable from a
+    # mode that works. Said here instead, where it cannot be reset by an install.
+    $env:LIARSBAR8P_DEV      = '1'
+    # Only the host takes pictures, and only when asked - a shot is a few megabytes and a
+    # visible pause, and eight copies all doing it would change what is being measured.
+    $env:LIARSBAR8P_SHOTSEVERY = if ($Shots -gt 0 -and $LoopbackRole -eq 'host') { "$Shots" } else { '' }
     $env:SteamAppId          = '3097560'
     $env:LIARSBAR8P_PORT     = '7777'
     $env:LIARSBAR8P_ROLE     = $Role
@@ -121,7 +130,9 @@ function Read-Verdict {
         Seated = 0; SeatGood = 0; SeatWrong = 0; WorstOffset = ''; Gap = ''
         DealtSeats = 0; ShortSeats = 0
         Turns = 0; Slots = 0; TurnRing = ''
-        Devils = 0; Chaos = 0; ChaosDone = 0
+        Devils = 0; Chaos = 0; ChaosDone = 0; Bids = 0; DiceCalls = 0
+        Aims = 0; AimBad = 0; Shots = 0; ShotsLost = 0
+        AimRing = ''; Driving = $false
         Exceptions = 0; Dropped = 0; ModErrors = 0; BadRpc = ''
         Notes = ''
     }
@@ -173,7 +184,26 @@ function Read-Verdict {
     # on the table has had everything except the thing that makes it a different game tested.
     $r.Devils    = ($h | Select-String -SimpleMatch "DEVIL'S DEAL started").Count
     $r.Chaos     = ($h | Select-String -SimpleMatch 'CHAOS thrown by').Count
+    $r.Bids      = ($h | Select-String -SimpleMatch 'DICE bid ').Count
+    $r.DiceCalls = ($h | Select-String -Pattern 'DICE (liar|spot-on) called').Count
     $r.ChaosDone = ($h | Select-String -SimpleMatch 'chaos aim resolved').Count
+
+    # Who a seat chose to shoot, and who the game then shot. Two numbers, because the aim
+    # ring was broken for half the table while the chaos card still 'fired' every time.
+    $r.Aims      = ($h | Select-String -Pattern '\[aim\] .* aims at .* and fires').Count
+    $r.AimBad    = ($h | Select-String -SimpleMatch 'meant to shoot').Count
+    $r.Shots     = ($h | Select-String -Pattern 'the shot from .* landed on ').Count
+    $r.ShotsLost = ($h | Select-String -SimpleMatch 'landed on nobody').Count
+
+    # Whether every seat could point at every other seat, asked directly rather than waiting
+    # for a chaos card to turn up and give the question a chance to be asked.
+    if ($joined -match '\[aimring\] every seat at this table of (\d+) can point') { $r.AimRing = "all $($Matches[1])" }
+    elseif ($joined -match '\[aimring\] (\d+) seat\(s\) at this table of (\d+) cannot reach') { $r.AimRing = "BLIND $($Matches[1])/$($Matches[2])" }
+
+    # A run where the harness was not driving proves nothing, and every count above would be a
+    # zero that reads like a pass. Say so instead of reporting it as a result.
+    $r.Driving = ($h | Select-String -SimpleMatch 'DEVELOPER MODE IS ON').Count -gt 0
+    if (-not $r.Driving) { $r.Notes = 'NOT DRIVEN - developer mode was off, every count below is meaningless' }
 
     if ($joined -match 'the turn reached all (\d+) seats') { $r.TurnRing = "all $($Matches[1])" }
     elseif ($joined -match 'the turn reached only (\d+) of (\d+) seats') { $r.TurnRing = "ONLY $($Matches[1])/$($Matches[2])" }
@@ -210,7 +240,7 @@ function Read-Verdict {
     }
     if ($worst -ge 0) { $r.WorstOffset = "{0:F2}" -f $worst }
 
-    if ($r.ShortSeats -gt 0) { $r.Notes = "$($r.ShortSeats) seat(s) dealt cards they never received" }
+    if ($r.ShortSeats -gt 0 -and $r.Driving) { $r.Notes = "$($r.ShortSeats) seat(s) dealt cards they never received" }
     return [pscustomobject]$r
 }
 
@@ -278,9 +308,11 @@ foreach ($name in $Tables) {
         $v = Read-Verdict -Folder $folder -Name $name -Mode $table.Mode -Players $n
         $summary += $v
 
-        Write-Host ("  ran on '{0}'  seats {1} good / {2} wrong  dealt {3}/{4}  short {5}  ring {6}  devil {7}  chaos {8}/{9}  exc {10}  modErr {11}" -f `
+        Write-Host ("  ran on '{0}'  seats {1} good / {2} wrong  dealt {3}/{4}  short {5}  ring {6} aimring {19}  devil {7}  chaos {8}/{9}  bids {10}  calls {11}  aim {12}/{13} bad {14}  shots {15} lost {16}  exc {17}  modErr {18}" -f `
             $v.Ran, $v.SeatGood, $v.SeatWrong, $v.DealtSeats, $v.Seated, $v.ShortSeats, $v.TurnRing,
-            $v.Devils, $v.ChaosDone, $v.Chaos, $v.Exceptions, $v.ModErrors) -ForegroundColor Gray
+            $v.Devils, $v.ChaosDone, $v.Chaos, $v.Bids, $v.DiceCalls,
+            $v.Aims, ($v.Aims + $v.AimBad), $v.AimBad, $v.Shots, $v.ShotsLost,
+            $v.Exceptions, $v.ModErrors, $(if ($v.Driving) { $v.AimRing } else { 'NOT DRIVEN' })) -ForegroundColor Gray
 
         $summary | Export-Csv $csv -NoTypeInformation -Force
     }
@@ -288,5 +320,5 @@ foreach ($name in $Tables) {
 
 Write-Host ""
 Write-Host "==================== matrix complete ====================" -ForegroundColor Cyan
-$summary | Format-Table Table, Players, Ran, Seated, SeatGood, SeatWrong, WorstOffset, DealtSeats, ShortSeats, TurnRing, Devils, Chaos, ChaosDone, Exceptions, Dropped, ModErrors -AutoSize
+$summary | Format-Table Table, Players, Ran, Seated, SeatGood, SeatWrong, WorstOffset, DealtSeats, ShortSeats, TurnRing, Devils, Chaos, Bids, DiceCalls, Exceptions, Dropped, ModErrors -AutoSize
 Write-Host "Logs and summary.csv: $Results"

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using HarmonyLib;
 using UnityEngine;
 
@@ -139,9 +139,86 @@ internal static class MechanicsTrace
         catch { }
     }
 
+    /// <summary>
+    /// Who the server decided the shot landed on. The ground truth for the aiming ring.
+    ///
+    /// The seat a player chose and the seat the game shot are two different claims, and until
+    /// this was printed only the first was ever visible. Above four players they came apart:
+    /// the aim table had no row for seats four and up, so a choice made by one of them
+    /// resolved to nobody and the shot quietly went nowhere. Reporting both is what turns
+    /// "the chaos card fired" into "the chaos card hit the person it was pointed at".
+    /// </summary>
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(ChaosDeckGameplay), "ServerApplyShotToTarget")]
+    private static void ShotLanded(ChaosDeckGameplay __instance, PlayerStats player, bool __result)
+    {
+        try
+        {
+            _shots++;
+            string who = "nobody";
+            if (player != null)
+            {
+                string n = player.PlayerName;
+                who = string.IsNullOrEmpty(n) ? $"seat {player.Slot}" : $"'{n}' (seat {player.Slot})";
+            }
+
+            Plugin.Log.LogWarning(
+                $"[mechanic] the shot from {Who(__instance)} landed on {who}" +
+                (__result ? "" : " - and was refused") + $" at a table of {Seats()}");
+        }
+        catch { }
+    }
+
+    // -------------------------------------------------------------------- the dice
+
+    /// <summary>
+    /// A bid. Liar's Dice is a bidding game, so this is the move the mode is made of - the
+    /// equivalent of a card reaching the table, and the thing that has to be seen happening
+    /// at eight players before the mode can be called tested.
+    /// </summary>
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.PlaceBet))]
+    private static void DiceBid(DiceGamePlay __instance, int count, int dice)
+    {
+        try
+        {
+            _bids++;
+            if (Plugin.Verbose != null && Plugin.Verbose.Value)
+                Plugin.Log.LogInfo($"[mechanic] DICE bid {count} x {dice} by {Who(__instance)} " +
+                                   $"at a table of {Seats()}");
+        }
+        catch { }
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.CallLier))]
+    private static void DiceLiar(DiceGamePlay __instance)
+    {
+        try
+        {
+            _diceLiar++;
+            Plugin.Log.LogWarning($"[mechanic] DICE liar called by {Who(__instance)} at a table of {Seats()}");
+        }
+        catch { }
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.CallSpotOn))]
+    private static void DiceSpotOn(DiceGamePlay __instance)
+    {
+        try
+        {
+            _diceSpotOn++;
+            Plugin.Log.LogWarning($"[mechanic] DICE spot-on called by {Who(__instance)} at a table of {Seats()}");
+        }
+        catch { }
+    }
+
     // ------------------------------------------------------------------ the tally
 
     private static int _devils, _chaos, _chaosDone;
+    private static int _bids, _diceLiar, _diceSpotOn;
+    private static int _shots;
 
     /// <summary>
     /// What fired during this match, printed once when it ends.
@@ -152,12 +229,19 @@ internal static class MechanicsTrace
     /// </summary>
     internal static void MatchOver()
     {
-        if (_devils == 0 && _chaos == 0) return;
+        if (_devils == 0 && _chaos == 0 && _bids == 0 && _diceLiar == 0 && _diceSpotOn == 0 && _shots == 0) return;
+
         Plugin.Log.LogWarning(
-            $"[mechanic] this match: {_devils} devil's deal(s), {_chaos} chaos throw(s), " +
-            $"{_chaosDone} of them resolved");
+            $"[mechanic] this match: {_devils} devil's deal(s), {_chaos} chaos throw(s) " +
+            $"({_chaosDone} resolved, {_shots} aimed shot(s)), {_bids} dice bid(s), " + $"{_diceLiar} dice liar call(s), " +
+            $"{_diceSpotOn} spot-on call(s)");
+
         _devils = 0;
         _chaos = 0;
         _chaosDone = 0;
+        _bids = 0;
+        _diceLiar = 0;
+        _diceSpotOn = 0;
+        _shots = 0;
     }
 }

@@ -38,6 +38,8 @@ internal static class TurnRingProbe
     private static float _next;
     private static int _left;
     private static readonly List<int> _visited = new();
+    private static HashSet<int> _reachable = new();
+    private static int _stuck;
 
     private static bool Wanted
     {
@@ -67,6 +69,11 @@ internal static class TurnRingProbe
             {
                 _for = m;
                 _visited.Clear();
+                _stuck = 0;
+
+                _reachable = new HashSet<int>();
+                foreach (var p in m.Players)
+                    if (p != null && !p.Dead && !p.Fnished) _reachable.Add(p.Slot);
 
                 // Twice round rather than once. Some tables move the turn on themselves - the
                 // Chaos deck throws for a player who is slow - so the sequence this sees is
@@ -80,22 +87,41 @@ internal static class TurnRingProbe
             if (_left <= 0 || Time.time < _next) return;
             _next = Time.time + StepSeconds;
 
+            // Clear the outgoing seat's turn first, exactly as every mode's own input path
+            // does before handing on. Without it HaveTurn accumulated on every seat the probe
+            // had visited, several clients each believed it was their turn, and each ran its
+            // own move and its own handover in between the probe's steps - so what the probe
+            // sampled was its own sequence interleaved with an unbounded number of the game's.
+            // That is what produced "reached only 5 of 7": not a turn order that misses seats,
+            // a measurement that could not tell whose handover it was looking at.
+            int before = m.ActivePlayerSlot;
+            try
+            {
+                foreach (var q in m.Players)
+                    if (q != null && q.HaveTurn) q.NetworkHaveTurn = false;
+            }
+            catch { }
+
             string how = Hand(m);
             _left--;
 
             int slot = m.ActivePlayerSlot;
+            if (slot == before) _stuck++;
             if (_visited.Count == 0 || _visited[_visited.Count - 1] != slot) _visited.Add(slot);
 
             if (_left > 0) return;
 
-            // Only the seats still in the game. The turn is supposed to skip a player who has
-            // been shot, so counting them as missed reported a fault where the game was doing
-            // exactly the right thing - a seven player round with one player already out came
-            // back as "reached only 6 of 7".
-            var wanted = new HashSet<int>();
-            foreach (var p in m.Players)
-                if (p != null && !p.Dead) wanted.Add(p.Slot);
-
+            // The seats the game itself considers reachable, using the game's own filter.
+            //
+            // Manager.GiveTurn skips a player who is Dead OR Fnished (the game's spelling).
+            // This asked only about Dead, so a Fnished seat that the turn order was right to
+            // skip was scored as a seat it had failed to reach. Nothing ever clears Fnished
+            // either, so once one is set the probe reports a miss for the rest of the match.
+            //
+            // Taken from the snapshot made when the run started, not from the roster as it is
+            // now: Manager.GiveTurn calls RefreshPlayerList, which rebuilds Manager.Players
+            // from a scene scan underneath this.
+            var wanted = _reachable;
             var seats = new HashSet<int>(_visited);
             var missed = new List<int>();
             foreach (int alive in wanted) if (!seats.Contains(alive)) missed.Add(alive);
@@ -103,7 +129,8 @@ internal static class TurnRingProbe
             string order = string.Join(" -> ", _visited);
             if (missed.Count == 0)
                 Plugin.Log.LogWarning(
-                    $"[turnring] {how}: the turn reached all {wanted.Count} seats still in - {order}");
+                    $"[turnring] {how}: the turn reached all {wanted.Count} seats still in - {order}" +
+                    (_stuck > 0 ? $" ({_stuck} step(s) moved nothing)" : ""));
             else
                 Plugin.Log.LogError(
                     $"[turnring] {how}: the turn reached only {wanted.Count - missed.Count} of " +

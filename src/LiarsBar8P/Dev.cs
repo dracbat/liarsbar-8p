@@ -14,7 +14,41 @@ namespace LiarsBar8P;
 /// </summary>
 internal static class Dev
 {
-    internal static bool Enabled => Plugin.DeveloperMode != null && Plugin.DeveloperMode.Value;
+    /// <summary>
+    /// Whether the developer tools are on: the config setting, or the environment variable the
+    /// test harness sets.
+    ///
+    /// The setting alone was not enough, and the way it failed was the worst kind. It lives in
+    /// the BepInEx config file, which a release build writes out with the shipped defaults - so
+    /// installing a build turns developer mode off, and the next test run drives nothing.
+    /// Nothing errors. Every seat sits still, no cards are thrown, no turn is taken, and the
+    /// harness reports a clean run with zeroes in every column, which reads exactly like a
+    /// mode that has nothing wrong with it. A whole matrix can be collected that way and
+    /// believed.
+    ///
+    /// So the harness now says so itself, out of band from the file it cannot rely on. The
+    /// shipped default stays off, because a player should never have any of this running.
+    /// </summary>
+    internal static bool Enabled => FromConfig || FromHarness;
+
+    private static bool FromConfig => Plugin.DeveloperMode != null && Plugin.DeveloperMode.Value;
+
+    private static bool? _harness;
+
+    internal static bool FromHarness
+    {
+        get
+        {
+            if (_harness == null)
+            {
+                string raw = null;
+                try { raw = Environment.GetEnvironmentVariable("LIARSBAR8P_DEV"); }
+                catch { }
+                _harness = !string.IsNullOrEmpty(raw) && raw != "0";
+            }
+            return _harness.Value;
+        }
+    }
 
     /// <summary>
     /// One line per event, tagged so a session can be read back by grepping a single tag:

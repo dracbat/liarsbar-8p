@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using HarmonyLib;
 
 namespace LiarsBar8P;
@@ -65,6 +65,7 @@ internal static class RosterFix
             TurnKickstart.RoundStarting();
             BotBehaviour.RoundStarting();
             ModePlay.RoundStarting();
+            AimDrive.RoundStarting();
             DealFallback.RoundStarting();
             DevShots.Take("chaos_round_start");
             TableFill.EnsureEveryoneSeated(m);
@@ -85,6 +86,7 @@ internal static class RosterFix
             TurnKickstart.RoundStarting();
             BotBehaviour.RoundStarting();
             ModePlay.RoundStarting();
+            AimDrive.RoundStarting();
             DealFallback.RoundStarting();
             DevShots.Take("round_start");
             TurnPointer.ReportLeftovers(m);
