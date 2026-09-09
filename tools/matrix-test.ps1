@@ -238,8 +238,12 @@ function Read-Verdict {
 
     # Whether every seat could point at every other seat, asked directly rather than waiting
     # for a chaos card to turn up and give the question a chance to be asked.
-    if ($joined -match '\[aimring\] every seat at this table of (\d+) can point') { $r.AimRing = "all $($Matches[1])" }
-    elseif ($joined -match '\[aimring\] (\d+) seat\(s\) at this table of (\d+) cannot reach') { $r.AimRing = "BLIND $($Matches[1])/$($Matches[2])" }
+    # The "on host, " / "on this client, " part is what says which machine is speaking, and it
+    # was added to the message after this was written - so the verdict stopped being picked up
+    # while the probe carried on printing it perfectly. Matched loosely enough that saying more
+    # about where a line came from cannot silently empty the column again.
+    if ($joined -match '\[aimring\].*every seat at this table of (\d+) can point') { $r.AimRing = "all $($Matches[1])" }
+    elseif ($joined -match '\[aimring\].*?(\d+) seat\(s\) at this table of (\d+) cannot reach') { $r.AimRing = "BLIND $($Matches[1])/$($Matches[2])" }
 
     # A run where the harness was not driving proves nothing, and every count above would be a
     # zero that reads like a pass. Say so instead of reporting it as a result.
