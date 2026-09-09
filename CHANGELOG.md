@@ -16,6 +16,169 @@ Versions that were once numbered 1.x and 2.x were folded into the same 0.x line 
 room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order is unchanged: what
 was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v1.0.0 — two modes were broken in ways nothing had ever looked at
+
+A player asked whether, in the Chaos deck at eight players, they would be able to choose any
+of the other seven to shoot. The answer was no. Following that question found a second thing
+that was worse.
+
+### Half the table could not be shot at
+
+When a chaos card lands the round stops and everyone picks somebody to shoot. Two pieces of
+the game decide who that can be, and both were written for four chairs.
+
+`GetAimTargetSlot` is a hand-written table of four seats by three directions: seats 0 to 3
+have a row each, and anything above that falls off the end and returns nothing. `LeftAim` and
+`RightAim` — the arrow keys — walk a single number between −1 and 1 and refuse to go past
+either end. Three values, three targets.
+
+So at eight players:
+
+- **seats four to seven could not aim at anybody.** There was no row for them, the shot
+  resolved against nothing, and the chaos card was spent for free;
+- **seats zero to three could only ever pick each other.** The other half of the table was not
+  hard to hit — it was unreachable, because no value the aim was permitted to hold referred to
+  it.
+
+Read as arithmetic rather than as a list, the shipped table is
+`target = (mySlot + (2 - aim)) mod 4`, which generalises on its own:
+
+```
+target = (mySlot + (n/2 - aim)) mod n,   aim from n/2-(n-1) up to n/2-1
+```
+
+At four players that is the same three answers for the same three inputs — so this is the
+shipped rule with the four taken out of it, not a new rule that happens to agree. Below five
+players none of it runs at all. The aim also steps over chairs whose player is dead or gone,
+which four seats could do without and seven cannot.
+
+**The pose could not be fixed, so the mod says the name instead.** Aiming is shown by an
+animation — look left, look ahead, look right — and the game never turns anyone to face a
+particular chair, at four players or eight. With four players those three poses *are* the
+three opponents. With eight they identify nobody, so the animator is given whichever pose
+matches the third of the table the target is in, and the chosen player is named on screen
+while you choose. Reachable but not choosable would have been a different bug, not a fixed one.
+
+### Liar's Dice stopped dead on the first liar call
+
+Above four players, resolving a liar call threw part way through the routine that shows
+everyone's dice. The coroutine stopped where it threw, so no dice were shown, no loser was
+chosen, nobody was given the turn, and the table sat there. The only way out was to quit.
+
+**Liar's Dice has been unplayable above four players in every release of this mod**, and
+nothing had noticed because nothing in the test rig had ever called liar in that mode — the
+harness only knew how to play Liar's Deck.
+
+The cause was the same trap as the seven deal routines: a four-player array and a four-seat
+cursor built inside a coroutine. It is in a mode that deals no cards, which is why looking for
+"the deal" never went near it.
+
+Finding it needed measuring rather than reading. The decompiler gives up at that routine's
+state-machine switch and emits no body at all, and this build logs exceptions without a stack,
+so neither the method nor the line was available. What was available was the size at which it
+broke — clean at four, broken at five, six and eight — which puts the array at exactly four
+entries. Nothing reachable from outside the routine is four long. An array of four that
+nothing outside can see is an array built inside, and that shape is one this mod already knows
+how to rewrite.
+
+### Why neither had been caught
+
+Both were reachable only by playing further into a mode than any test had gone.
+
+The aiming phase needs a chaos card to be dealt into somebody's hand and then thrown before
+the round ends. Every run so far had opened that phase, let it time out, and logged
+`chaos aim resolved` — which was true, and meant only that it had resolved the way it resolves
+when nobody is playing. The liar call in Liar's Dice needed a harness that could play Liar's
+Dice, and there wasn't one.
+
+Three things changed so that this class of bug cannot hide again:
+
+- **the harness plays every mode**, and takes the shot through the same methods a keypress
+  reaches rather than by writing state;
+- **the aim ring is measured directly** once a match, on every machine rather than only the
+  host, so it does not depend on a chaos card turning up to be tested;
+- **the shipped code was swept** for the six shapes a four-player assumption takes, instead of
+  waiting for the next one to cost a session. What that found, and what it cannot see, is in
+  `docs/PLAYER-LIMITS.md`.
+
+### A test run that drove nobody
+
+Developer mode — which is what makes the harness fill the seats and play them — is a setting in
+the BepInEx config file, and installing a build rewrites that file with its shipped defaults. A
+run with it off throws no cards, takes no turns, and finishes with a zero in every column,
+which is indistinguishable from a mode that works perfectly. A whole run was collected that way
+before the pattern of zeroes looked wrong. The harness sets it itself now, and refuses to
+report a run in which it was not on.
+
+The same run was also measuring about thirty-five seconds of play per cell while reporting four
+minutes: it started its clock when the host pressed start, and eight copies of an HDRP game
+take three and a half minutes to load the bar between them. Timing now starts when the table is
+actually up.
+
+### Also fixed
+
+- **`Manager.GiveTurnSpinDeadSpinMoment`** — the handover after a dead spin kills somebody in
+  Liar's Spin — walks a four-seat ring and had been shipping unpatched. Its `GiveTurnSpin`
+  sibling was found long ago because it uses the plain `cmp` shape the scanner knew; this one
+  writes the wrap as a bitmask, so the scanner walked past it. Above four seats it tries four
+  chairs out of eight, and if those four are dead or gone it hands the turn to nobody.
+
+- **Liar's Texas and Liar's Spin can be played by the harness at all**, so those modes are now
+  tested past seating and dealing.
+
+- **There is no fourth deck variant.** The lobby reports four and the arrow cycles three, so a
+  test cell asking for a fourth had been quietly playing Basic a second time and filing the
+  result under a table that does not exist.
+
+### Left alone on purpose
+
+The ceiling on a claim in Liar's Spin is a fixed number in the scene that nothing recomputes,
+and the bid keys clamp against it. It looked like a four-player assumption worth raising. Read
+at runtime it is **four** — not sixteen — so it was already far below an honest count of what
+four players have on the table, and cannot have been derived from the seat count. Raising it
+would have been changing what the mode is on a guess about a constant. It is measured, printed,
+and left exactly as shipped.
+
+### What was played this time
+
+Every mode a player can choose from the lobby arrows, at every table size from one to eight, in
+all four bars. **Sixty-five matches over eight and a half hours**, each a real table of that
+many separate copies of the game with its own network connection, seating measured on *every*
+machine rather than only the host's.
+
+| Table | 8 | 7 | 6 | 5 | 4 | 3 | 2 | 1 |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| Liar's Deck — Basic | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | lobby |
+| Liar's Deck — Devil | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | lobby |
+| Chaos Deck | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | lobby |
+| Liar's Dice (both) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | lobby |
+| Liar's Texas | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | lobby |
+| Liar's Spin | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | lobby |
+
+A table of one is a lobby: it forms, holds, reports nothing wrong, and no match begins.
+
+Seats, measured on every machine: 44.9–45.1° apart at eight, 51.2–51.7° at seven, 59.7–60.3° at
+six, 71.7–72.2° at five, with nobody more than 0.11 m from their own chair.
+
+The aim ring was measured separately, on every machine, in every Chaos deck match: **every seat
+could point at every other seat at every size from two to eight.**
+
+### Still not true
+
+**Eight people on eight machines has never happened.** Every table above is eight copies of the
+game talking to each other on one PC. The largest real game so far is five people on five PCs.
+
+**Two faults belong to the game and are still there.** The Chaos deck makes every client log a
+handful of `NullReferenceException`s handling two of its own remote calls, and Liar's Spin logs
+a few per round. Both happen at four players as well, so neither is a seat-count fault and
+neither is introduced here. The mod catches the first kind so Mirror does not drop the
+connection, which is what used to end the session for everybody.
+
+**Liar's Texas throws once as a round sets up** above four players. The round plays on; the
+cause is not isolated. Its `WinStats` list was four entries long at an eight-seat table and has
+been grown, which did not stop it - so that list was a latent fault worth fixing on its own
+merits, and not this one.
+
 ## v0.31.0 — every mode except Liar's Deck was dealing to nobody
 
 v0.30.0 signed off Liar's Dice at six and eight and Liar's Poker at seven. The seating was

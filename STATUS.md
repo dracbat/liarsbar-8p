@@ -48,18 +48,30 @@ Each cell is a real table of that many separate copies of the game. "Dealt" mean
 holding the cards it was dealt, read back from the server; "turn ring" means the turn was
 handed round deliberately and reached every seat still in the game.
 
-| Table | 5 | 6 | 7 | 8 | Its own mechanic |
-|---|---|---|---|---|---|
-| Liar's Deck — Basic | ✅ | ✅ | ✅ | ✅ | — |
-| Liar's Deck — Devil | ✅ | ✅ | ✅ | ✅ | devil's deal fired at 7 |
-| Chaos Deck | ✅ | ✅ | ✅ | ✅ | chaos card thrown and resolved at every size |
-| Liar's Dice | ✅ | ✅ | ⚠️ | ⚠️ | no cards to deal |
-| Liar's Texas | — | — | — | ✅ | — |
-| Liar's Poker | ✅ | — | — | — | — |
+**v1.0.0: 65 matches over 8h35m** — every mode the lobby arrows can reach, at every size from
+one to eight, in all four bars.
 
-⚠️ Liar's Dice: seated and playing, but the turn-ring probe reached five of seven and seven of
-eight. The probe hands the turn on with the generic method and Dice may not use it, so this is
-as likely to be the wrong question as a wrong answer. Unresolved either way.
+| Table | 8 | 7 | 6 | 5 | 4 | 3 | 2 | 1 | Its own mechanic |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|---|
+| Liar's Deck — Basic | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | lobby | — |
+| Liar's Deck — Devil | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | lobby | devil's deal fired at 8 |
+| Chaos Deck | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | lobby | chaos thrown, aimed and fired at 5–8 |
+| Liar's Dice (both) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | lobby | bids, liar calls and spot-on calls resolving |
+| Liar's Texas | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | lobby | raises and folds |
+| Liar's Spin | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | lobby | spins, claims and liar calls |
+
+A table of one is a lobby: it forms, holds, reports nothing wrong, and no match begins. Whether
+the game would allow a solo match is untested — the lobby never registers a player to ready, so
+the game is never asked.
+
+**The aim ring** — can every seat point the revolver at every other seat — was measured
+separately in every Chaos deck match, on every machine rather than only the host: **all seats
+reachable from all seats, at every size from two to eight.**
+
+Liar's Poker and the standalone Chaos mode are not in this table. The lobby's mode arrows cycle
+Liar's Deck, Texas, Dice and Spin and nothing else, so neither is reachable by a player; the
+harness can force them, and testing what nobody can select would pad the matrix rather than
+fill it.
 
 > **Both of those Dice warnings turned out to be about the test rig, and a real fault was
 > hiding behind them.** The turn was reaching few seats because the harness treated
