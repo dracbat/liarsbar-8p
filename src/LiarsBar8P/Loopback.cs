@@ -76,8 +76,18 @@ internal static class Loopback
             // synced - and the match still started Liar's Deck, because choosing a mode also
             // sets up the sub-mode lists and whatever else the button does. Press the button.
             lobby.ChangeGameMode(index);
+
+            // Read back rather than assumed - but the read is deliberately not treated as a
+            // failure. The button does more than assign the field, and the field is not
+            // necessarily the button's first act, so asking a line later can still show the
+            // mode the lobby was on before. This once printed "game mode set to LiarsTexas
+            // (lobby now reports LiarsChaos)" on a run that went on to play Texas perfectly,
+            // which is a log accusing the game of something the game did not do. The mode a
+            // match actually ran is settled afterwards, by asking the players what component
+            // they are carrying - see the census - and that is what the harness checks.
             Plugin.Log.LogWarning(
-                $"[loopback] game mode set to {names[index]} for this run (lobby now reports {lobby.Mode})");
+                $"[loopback] game mode set to {names[index]} for this run (the lobby reads back " +
+                $"as {lobby.Mode}; what the table actually plays is reported by the census)");
 
             ChooseSubMode(lobby);
         }

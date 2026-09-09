@@ -48,6 +48,19 @@ $Catalogue = @{
     chaos = @{ Mode = 'LiarsChaos'; Deck = '';  Dice = '' }
 }
 
+# What the census should call each of these once the match is running. The mode is chosen by
+# pressing the lobby arrow, and that arrow does more than set a number - the deck variants are
+# three different games and one of them switches the game mode outright. The lobby also keeps
+# whatever it was last left on, so a run can quietly inherit the previous cell's table. Asking
+# the players what they are actually holding, and checking it against what was asked for, is
+# the only way to know a cell tested the mode it is filed under.
+$Expected = @{
+    deck0 = "Liar's Deck, 0 variant"; deck1 = "Liar's Deck, 1 variant"
+    deck2 = 'Chaos Deck';             deck3 = "Liar's Deck, 3 variant"
+    dice0 = 'Dice';  dice1 = 'Dice';  texas = 'Texas'
+    spin  = 'Spin';  poker = 'Poker'; chaos = 'Chaos Deck'
+}
+
 $Game = "${env:ProgramFiles(x86)}\Steam\steamapps\common\Liar's Bar"
 $Exe  = "$Game\Liar's Bar.exe"
 $Logs = "$env:LOCALAPPDATA\LiarsBar8P\logs"
@@ -128,11 +141,12 @@ function Read-Verdict {
         Table = $Name; Mode = $Mode; Players = $Players; Peers = $all.Count
         Ran = ''; Bar = ''; Started = $false; SceneLive = $false
         Seated = 0; SeatGood = 0; SeatWrong = 0; WorstOffset = ''; Gap = ''
-        DealtSeats = 0; ShortSeats = 0
+        DealtSeats = 0; ShortSeats = 0; Hand = 0
         Turns = 0; Slots = 0; TurnRing = ''
         Devils = 0; Chaos = 0; ChaosDone = 0; Bids = 0; DiceCalls = 0
         Aims = 0; AimBad = 0; Shots = 0; ShotsLost = 0
-        AimRing = ''; Driving = $false
+        Raises = 0; Folds = 0; Claims = 0
+        AimRing = ''; Driving = $false; ModeOk = $true
         Exceptions = 0; Dropped = 0; ModErrors = 0; BadRpc = ''
         Notes = ''
     }
@@ -143,6 +157,18 @@ function Read-Verdict {
 
     if ($joined -match 'starting a (\w+) match') { $r.Started = $true }
     if ($joined -match "the table running this match is ([^\r\n]+)") { $r.Ran = $Matches[1].Trim() }
+
+    # Did this cell test the mode it is filed under? The mode is chosen by pressing the lobby
+    # arrow and the lobby keeps whatever it was last left on, so a cell can quietly inherit the
+    # previous one's table - and every number below would then describe the wrong mode while
+    # looking perfectly healthy. The players are asked what they are holding, and that is
+    # checked against what was requested.
+    if ($Expected.ContainsKey($Name) -and $r.Ran) {
+        if ($r.Ran -notlike "*$($Expected[$Name])*") {
+            $r.ModeOk = $false
+            $r.Notes = "WRONG MODE - asked for $($Expected[$Name]), the table played '$($r.Ran)'"
+        }
+    }
     # The scene the match itself loaded, not the lobby it left. There are four bars and the
     # host's own saved choice decides which one, so a run's verdict has to say where it was.
     $scenes = $h | Select-String -Pattern 'OnClientChangeScene[^:]*: (\S+) \(op=' -AllMatches |
@@ -160,7 +186,7 @@ function Read-Verdict {
         $r.SceneLive = $true
         if ($census.Line -match '\[census\] (\d+) at the table') { $seated = [int]$Matches[1] } else { continue }
 
-        $dealtHere = 0; $shortHere = 0
+        $dealtHere = 0; $shortHere = 0; $handHere = 0
         $from = $census.LineNumber
         for ($i = $from; $i -lt [Math]::Min($from + 12, $h.Count); $i++) {
             if ($h[$i] -notmatch 'seat \d+ (in |OUT)') { break }
@@ -170,12 +196,18 @@ function Read-Verdict {
                 $dealt = [int]$Matches[1]; $out = [int]$Matches[2]
                 if ($dealt -gt 0) { $dealtHere++ }
                 if ($dealt -gt 0 -and $out -lt $dealt) { $shortHere++ }
+                # The biggest hand seen. A hand size is the only way to tell from outside
+                # whether the deck was sized for the table - at three players the deal must
+                # not shrink below what four players get, and nothing else in this report
+                # would show it if it did.
+                if ($dealt -gt $handHere) { $handHere = $dealt }
             }
         }
 
         if ($dealtHere -ge $r.DealtSeats) {
             $r.DealtSeats = $dealtHere
             $r.ShortSeats = $shortHere
+            $r.Hand = $handHere
         }
         if ($seated -gt $r.Seated) { $r.Seated = $seated }
     }
@@ -186,6 +218,9 @@ function Read-Verdict {
     $r.Chaos     = ($h | Select-String -SimpleMatch 'CHAOS thrown by').Count
     $r.Bids      = ($h | Select-String -SimpleMatch 'DICE bid ').Count
     $r.DiceCalls = ($h | Select-String -Pattern 'DICE (liar|spot-on) called').Count
+    $r.Raises    = ($h | Select-String -Pattern 'TEXAS (call|all in) by').Count
+    $r.Folds     = ($h | Select-String -SimpleMatch 'TEXAS fold by').Count
+    $r.Claims    = ($h | Select-String -SimpleMatch 'SPIN claim of').Count
     $r.ChaosDone = ($h | Select-String -SimpleMatch 'chaos aim resolved').Count
 
     # Who a seat chose to shoot, and who the game then shot. Two numbers, because the aim
@@ -240,7 +275,7 @@ function Read-Verdict {
     }
     if ($worst -ge 0) { $r.WorstOffset = "{0:F2}" -f $worst }
 
-    if ($r.ShortSeats -gt 0 -and $r.Driving) { $r.Notes = "$($r.ShortSeats) seat(s) dealt cards they never received" }
+    if ($r.ShortSeats -gt 0 -and $r.Driving -and $r.ModeOk) { $r.Notes = "$($r.ShortSeats) seat(s) dealt cards they never received" }
     return [pscustomobject]$r
 }
 
@@ -308,11 +343,12 @@ foreach ($name in $Tables) {
         $v = Read-Verdict -Folder $folder -Name $name -Mode $table.Mode -Players $n
         $summary += $v
 
-        Write-Host ("  ran on '{0}'  seats {1} good / {2} wrong  dealt {3}/{4}  short {5}  ring {6} aimring {19}  devil {7}  chaos {8}/{9}  bids {10}  calls {11}  aim {12}/{13} bad {14}  shots {15} lost {16}  exc {17}  modErr {18}" -f `
+        Write-Host ("  ran on '{0}'  seats {1} good / {2} wrong  dealt {3}/{4}  short {5}  ring {6} aimring {19}  devil {7}  chaos {8}/{9}  bids {10}  calls {11}  texas {20}/{21}  spin {22}  aim {12}/{13} bad {14}  shots {15} lost {16}  exc {17}  modErr {18}" -f `
             $v.Ran, $v.SeatGood, $v.SeatWrong, $v.DealtSeats, $v.Seated, $v.ShortSeats, $v.TurnRing,
             $v.Devils, $v.ChaosDone, $v.Chaos, $v.Bids, $v.DiceCalls,
             $v.Aims, ($v.Aims + $v.AimBad), $v.AimBad, $v.Shots, $v.ShotsLost,
-            $v.Exceptions, $v.ModErrors, $(if ($v.Driving) { $v.AimRing } else { 'NOT DRIVEN' })) -ForegroundColor Gray
+            $v.Exceptions, $v.ModErrors, $(if ($v.Driving) { $v.AimRing } else { 'NOT DRIVEN' }),
+            $v.Raises, $v.Folds, $v.Claims) -ForegroundColor Gray
 
         $summary | Export-Csv $csv -NoTypeInformation -Force
     }

@@ -214,11 +214,78 @@ internal static class MechanicsTrace
         catch { }
     }
 
+    // ------------------------------------------------------------------- the texas
+
+    /// <summary>
+    /// A seat matching the stake, or shoving everything in. The move Liar's Texas is made of.
+    ///
+    /// Patched on the server-side body rather than on the command, so it counts what the table
+    /// actually did with the move rather than what somebody tried to send. A command that
+    /// Mirror drops for want of authority never reaches here, which is the point: a run where
+    /// every move was refused should not read like a run where every move was made.
+    /// </summary>
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.UserCode_CMDRised__Boolean))]
+    private static void TexasRaised(TexasGamePlay __instance, bool AllInN)
+    {
+        try
+        {
+            _raises++;
+            if (AllInN) _allIns++;
+            if (Plugin.Verbose != null && Plugin.Verbose.Value)
+                Plugin.Log.LogInfo($"[mechanic] TEXAS {(AllInN ? "all in" : "call")} by {Who(__instance)} " +
+                                   $"at a table of {Seats()}");
+        }
+        catch { }
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.UserCode_CMDFolded))]
+    private static void TexasFolded(TexasGamePlay __instance)
+    {
+        try
+        {
+            _folds++;
+            if (Plugin.Verbose != null && Plugin.Verbose.Value)
+                Plugin.Log.LogInfo($"[mechanic] TEXAS fold by {Who(__instance)} at a table of {Seats()}");
+        }
+        catch { }
+    }
+
+    // -------------------------------------------------------------------- the spin
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(SpinGamePlay), nameof(SpinGamePlay.UserCode_RiseCmd__Int32))]
+    private static void SpinClaim(SpinGamePlay __instance, int count)
+    {
+        try
+        {
+            _claims++;
+            if (Plugin.Verbose != null && Plugin.Verbose.Value)
+                Plugin.Log.LogInfo($"[mechanic] SPIN claim of {count} by {Who(__instance)} " +
+                                   $"at a table of {Seats()}");
+        }
+        catch { }
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(SpinGamePlay), nameof(SpinGamePlay.UserCode_CallLiar))]
+    private static void SpinLiar(SpinGamePlay __instance)
+    {
+        try
+        {
+            _spinLiar++;
+            Plugin.Log.LogWarning($"[mechanic] SPIN liar called by {Who(__instance)} at a table of {Seats()}");
+        }
+        catch { }
+    }
+
     // ------------------------------------------------------------------ the tally
 
     private static int _devils, _chaos, _chaosDone;
     private static int _bids, _diceLiar, _diceSpotOn;
     private static int _shots;
+    private static int _raises, _allIns, _folds, _claims, _spinLiar;
 
     /// <summary>
     /// What fired during this match, printed once when it ends.
@@ -229,12 +296,14 @@ internal static class MechanicsTrace
     /// </summary>
     internal static void MatchOver()
     {
-        if (_devils == 0 && _chaos == 0 && _bids == 0 && _diceLiar == 0 && _diceSpotOn == 0 && _shots == 0) return;
+        if (_devils == 0 && _chaos == 0 && _bids == 0 && _diceLiar == 0 && _diceSpotOn == 0 &&
+            _shots == 0 && _raises == 0 && _folds == 0 && _claims == 0) return;
 
         Plugin.Log.LogWarning(
             $"[mechanic] this match: {_devils} devil's deal(s), {_chaos} chaos throw(s) " +
             $"({_chaosDone} resolved, {_shots} aimed shot(s)), {_bids} dice bid(s), " + $"{_diceLiar} dice liar call(s), " +
-            $"{_diceSpotOn} spot-on call(s)");
+            $"{_diceSpotOn} spot-on call(s), {_raises} texas call(s) ({_allIns} all in), " +
+            $"{_folds} fold(s), {_claims} spin claim(s), {_spinLiar} spin liar call(s)");
 
         _devils = 0;
         _chaos = 0;
@@ -243,5 +312,10 @@ internal static class MechanicsTrace
         _diceLiar = 0;
         _diceSpotOn = 0;
         _shots = 0;
+        _raises = 0;
+        _allIns = 0;
+        _folds = 0;
+        _claims = 0;
+        _spinLiar = 0;
     }
 }

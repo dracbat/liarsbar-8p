@@ -1,67 +1,77 @@
 using System;
-using UnityEngine;
 
 namespace LiarsBar8P;
 
 /// <summary>
-/// Lets a claim in Liar's Spin be as large as the table it is made about.
+/// Reads the ceiling on a claim in Liar's Spin, and says what it is.
 ///
-/// A round of Liar's Spin is a claim about how many of something are showing across everyone's
-/// reels. Each player has four, so a full and honest count at four players tops out at sixteen
-/// and at eight players at thirty-two. The ceiling on what can be claimed is
-/// <c>LiarsSpinGameplayManager.MaxCount</c> - a plain number set in the scene, which the bid
-/// keys clamp and wrap against, and which nothing in the game ever recomputes.
+/// This was going to raise it. A claim in Liar's Spin is a number, and the number is clamped
+/// against <c>LiarsSpinGameplayManager.MaxCount</c> - a plain value set in the scene that
+/// nothing in the game ever recomputes. Each player has four reels, so the reasoning was that
+/// a ceiling set for four players would leave eight players unable to claim more than half of
+/// what is honestly on the table, and the mode would quietly stop being a game without
+/// anything in a log complaining.
 ///
-/// If that number was set for four players then above four the mode quietly stops working as a
-/// game. It does not crash and nothing in a log complains: bidding simply cannot go past the
-/// halfway point of what is honestly on the table, so the claims that make the last half of a
-/// round interesting cannot be made at all, and a player wondering why the number will not go
-/// any higher has nothing to tell them. That is a worse failure than a crash, because it looks
-/// like the mode working.
+/// Read at runtime, the shipped ceiling is <b>four</b> - not sixteen. Four reels each and four
+/// players is sixteen symbols on the table, so the ceiling was already far below an honest
+/// count before this mod touched anything. Whatever four means here, it is not four players:
+/// a number that was derived from the seat count would have been sixteen.
 ///
-/// So the ceiling is raised to four reels per seat, and both the shipped value and the new one
-/// are put in the log - the shipped value because it had never been read, and because if it
-/// turns out to be generous already this changes nothing and should say so. It is only ever
-/// raised, never lowered: a table smaller than four keeps whatever the game shipped.
+/// So it is left exactly as shipped. Raising it would not be fixing a four-player assumption,
+/// it would be changing what the mode is, on a guess about a constant whose meaning is not
+/// established - and a mod that quietly rewrites a game's rules because a number looked small
+/// is worse than one that leaves them alone. The value is printed instead, with the table size
+/// beside it, so the fact is on the record and a later run that shows the mode misbehaving at
+/// eight has somewhere to start.
+///
+/// The bid keys clamp and wrap against this number, so <see cref="ModePlay"/> keeps its claims
+/// inside it too. A test that made claims a player cannot make would not be testing the mode.
 /// </summary>
 internal static class SpinBidCap
 {
-    /// <summary>Reels in front of each player. Four, and not derived from the seat count.</summary>
-    private const int ReelsPerSeat = 4;
+    /// <summary>Reels in front of each player.</summary>
+    internal const int ReelsPerSeat = 4;
 
-    private static LiarsSpinGameplayManager _done;
+    private static LiarsSpinGameplayManager _reported;
+
+    /// <summary>The highest claim the game allows, or zero if it cannot be read.</summary>
+    internal static int Ceiling()
+    {
+        try
+        {
+            var m = Manager.Instance;
+            var spin = m != null ? m.SpinGame : null;
+            return spin != null ? spin.MaxCount : 0;
+        }
+        catch { return 0; }
+    }
 
     internal static void Tick()
     {
         try
         {
             var m = Manager.Instance;
-            if (m == null || !m.GameStarted) { _done = null; return; }
+            if (m == null || !m.GameStarted) { _reported = null; return; }
+
+            // Which mode is running is decided from the component on the players, never from
+            // whether a manager object exists. Every mode's manager is awake in every match,
+            // so "the Spin manager is here" is true during a game of Texas - and this first
+            // reported the Spin bid ceiling in the middle of a Texas round.
+            if (TableHand.Playing() != TableHand.Kind.Spin) return;
 
             var spin = m.SpinGame;
-            if (spin == null || ReferenceEquals(_done, spin)) return;
+            if (spin == null || ReferenceEquals(_reported, spin)) return;
+            _reported = spin;
 
             int n = AimRing.Seats(m);
-            if (n < 2) return;
+            int ceiling = spin.MaxCount;
 
-            _done = spin;
-
-            int shipped = spin.MaxCount;
-            int wanted = ReelsPerSeat * n;
-
-            if (shipped >= wanted)
-            {
-                Plugin.Log.LogInfo(
-                    $"[spin] the highest claim allowed is {shipped}, and {n} players have " +
-                    $"{wanted} reels between them - the shipped ceiling is high enough, left alone");
-                return;
-            }
-
-            spin.MaxCount = wanted;
             Plugin.Log.LogWarning(
-                $"[spin] the highest claim allowed was {shipped} but {n} players have {wanted} " +
-                $"reels between them - raised to {wanted}, so a true claim can still be made");
+                $"[spin] the highest claim allowed is {ceiling}; {n} players have " +
+                $"{ReelsPerSeat * n} reels between them. Left as shipped - the ceiling is not " +
+                "worked out from the number of players, so raising it would change the mode " +
+                "rather than fix it");
         }
-        catch (Exception e) { Plugin.Log.LogError($"[spin] could not check the bid ceiling: {e.Message}"); }
+        catch (Exception e) { Plugin.Log.LogError($"[spin] could not read the bid ceiling: {e.Message}"); }
     }
 }
