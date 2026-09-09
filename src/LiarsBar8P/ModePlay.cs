@@ -142,7 +142,15 @@ internal static class ModePlay
 
             bool anyBid = false;
             int count = 0, face = 0, total = 0;
-            try { anyBid = d.BetPlaced; count = d.LastCount; face = d.LastDice; total = d.TotalCount; } catch { }
+
+            // MaxCount, not TotalCount. MaxCount is every die on the table - the game adds
+            // five to it for each player as they are seated - and is what makes a bid
+            // impossible to satisfy. TotalCount is how many of one face were showing when a
+            // round was last revealed, and at the start of a round it is small or zero: read
+            // as a ceiling it made the second bid of every round look absurd, so at eight
+            // players the table called liar three moves in, every round, and only four of the
+            // eight seats ever got a turn.
+            try { anyBid = d.BetPlaced; count = d.LastCount; face = d.LastDice; total = d.MaxCount; } catch { }
 
             if (!anyBid || count <= 0)
             {

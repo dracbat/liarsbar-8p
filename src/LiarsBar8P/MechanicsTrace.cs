@@ -175,9 +175,15 @@ internal static class MechanicsTrace
     /// A bid. Liar's Dice is a bidding game, so this is the move the mode is made of - the
     /// equivalent of a card reaching the table, and the thing that has to be seen happening
     /// at eight players before the mode can be called tested.
+    ///
+    /// Patched on the server-side body, not on <c>PlaceBet</c> itself. <c>PlaceBet</c> is a
+    /// weaved Mirror command whose whole body is "send this to the server", so it runs on the
+    /// machine that presses the key and never on the one that resolves the round. Watching it
+    /// counted nothing at all here: a table that bid, raised and called liar all the way
+    /// through a match reported zero bids, which reads exactly like a mode where nobody moved.
     /// </summary>
     [HarmonyPostfix]
-    [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.PlaceBet))]
+    [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.UserCode_PlaceBet__Int32__Int32))]
     private static void DiceBid(DiceGamePlay __instance, int count, int dice)
     {
         try
@@ -191,7 +197,7 @@ internal static class MechanicsTrace
     }
 
     [HarmonyPostfix]
-    [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.CallLier))]
+    [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.UserCode_CallLier))]
     private static void DiceLiar(DiceGamePlay __instance)
     {
         try
@@ -203,7 +209,7 @@ internal static class MechanicsTrace
     }
 
     [HarmonyPostfix]
-    [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.CallSpotOn))]
+    [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.UserCode_CallSpotOn))]
     private static void DiceSpotOn(DiceGamePlay __instance)
     {
         try

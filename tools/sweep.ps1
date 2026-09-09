@@ -31,8 +31,9 @@ $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $matrix = Join-Path $here 'matrix-test.ps1'
 
-# Every table a player can pick from the lobby.
-$All = @('deck0', 'deck1', 'deck2', 'deck3', 'dice0', 'dice1', 'texas', 'spin')
+# Every table a player can pick from the lobby. Three deck variants, not four - the deck
+# arrow cycles 0, 1, 2 and resets, so what was filed as a fourth was Basic run twice.
+$All = @('deck0', 'deck1', 'deck2', 'dice0', 'dice1', 'texas', 'spin')
 
 # Two tables for the bar sweep: an ordinary deck and the one with the aiming phase in it.
 $PerBar = @('deck0', 'deck2')
@@ -68,7 +69,7 @@ if (-not $SkipBig) {
     # down, so a mode that is broken at eight says so in the first hour rather than the fifth.
     foreach ($n in 8, 7, 6, 5) {
         Phase -What "$n players, every mode, bar 0" -Tables $All -Sizes @($n) `
-              -Seconds 170 -Map '0' -First:$first
+              -Seconds 150 -Map '0' -First:$first
         $first = $false
     }
 }
@@ -78,7 +79,7 @@ if (-not $SkipSmall) {
     # claim being tested rather than the one it exists to make.
     foreach ($n in 4, 3, 2, 1) {
         Phase -What "$n player(s), every mode, bar 0" -Tables $All -Sizes @($n) `
-              -Seconds 110 -Map '0' -First:$first
+              -Seconds 100 -Map '0' -First:$first
         $first = $false
     }
 }
@@ -86,7 +87,7 @@ if (-not $SkipSmall) {
 if (-not $SkipBars) {
     foreach ($map in @('1', '2', '3')) {
         Phase -What "bar $map, eight players" -Tables $PerBar -Sizes @(8) `
-              -Seconds 170 -Map $map -First:$first
+              -Seconds 150 -Map $map -First:$first
         $first = $false
     }
 
@@ -94,7 +95,7 @@ if (-not $SkipBars) {
     # table is not full, and that is a different piece of arithmetic from a full ring.
     foreach ($map in @('1', '2', '3')) {
         Phase -What "bar $map, five players" -Tables @('deck0') -Sizes @(5) `
-              -Seconds 140 -Map $map
+              -Seconds 130 -Map $map
     }
 }
 
