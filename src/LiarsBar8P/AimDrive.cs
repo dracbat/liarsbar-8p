@@ -335,6 +335,14 @@ internal static class AimDrive
         if (hit != null && hit.Slot == want)
             Plugin.Log.LogWarning(
                 $"[aim] {Name(p, me)} aims at {meant} - aim {landed} of a {n} seat ring - and fires");
+        else if (m.GetTargetPlayer(want, true) == null)
+            // The chosen player died while the aim was being walked to them. That is the game
+            // working, not the ring failing - a round can kill somebody between one tick and
+            // the next - and reporting it as a wrong answer put mismatches in cells whose own
+            // ring probe had just said every seat could reach every other.
+            Plugin.Log.LogWarning(
+                $"[aim] {Name(p, me)} was aiming at {meant}, who went out before the shot - " +
+                $"not fired (aim {landed}, {n} seats)");
         else
             Plugin.Log.LogError(
                 $"[aim] {Name(p, me)} meant to shoot {meant} but the aim resolved to {got} " +
@@ -375,10 +383,23 @@ internal static class AimDrive
         return last;
     }
 
-    /// <summary>The player the aim currently resolves to, asked of the game rather than computed.</summary>
+    /// <summary>
+    /// The player the aim currently resolves to, asked of the game rather than computed.
+    ///
+    /// Asked through the game's own <c>GetAim</c>, not through <see cref="AimRing"/>. The mod
+    /// stands aside at four players and below - the shipped table is right for that size - so
+    /// asking it there returns nothing, and this reported every single shot at four players as
+    /// having resolved to nobody. Five wrong answers in a cell about a mode that was behaving
+    /// perfectly, from an instrument measuring itself.
+    /// </summary>
     private static PlayerStats Selected(CharController cc)
     {
-        try { return AimRing.AimingAt(cc); } catch { return null; }
+        try { return AskGetAim(cc, CurrentAim(cc)); } catch { return null; }
+    }
+
+    private static int CurrentAim(CharController cc)
+    {
+        try { return AimRing.CurrentAim(cc); } catch { return 0; }
     }
 
     private static int Aim(CharController cc)
