@@ -243,6 +243,25 @@ a detour would move the bytes this reads.
 | `ChaosGamePlayManager.GiveCardPlayer` | Liar's Chaos |
 | `BlorfGamePlayManager.GiveCardPlayer` | Blorf |
 | `BlorfMatchMakingGamePlayManager.GiveCardPlayer` | Blorf, matchmade |
+| `DiceGamePlayManager.ShowPlayer` | Liar's Dice — the reveal, not a deal |
+| `DiceGamePlayManager.ShowPlayerSpotOn` | Liar's Dice — the spot-on reveal |
+
+The last two are not deals at all: Liar's Dice hands out no cards. They are the routines
+that walk the table showing everyone's dice after a liar or spot-on call, and they hold the
+same four-player array for the same reason. Above four players, calling liar threw
+`IndexOutOfRangeException` and killed the coroutine part way through — so no dice were
+shown, no loser was chosen, nobody was given the turn, and the table sat there until
+somebody quit. **Liar's Dice was unplayable above four players from the first liar call
+anyone made**, and had been through every release of this mod.
+
+Finding it took measuring rather than reading. The decompiler gives up at these routines'
+state-machine switch and emits no body at all, and this build logs exceptions without a
+stack, so neither the method nor the line was available. What was available was the table
+size at which it broke: clean at four, broken at five, six and eight. That puts the array at
+exactly four entries — and nothing reachable from outside the routine is four long
+(`turnTexts` is 2, `DiceIcons` 6, the reveal panel's lists 6, 6 and 20, `Manager.Slots` 8,
+every seat holding five dice). An array of four that nothing outside can see is an array
+built inside, which is this exact shape, in this exact kind of place.
 
 Until v0.31.0 only the first was actually patched, and that was not obvious: the mod
 listed two targets and reported the second one refused, one warning line among hundreds.
