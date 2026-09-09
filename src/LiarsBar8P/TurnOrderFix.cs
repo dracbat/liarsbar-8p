@@ -196,6 +196,7 @@ internal static class TurnOrderFix
         done += PatchMoveImm("BackGiveTurn", maxSlot);
         done += PatchMoveImm("findbackplayer", maxSlot);
         done += PatchLeaverRing();
+        done += PatchDeadSpinRing();
 
         // Nothing resolved means the game was not ready yet rather than that the patterns
         // are wrong, so leave the door open for the next round to try again.
@@ -302,6 +303,112 @@ internal static class TurnOrderFix
         catch (Exception e)
         {
             Plugin.Log.LogError($"[turn] GiveTurnSkippingLeaver: {e.Message}");
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Hand the turn on correctly in Liar's Spin after somebody is killed by a dead spin.
+    ///
+    /// <c>Manager.GiveTurnSpinDeadSpinMoment</c> walks the ring exactly the way
+    /// <c>GiveTurnSkippingLeaver</c> does, and is wrong in exactly the same way: the same
+    /// power-of-two modulus and the same four probes. Its <c>GiveTurnSpin</c> sibling was
+    /// found and rewritten long ago because it uses the plain <c>cmp r32,3</c> shape the
+    /// scanner already knew; this one encodes the wrap as an <c>and</c> with a mask, so the
+    /// scanner walked past it and it has been shipping unpatched.
+    ///
+    /// It only runs when a dead spin kills somebody, which is why it survived: a Spin round
+    /// that nobody dies in never reaches it. When it does run at more than four seats, it
+    /// probes four chairs out of eight for one that can take the turn, and if all four happen
+    /// to be dead or gone it hands the turn to nobody and the table stops.
+    ///
+    /// The modulus has to stay a power of two - the wrap is an <c>and</c>, not a division - so
+    /// the same rounding up is used as for the leaver ring, and the mask, its negative fix-up
+    /// and the probe count are written together or not at all.
+    /// </summary>
+    private static int PatchDeadSpinRing()
+    {
+        try
+        {
+            int p = 1;
+            while (p < Limits.Max) p <<= 1;
+            if (p < 4 || p > 128)
+            {
+                Plugin.Log.LogWarning($"[turn] a ring of {p} seats is out of range - the dead spin handover is left as shipped");
+                return 0;
+            }
+            if (p == Limits.VanillaPlayers) return 1;
+
+            var code = NativeCode.CodePointer(typeof(Manager), "GiveTurnSpinDeadSpinMoment");
+            if (code == IntPtr.Zero) return 0;
+
+            IntPtr mask = IntPtr.Zero, orImm = IntPtr.Zero, bound = IntPtr.Zero;
+            int maskHits = 0, boundHits = 0;
+
+            for (int i = 0; i < ScanBytes; i++)
+            {
+                // and r32, 0x80000003 ; jge +7 ; dec r32 ; or r32, 0xFFFFFFFC ; inc r32
+                // - all four instructions on one register, which is what makes this the wrap
+                // and not an unrelated mask.
+                if (NativeCode.TryReadByte(code, i, out byte and) && and == 0x81 &&
+                    NativeCode.TryReadByte(code, i + 1, out byte andReg) && andReg >= 0xE0 && andReg <= 0xE7 &&
+                    NativeCode.TryReadInt32(code, i + 2, out int m) && m == unchecked((int)0x80000003) &&
+                    Match(code, i + 6, 0x7D, 0x07) &&
+                    NativeCode.TryReadByte(code, i + 8, out byte dec) && dec == 0xFF &&
+                    NativeCode.TryReadByte(code, i + 9, out byte decReg) && decReg == (byte)(0xC8 + (andReg - 0xE0)) &&
+                    NativeCode.TryReadByte(code, i + 10, out byte or) && or == 0x83 &&
+                    NativeCode.TryReadByte(code, i + 11, out byte orReg) && orReg == (byte)(0xC8 + (andReg - 0xE0)) &&
+                    NativeCode.TryReadByte(code, i + 12, out byte orVal) && orVal == 0xFC &&
+                    NativeCode.TryReadByte(code, i + 13, out byte inc2) && inc2 == 0xFF &&
+                    NativeCode.TryReadByte(code, i + 14, out byte incReg2) && incReg2 == (byte)(0xC0 + (andReg - 0xE0)))
+                {
+                    maskHits++;
+                    if (maskHits == 1) { mask = code + i + 2; orImm = code + i + 12; }
+                }
+
+                // inc r32 ; cmp r32, 4 ; jl short back - how many chairs it is willing to try.
+                if (NativeCode.TryReadByte(code, i, out byte inc) && inc == 0xFF &&
+                    NativeCode.TryReadByte(code, i + 1, out byte iReg) && iReg >= 0xC0 && iReg <= 0xC7 &&
+                    NativeCode.TryReadByte(code, i + 2, out byte cmp) && cmp == 0x83 &&
+                    NativeCode.TryReadByte(code, i + 3, out byte cReg) && cReg == (byte)(0xF8 + (iReg - 0xC0)) &&
+                    NativeCode.TryReadByte(code, i + 4, out byte n) && n == Limits.VanillaPlayers &&
+                    NativeCode.TryReadByte(code, i + 5, out byte jl) && jl == 0x7C)
+                {
+                    boundHits++;
+                    if (boundHits == 1) bound = code + i + 4;
+                }
+            }
+
+            if (maskHits != 1 || boundHits != 1)
+            {
+                Plugin.Log.LogWarning(
+                    $"[turn] GiveTurnSpinDeadSpinMoment: expected one ring and one probe count, found " +
+                    $"{maskHits} and {boundHits} - left as shipped, so a dead spin at more than four " +
+                    "seats may still strand the turn");
+                return 1;
+            }
+
+            if (!NativeCode.WriteInt32(mask, unchecked((int)(0x80000000u | (uint)(p - 1)))))
+            {
+                Plugin.Log.LogError("[turn] GiveTurnSpinDeadSpinMoment: could not widen the ring");
+                return 1;
+            }
+            if (!NativeCode.WriteByte(orImm, (byte)(0x100 - p)) ||
+                !NativeCode.WriteByte(bound, (byte)p))
+            {
+                NativeCode.WriteInt32(mask, unchecked((int)0x80000003));
+                Plugin.Log.LogError("[turn] GiveTurnSpinDeadSpinMoment: could not finish widening the ring - put back as shipped");
+                return 1;
+            }
+
+            Plugin.Log.LogInfo(
+                $"[turn] GiveTurnSpinDeadSpinMoment: the ring walked after a dead spin grows " +
+                $"{Limits.VanillaPlayers} -> {p} seats");
+            return 1;
+        }
+        catch (Exception e)
+        {
+            Plugin.Log.LogError($"[turn] GiveTurnSpinDeadSpinMoment: {e.Message}");
             return 0;
         }
     }

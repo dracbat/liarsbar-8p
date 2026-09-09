@@ -73,6 +73,15 @@ public class Plugin : BasePlugin
 
         Log.LogInfo($"=== Liar's Bar 8P loading (target={MaxPlayers.Value}) ===");
 
+        // Said plainly and early, because a test run with this off drives nobody and reports
+        // zeroes that look exactly like a mode with nothing wrong with it.
+        if (Dev.Enabled)
+            Log.LogWarning("  DEVELOPER MODE IS ON" +
+                           (Dev.FromHarness ? " (LIARSBAR8P_DEV is set - this is a test run)"
+                                            : " (DeveloperMode in the config file)"));
+        else
+            Log.LogInfo("  developer mode off - normal play");
+
         var harmony = new Harmony(Guid);
 
         // Patch each area independently so one broken hook cannot disable the rest.
@@ -99,6 +108,7 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(DevLogging),     "developer logging");
         Apply(harmony, typeof(RpcTrace),       "naming a remote call that throws");
         Apply(harmony, typeof(ResetAnimFix),   "reset animation beyond four seats");
+        Apply(harmony, typeof(AimRing),        "aiming at every seat, not three");
         Apply(harmony, typeof(MechanicsTrace),  "devil and chaos mechanics trace");
 
         // Only does anything when the loopback harness is running.
@@ -141,9 +151,14 @@ public class Plugin : BasePlugin
             // Whose turn it is, for every player - not a developer tool.
             Il2CppInterop.Runtime.Injection.ClassInjector.RegisterTypeInIl2Cpp<TurnHud>();
             go.AddComponent<TurnHud>();
+
+            // Who you are pointing the revolver at. Three aiming poses cannot identify one of
+            // seven people, so the choice is named as well as posed.
+            Il2CppInterop.Runtime.Injection.ClassInjector.RegisterTypeInIl2Cpp<AimHud>();
+            go.AddComponent<AimHud>();
             Log.LogInfo("  version HUD attached (top left)");
 
-            if (DeveloperMode.Value)
+            if (Dev.Enabled)
             {
                 Il2CppInterop.Runtime.Injection.ClassInjector.RegisterTypeInIl2Cpp<DevHud>();
                 go.AddComponent<DevHud>();
