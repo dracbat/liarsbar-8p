@@ -31,23 +31,42 @@ function Info ($m) { Write-Host "         $m" -ForegroundColor Gray }
 $Repo = 'dracbat/liarsbar-8p'
 $Zip  = "$PSScriptRoot\dist\LiarsBar-8P.zip"
 $Bat  = "$PSScriptRoot\installer\Install-LiarsBar8P.bat"
+$Sh   = "$PSScriptRoot\installer\Install-LiarsBar8P.sh"
 
 # Shown on every release page under that version's changelog entry. The changelog says
 # what changed; this says how to install it, and it is the same for every version.
 $InstallFooter = @'
 ## Install
 
-Download **Install-LiarsBar8P.bat** below and run it. It finds the game through Steam
-automatically, downloads the mod and installs it. It removes any previous copy first, so
-it is also the way to update.
+**Windows:** download **Install-LiarsBar8P.bat** below and run it. It finds the game through
+Steam automatically, downloads the mod and installs it. It removes any previous copy first,
+so it is also the way to update. Updating from 1.0.0? Download it again from here rather
+than re-running your old copy, which also deletes other mods with "LiarsBar" in their name.
 
-Prefer to do it by hand? Download the zip, extract it, run install.bat.
+**Linux and Steam Deck:** download **Install-LiarsBar8P.sh** below, open a terminal, and run
+it from where it downloaded to - usually:
+
+    bash ~/Downloads/Install-LiarsBar8P.sh
+
+Then, in Steam, right-click Liar's Bar > **Properties > General > Launch Options** and paste:
+
+    WINEDLLOVERRIDES="winhttp=n,b" %command%
+
+Without that, Proton never starts the mod and the game runs as normal. On a Steam Deck, run
+the installer in Desktop Mode (the launch option can be set in either mode), and set the
+game's graphics to High or lower: on Ultra the Deck runs out of graphics memory loading the
+table.
+
+Prefer to do it by hand? Download the zip, extract it, and run install.bat (Windows) or
+`bash install.sh` (Linux).
 
 The first game launch after installing is slow (a few minutes) while the loader sets
 itself up. That happens once.
 
 **Everyone playing together must install this, and must be on the same version.** The
-version you are running is shown in the top-left corner in game.
+version you are running is shown in the top-left corner in game. Linux support is tested on
+a Steam Deck. Windows and Linux players run the very same mod, so they should be able to
+share a lobby - but that part has not yet been confirmed.
 '@
 
 # Native tools write to stderr routinely. Under $ErrorActionPreference = 'Stop',
@@ -144,6 +163,17 @@ if (-not $Tag) {
 }
 Info "release tag: $Tag"
 
+# A changelog section still headed "Unreleased" means nobody has decided which version it
+# goes out as. Publishing anyway puts the files out without the notes that explain them -
+# for a tag that already exists, only its assets are replaced - so stop until it is decided.
+$clText = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'CHANGELOG.md'), [Text.Encoding]::UTF8)
+if ($clText -match '(?m)^## Unreleased') {
+    Bad "CHANGELOG.md still has an '## Unreleased' section."
+    Info "Give it the version it ships as (and set that version in the csproj and Plugin.cs),"
+    Info "or fold it into the release it belongs to, then run this again."
+    exit 1
+}
+
 # ----------------------------------------------------------------------- build
 if (-not $SkipBuild) {
     Step "Building plugin"
@@ -165,8 +195,26 @@ if (-not $SkipBuild) {
     Good "packaged"
 }
 
-foreach ($a in @($Zip, $Bat)) {
+foreach ($a in @($Zip, $Bat, $Sh)) {
     if (-not (Test-Path $a)) { Bad "missing asset: $a"; exit 1 }
+}
+
+# The Linux installer is uploaded as it is on disk, so it gets the same check package.ps1
+# gives the scripts inside the zip: a carriage return or a byte order mark stops it running.
+$shBytes = [IO.File]::ReadAllBytes($Sh)
+if (($shBytes.Length -ge 3 -and $shBytes[0] -eq 0xEF -and $shBytes[1] -eq 0xBB -and $shBytes[2] -eq 0xBF) -or
+    [Array]::IndexOf($shBytes, [byte]13) -ge 0) {
+    Bad "Install-LiarsBar8P.sh has Windows line endings or a byte order mark - it would not run on Linux"
+    exit 1
+}
+
+# Both online installers are uploaded straight from installer\, outside package.ps1's
+# staging, so its check for the build account's name is made on them here.
+foreach ($a in @($Sh, $Bat)) {
+    if ($env:USERNAME -and ([IO.File]::ReadAllText($a) -like "*$env:USERNAME*")) {
+        Bad "$([IO.Path]::GetFileName($a)) contains the build account's name - it must not be published"
+        exit 1
+    }
 }
 
 # The zip is the thing people actually download, so the version check has to be made against
@@ -203,6 +251,7 @@ try {
 Good "assets ready"
 Info "$([IO.Path]::GetFileName($Zip))  $([math]::Round((Get-Item $Zip).Length/1MB,1)) MB"
 Info "$([IO.Path]::GetFileName($Bat))  $([math]::Round((Get-Item $Bat).Length/1KB,1)) KB"
+Info "$([IO.Path]::GetFileName($Sh))  $([math]::Round((Get-Item $Sh).Length/1KB,1)) KB"
 
 # ------------------------------------------------------------- commit + push
 Step "Committing and pushing"
@@ -275,14 +324,14 @@ if (-not $Notes) {
 $exists = (Invoke-Gh release view $Tag --repo $Repo).Code -eq 0
 if ($exists) {
     Info "release $Tag exists - replacing its assets"
-    $r = Invoke-Gh release upload $Tag $Zip $Bat --repo $Repo --clobber
+    $r = Invoke-Gh release upload $Tag $Zip $Bat $Sh --repo $Repo --clobber
     if ($r.Code -ne 0) { Bad "asset upload failed"; Info $r.Out; exit 1 }
     Good "assets updated"
 } else {
     $notesFile = Join-Path $env:TEMP "lb8p-notes-$([guid]::NewGuid().ToString('N').Substring(0,6)).md"
     # ...and write it back without a BOM, which would otherwise open the release body.
     [IO.File]::WriteAllText($notesFile, $Notes, (New-Object Text.UTF8Encoding $false))
-    $r = Invoke-Gh release create $Tag $Zip $Bat --repo $Repo --title "Liar's Bar 8 Player Mod $Tag" --notes-file $notesFile
+    $r = Invoke-Gh release create $Tag $Zip $Bat $Sh --repo $Repo --title "Liar's Bar 8 Player Mod $Tag" --notes-file $notesFile
     if ($r.Code -ne 0) { Bad "release creation failed"; Info $r.Out; exit 1 }
     Good "release created"
 }
@@ -318,4 +367,4 @@ try {
 
 Write-Host "`nDone." -ForegroundColor Green
 Write-Host "  Release : https://github.com/$Repo/releases/tag/$Tag" -ForegroundColor Green
-Write-Host "  Share   : the Install-LiarsBar8P.bat link on that page" -ForegroundColor Green
+Write-Host "  Share   : the Install-LiarsBar8P.bat link on that page (Install-LiarsBar8P.sh for Linux)" -ForegroundColor Green

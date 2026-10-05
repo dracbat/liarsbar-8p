@@ -4,8 +4,9 @@
   Finds the game through Steam's own registry keys and library config, then copies the
   loader and plugin in.
 
-  No file that belongs to the GAME is modified or deleted - Steam's "Verify integrity of
-  game files" removes this mod completely. It does remove a previous copy of THIS mod
+  No file that belongs to the GAME is modified or deleted. (Steam's "Verify integrity of
+  game files" checks only those, so it does not remove this mod - uninstall.bat does.) It
+  does remove a previous copy of THIS mod
   first, which is a deletion and used to be described here as "nothing is deleted": this
   script removes its own plugin and config from BepInEx before reinstalling, and it
   overwrites the bundled BepInEx loader and dotnet runtime if they are already present.
@@ -28,6 +29,11 @@ Say "==========================================" Cyan
 Say ""
 
 # ---------------------------------------------------------------- find Steam
+# Every file and folder path in this script is given to PowerShell with -LiteralPath. A
+# plain path is read as a wildcard pattern, in which [ and ] mean "any one of these
+# characters" - so a Steam library in a folder like "D:\Games [SSD]" matched nothing. The
+# game was never found there, pasting its folder in by hand was turned down as having no
+# game in it, and the clean-up and the final checks would have missed it the same way.
 function Get-SteamRoot {
     foreach ($k in @('HKCU:\Software\Valve\Steam',
                      'HKLM:\SOFTWARE\WOW6432Node\Valve\Steam',
@@ -35,7 +41,7 @@ function Get-SteamRoot {
         try {
             $p = Get-ItemProperty $k -ErrorAction Stop
             foreach ($v in @($p.SteamPath, $p.InstallPath)) {
-                if ($v -and (Test-Path $v)) { return $v }
+                if ($v -and (Test-Path -LiteralPath $v)) { return $v }
             }
         } catch { }
     }
@@ -44,7 +50,7 @@ function Get-SteamRoot {
     # "C:\Program Files(x86)\Steam" - no space, so the one guess that would have found a
     # standard Steam install could never match anything.
     foreach ($g in @("${env:ProgramFiles(x86)}\Steam", "$env:ProgramFiles\Steam", "C:\Steam")) {
-        if ($g -and (Test-Path $g)) { return $g }
+        if ($g -and (Test-Path -LiteralPath $g)) { return $g }
     }
     return $null
 }
@@ -61,8 +67,8 @@ function Get-GameDir {
     # yourself" prompt further down, the installer died with a raw PowerShell error and the
     # person had no way forward.
     $vdf = if ($SteamRoot) { Join-Path $SteamRoot 'steamapps\libraryfolders.vdf' } else { $null }
-    if ($vdf -and (Test-Path $vdf)) {
-        foreach ($m in [regex]::Matches((Get-Content $vdf -Raw), '"path"\s+"([^"]+)"')) {
+    if ($vdf -and (Test-Path -LiteralPath $vdf)) {
+        foreach ($m in [regex]::Matches((Get-Content -LiteralPath $vdf -Raw), '"path"\s+"([^"]+)"')) {
             $libs.Add(($m.Groups[1].Value -replace '\\\\', '\'))
         }
     }
@@ -70,18 +76,18 @@ function Get-GameDir {
     # a library that actually declares the app wins
     foreach ($lib in $libs) {
         $man = Join-Path $lib "steamapps\appmanifest_$AppId.acf"
-        if (Test-Path $man) {
-            $c = Get-Content $man -Raw
+        if (Test-Path -LiteralPath $man) {
+            $c = Get-Content -LiteralPath $man -Raw
             if ($c -match '"installdir"\s+"([^"]+)"') {
                 $d = Join-Path $lib "steamapps\common\$($Matches[1])"
-                if (Test-Path (Join-Path $d "Liar's Bar.exe")) { return $d }
+                if (Test-Path -LiteralPath (Join-Path $d "Liar's Bar.exe")) { return $d }
             }
         }
     }
     # fall back to the conventional folder name
     foreach ($lib in $libs) {
         $d = Join-Path $lib "steamapps\common\Liar's Bar"
-        if (Test-Path (Join-Path $d "Liar's Bar.exe")) { return $d }
+        if (Test-Path -LiteralPath (Join-Path $d "Liar's Bar.exe")) { return $d }
     }
     return $null
 }
@@ -102,7 +108,7 @@ if (-not $game) {
     $typed = Read-Host "  Paste the Liar's Bar folder path (or press Enter to cancel)"
     if ([string]::IsNullOrWhiteSpace($typed)) { Say ""; Bad "Cancelled."; exit 1 }
     $typed = $typed.Trim('"').Trim()
-    if (-not (Test-Path (Join-Path $typed "Liar's Bar.exe"))) {
+    if (-not (Test-Path -LiteralPath (Join-Path $typed "Liar's Bar.exe"))) {
         Bad "No `"Liar's Bar.exe`" in that folder. Nothing was changed."
         exit 1
     }
@@ -119,7 +125,7 @@ if (Get-Process -Name "Liar's Bar" -ErrorAction SilentlyContinue) {
 
 $payload = @('BepInEx', 'dotnet', 'winhttp.dll', 'doorstop_config.ini',
              '.doorstop_version', 'changelog.txt')
-$missing = $payload | Where-Object { -not (Test-Path (Join-Path $Here $_)) }
+$missing = $payload | Where-Object { -not (Test-Path -LiteralPath (Join-Path $Here $_)) }
 if ($missing -contains 'BepInEx' -or $missing -contains 'winhttp.dll') {
     Say ""
     Bad "This installer is missing its files (BepInEx / winhttp.dll)."
@@ -139,19 +145,23 @@ $targets = @((Join-Path $game 'BepInEx\plugins\LiarsBar8P.dll'), $cfgPath)
 # Earlier versions used a differently prefixed settings file. Match on the suffix so any
 # of them is cleared, and a stale option cannot survive an update.
 $cfgDir = Join-Path $game 'BepInEx\config'
-if (Test-Path $cfgDir) {
-    foreach ($oldCfg in Get-ChildItem $cfgDir -Filter '*liarsbar.eightplayers.cfg' -File -ErrorAction SilentlyContinue) {
+if (Test-Path -LiteralPath $cfgDir) {
+    foreach ($oldCfg in Get-ChildItem -LiteralPath $cfgDir -Filter '*liarsbar.eightplayers.cfg' -File -ErrorAction SilentlyContinue) {
         $targets += $oldCfg.FullName
     }
 }
+# Any other copy of the plugin - renamed, switched off, kept as a backup - goes too. This
+# used to match '*LiarsBar*', which also took every other Liar's Bar mod in the folder
+# (LiarsBarEnhance.dll, say) without a word. The plugin has only ever been LiarsBar8P.dll,
+# so only names with that in them are this mod's.
 $plugDir = Join-Path $game 'BepInEx\plugins'
-if (Test-Path $plugDir) {
-    foreach ($stray in Get-ChildItem $plugDir -Filter '*LiarsBar*' -File -ErrorAction SilentlyContinue) {
+if (Test-Path -LiteralPath $plugDir) {
+    foreach ($stray in Get-ChildItem -LiteralPath $plugDir -Filter '*LiarsBar8P*' -File -ErrorAction SilentlyContinue) {
         $targets += $stray.FullName
     }
 }
 foreach ($old in ($targets | Select-Object -Unique)) {
-    if (Test-Path $old) {
+    if (Test-Path -LiteralPath $old) {
         try { [IO.File]::Delete($old); Good "removed old $(Split-Path $old -Leaf)" } catch { }
     }
 }
@@ -159,8 +169,8 @@ foreach ($old in ($targets | Select-Object -Unique)) {
 try {
     foreach ($item in $payload) {
         $src = Join-Path $Here $item
-        if (-not (Test-Path $src)) { continue }
-        Copy-Item $src -Destination $game -Recurse -Force
+        if (-not (Test-Path -LiteralPath $src)) { continue }
+        Copy-Item -LiteralPath $src -Destination $game -Recurse -Force
     }
     Good "Files copied"
 } catch {
@@ -182,7 +192,7 @@ $checks = @{
 }
 $fail = $false
 foreach ($k in $checks.Keys | Sort-Object) {
-    if (Test-Path $checks[$k]) { Good $k } else { Bad $k; $fail = $true }
+    if (Test-Path -LiteralPath $checks[$k]) { Good $k } else { Bad $k; $fail = $true }
 }
 
 Say ""
@@ -192,8 +202,8 @@ if ($fail) {
 }
 
 $mp = 8
-if (Test-Path $cfgPath) {
-    $m = [regex]::Match((Get-Content $cfgPath -Raw), 'MaxPlayers\s*=\s*(\d+)')
+if (Test-Path -LiteralPath $cfgPath) {
+    $m = [regex]::Match((Get-Content -LiteralPath $cfgPath -Raw), 'MaxPlayers\s*=\s*(\d+)')
     if ($m.Success) { $mp = $m.Groups[1].Value }
 }
 

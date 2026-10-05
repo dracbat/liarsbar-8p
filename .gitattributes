@@ -1,0 +1,11 @@
+# Shell scripts run on Linux and the Steam Deck, where a carriage return at the end of a
+# line breaks them ("bash\r: No such file or directory"). This machine checks files out
+# with Windows line endings, so the scripts have to be pinned to LF here or they would
+# ship broken.
+*.sh text eol=lf
+
+# Batch files are the other way round. cmd.exe finds a label by reading the file in
+# 512-byte blocks, and with bare LF line endings it can land part way through a line and
+# jump to the wrong place, or not find the label at all. They are stored with LF like
+# everything else, but checked out - and so packaged and uploaded - with CRLF.
+*.bat text eol=crlf

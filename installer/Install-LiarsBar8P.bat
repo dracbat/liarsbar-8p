@@ -12,14 +12,32 @@ rem  exactly what it will do before you run it.
 rem ---------------------------------------------------------------------------
 
 rem The game lives under Program Files, so writing to it needs administrator rights.
-net session >nul 2>&1
+rem
+rem This file's own path reaches PowerShell through the environment, not pasted into its
+rem commands. Pasted in, it sat inside a quoted string, and an apostrophe in it - a folder
+rem like C:\Users\O'Brien - ended the string early, and the window closed on a PowerShell
+rem error before anything had happened.
+set "LB8P_SELF=%~f0"
+
+rem fltmc answers only to an administrator. This used to ask "net session", which also
+rem fails when Windows' Server service is switched off, administrator or not - so every
+rem elevated copy saw itself as not elevated and started another, with no prompt to stop
+rem it, for ever. The relaunched copy is now marked, and asks only once.
+fltmc >nul 2>&1
 if %errorLevel% neq 0 (
+    if /i "%~1"=="/elevated" (
+        echo Could not get administrator rights, so nothing was installed.
+        echo Right click this file and choose "Run as administrator".
+        echo.
+        pause
+        exit /b 1
+    )
     echo Requesting administrator permission...
-    powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+    powershell -NoProfile -Command "Start-Process -FilePath $env:LB8P_SELF -ArgumentList '/elevated' -Verb RunAs"
     exit /b
 )
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$c=[IO.File]::ReadAllText('%~f0'); Invoke-Expression $c.Substring($c.LastIndexOf('#PS_BEGIN')+9)"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$c=[IO.File]::ReadAllText($env:LB8P_SELF); Invoke-Expression $c.Substring($c.LastIndexOf('#PS_BEGIN')+9)"
 
 echo.
 pause
@@ -44,6 +62,11 @@ Say "  Liar's Bar - 8 Player Mod  :  Online Installer" Cyan
 Say "=================================================" Cyan
 Say ""
 
+# Every file and folder path in this script is given to PowerShell with -LiteralPath. A
+# plain path is read as a wildcard pattern, in which [ and ] mean "any one of these
+# characters" - so a Steam library in a folder like "D:\Games [SSD]" matched nothing. The
+# game was never found there, pasting its folder in by hand was turned down as having no
+# game in it, and the clean-up and the final checks would have missed it the same way.
 function Get-SteamRoot {
     foreach ($k in @('HKCU:\Software\Valve\Steam',
                      'HKLM:\SOFTWARE\WOW6432Node\Valve\Steam',
@@ -51,12 +74,12 @@ function Get-SteamRoot {
         try {
             $p = Get-ItemProperty $k -ErrorAction Stop
             foreach ($v in @($p.SteamPath, $p.InstallPath)) {
-                if ($v -and (Test-Path $v)) { return $v }
+                if ($v -and (Test-Path -LiteralPath $v)) { return $v }
             }
         } catch { }
     }
     foreach ($g in @("${env:ProgramFiles(x86)}\Steam", "$env:ProgramFiles\Steam")) {
-        if ($g -and (Test-Path $g)) { return $g }
+        if ($g -and (Test-Path -LiteralPath $g)) { return $g }
     }
     return $null
 }
@@ -68,24 +91,24 @@ function Get-GameDir ($SteamRoot) {
     # registry - so this crashed with a raw error instead of reaching the prompt that asks
     # the person to type the folder in themselves.
     $vdf = if ($SteamRoot) { Join-Path $SteamRoot 'steamapps\libraryfolders.vdf' } else { $null }
-    if ($vdf -and (Test-Path $vdf)) {
-        foreach ($m in [regex]::Matches((Get-Content $vdf -Raw), '"path"\s+"([^"]+)"')) {
+    if ($vdf -and (Test-Path -LiteralPath $vdf)) {
+        foreach ($m in [regex]::Matches((Get-Content -LiteralPath $vdf -Raw), '"path"\s+"([^"]+)"')) {
             $libs.Add(($m.Groups[1].Value -replace '\\\\', '\'))
         }
     }
     foreach ($lib in $libs) {
         $man = Join-Path $lib "steamapps\appmanifest_$AppId.acf"
-        if (Test-Path $man) {
-            $c = Get-Content $man -Raw
+        if (Test-Path -LiteralPath $man) {
+            $c = Get-Content -LiteralPath $man -Raw
             if ($c -match '"installdir"\s+"([^"]+)"') {
                 $d = Join-Path $lib "steamapps\common\$($Matches[1])"
-                if (Test-Path (Join-Path $d "Liar's Bar.exe")) { return $d }
+                if (Test-Path -LiteralPath (Join-Path $d "Liar's Bar.exe")) { return $d }
             }
         }
     }
     foreach ($lib in $libs) {
         $d = Join-Path $lib "steamapps\common\Liar's Bar"
-        if (Test-Path (Join-Path $d "Liar's Bar.exe")) { return $d }
+        if (Test-Path -LiteralPath (Join-Path $d "Liar's Bar.exe")) { return $d }
     }
     return $null
 }
@@ -101,7 +124,7 @@ if (-not $game) {
     $typed = Read-Host "  Paste the Liar's Bar folder path (Enter to cancel)"
     if ([string]::IsNullOrWhiteSpace($typed)) { Bad "Cancelled."; exit 1 }
     $game = $typed.Trim('"').Trim()
-    if (-not (Test-Path (Join-Path $game "Liar's Bar.exe"))) {
+    if (-not (Test-Path -LiteralPath (Join-Path $game "Liar's Bar.exe"))) {
         Bad "That folder does not contain the game executable. Nothing was changed."
         exit 1
     }
@@ -136,19 +159,23 @@ $targets = @(
 # Earlier versions used a differently prefixed settings file. Match on the suffix so any
 # of them is cleared, and a stale option cannot survive an update.
 $cfgDir = Join-Path $game 'BepInEx\config'
-if (Test-Path $cfgDir) {
-    foreach ($oldCfg in Get-ChildItem $cfgDir -Filter '*liarsbar.eightplayers.cfg' -File -ErrorAction SilentlyContinue) {
+if (Test-Path -LiteralPath $cfgDir) {
+    foreach ($oldCfg in Get-ChildItem -LiteralPath $cfgDir -Filter '*liarsbar.eightplayers.cfg' -File -ErrorAction SilentlyContinue) {
         $targets += $oldCfg.FullName
     }
 }
+# Any other copy of the plugin - renamed, switched off, kept as a backup - goes too. This
+# used to match '*LiarsBar*', which also took every other Liar's Bar mod in the folder
+# (LiarsBarEnhance.dll, say) without a word. The plugin has only ever been LiarsBar8P.dll,
+# so only names with that in them are this mod's.
 $plugDir = Join-Path $game 'BepInEx\plugins'
-if (Test-Path $plugDir) {
-    foreach ($stray in Get-ChildItem $plugDir -Filter '*LiarsBar*' -File -ErrorAction SilentlyContinue) {
+if (Test-Path -LiteralPath $plugDir) {
+    foreach ($stray in Get-ChildItem -LiteralPath $plugDir -Filter '*LiarsBar8P*' -File -ErrorAction SilentlyContinue) {
         $targets += $stray.FullName
     }
 }
 foreach ($old in ($targets | Select-Object -Unique)) {
-    if (Test-Path $old) {
+    if (Test-Path -LiteralPath $old) {
         try { [IO.File]::Delete($old); Good "removed $(Split-Path $old -Leaf)"; $gone++ }
         catch { Warn "could not remove $(Split-Path $old -Leaf): $($_.Exception.Message)" }
     }
@@ -176,7 +203,45 @@ try {
 
 $asset = $rel.assets | Where-Object { $_.name -like '*.zip' } | Select-Object -First 1
 if (-not $asset) { Bad "That release has no .zip attached to it."; exit 1 }
-Good "Version $($rel.tag_name)  ($([math]::Round($asset.size/1MB,1)) MB)"
+
+# Where the download may come from is decided here, not by the response.
+#
+# This script asks GitHub's API for the newest release and then downloads whatever URL
+# comes back, as administrator, and installs it. That is fine right up until the answer is
+# not this project's. This used to check only that the link was on one of GitHub's hosts -
+# which every release file of every repository on GitHub is. So the link now has to be
+# exactly the form GitHub gives this repository's release files - https://github.com/<this
+# repo>/releases/download/<tag>/<file> - and anything else, another host or another
+# repository on GitHub, stops the install before anything is fetched. GitHub then redirects
+# the download to its file servers, and Windows will not follow a redirect from https to
+# plain http. Should the repository ever be renamed, this fails closed, and the installer
+# has to be downloaded again.
+#
+# The link is checked as the text that came back, not as a [uri]: that would quietly fold
+# a "/../" in it away before the check ever saw it. -cmatch, because a case-insensitive
+# [A-Za-z] also matches letters that are not A to Z, and \z rather than $, because in .NET
+# a $ also matches in front of a line break at the very end.
+$seg = '^[A-Za-z0-9._+-]+\z'
+# The tag is printed to the terminal, so it may only be what a version tag looks like.
+$tag = [string]$rel.tag_name
+if ($tag -cnotmatch $seg) { $tag = $null }
+$url   = [string]$asset.browser_download_url
+$want  = "https://github.com/$Repo/releases/download/"
+$parts = @()
+if ($url.StartsWith($want, [StringComparison]::Ordinal)) { $parts = $url.Substring($want.Length).Split('/') }
+$urlOk = $tag -and $parts.Count -eq 2 -and
+         $parts[0] -cmatch $seg -and $parts[0] -ne '.' -and $parts[0] -ne '..' -and
+         $parts[0] -ceq $tag -and
+         $parts[1] -cmatch '^[A-Za-z0-9._+-]+\.zip\z'
+if (-not $urlOk) {
+    $shown = $url -replace '[^\x20-\x7E]', ''
+    if ($shown.Length -gt 200) { $shown = $shown.Substring(0, 200) }
+    Bad "The download link is not one of this project's own releases on GitHub:"
+    Say "      $shown" Gray
+    Bad "Nothing has been downloaded or installed. Please report this."
+    exit 1
+}
+Good "Version $tag  ($([math]::Round($asset.size/1MB,1)) MB)"
 
 $tmp = Join-Path $env:TEMP "LiarsBar8P_$([guid]::NewGuid().ToString('N').Substring(0,8))"
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null
@@ -185,24 +250,8 @@ $zip = Join-Path $tmp 'mod.zip'
 try {
     Say ""
     Say "Downloading..."
-
-    # Where the download may come from is decided here, not by the response.
-    #
-    # This script asks GitHub's API for the newest release and then downloads whatever URL
-    # comes back, as administrator, and installs it. That is fine right up until the answer
-    # is not GitHub's - so the answer is checked against the only hosts GitHub actually
-    # serves release assets from, and anything else stops the install rather than being
-    # fetched and run on somebody's machine.
-    $url = [uri]$asset.browser_download_url
-    $allowed = @('github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com')
-    if ($url.Scheme -ne 'https' -or $allowed -notcontains $url.Host) {
-        Bad "The download link points at $($url.Scheme)://$($url.Host), which is not GitHub."
-        Bad "Nothing has been downloaded or installed. Please report this."
-        exit 1
-    }
-
     Invoke-WebRequest $url -OutFile $zip -UseBasicParsing
-    Good "Downloaded $([math]::Round((Get-Item $zip).Length / 1MB, 1)) MB"
+    Good "Downloaded $([math]::Round((Get-Item -LiteralPath $zip).Length / 1MB, 1)) MB"
 
     Say ""
     Say "Extracting..."
@@ -212,11 +261,11 @@ try {
     Good "Extracted"
 
     $srcRoot = $extract
-    if (-not (Test-Path (Join-Path $srcRoot 'BepInEx'))) {
-        $inner = Get-ChildItem $extract -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'BepInEx') } | Select-Object -First 1
+    if (-not (Test-Path -LiteralPath (Join-Path $srcRoot 'BepInEx'))) {
+        $inner = Get-ChildItem -LiteralPath $extract -Directory | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'BepInEx') } | Select-Object -First 1
         if ($inner) { $srcRoot = $inner.FullName }
     }
-    if (-not (Test-Path (Join-Path $srcRoot 'BepInEx'))) {
+    if (-not (Test-Path -LiteralPath (Join-Path $srcRoot 'BepInEx'))) {
         Bad "The downloaded package does not look right (no BepInEx folder)."
         exit 1
     }
@@ -229,7 +278,7 @@ try {
     Say "Installing fresh..."
     foreach ($item in @('BepInEx','dotnet','winhttp.dll','doorstop_config.ini','.doorstop_version','changelog.txt')) {
         $src = Join-Path $srcRoot $item
-        if (Test-Path $src) { Copy-Item $src -Destination $game -Recurse -Force }
+        if (Test-Path -LiteralPath $src) { Copy-Item -LiteralPath $src -Destination $game -Recurse -Force }
     }
     Good "Files copied"
 }
@@ -252,19 +301,19 @@ $checks = @{
 }
 $fail = $false
 foreach ($k in ($checks.Keys | Sort-Object)) {
-    if (Test-Path $checks[$k]) { Good $k } else { Bad $k; $fail = $true }
+    if (Test-Path -LiteralPath $checks[$k]) { Good $k } else { Bad $k; $fail = $true }
 }
 
 Say ""
 if ($fail) { Say "Install INCOMPLETE - see the failures above." Red; exit 1 }
 
 Say "=================================================" Green
-Say "  Installed $($rel.tag_name) - clean install" Green
+Say "  Installed $tag - clean install" Green
 Say "=================================================" Green
 Say ""
 Say "NEXT:" Cyan
 Say "  1. Launch Liar's Bar."
-Say "  2. Check the TOP LEFT of the screen - it must read $($rel.tag_name)."
+Say "  2. Check the TOP LEFT of the screen - it must read $tag."
 Say "     Everyone playing together must show the same version."
 Say ""
 Say "  The first launch after installing can take a few minutes." Gray

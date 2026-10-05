@@ -16,6 +16,10 @@ Say "  Liar's Bar - 8 Player Mod  :  Uninstaller" Cyan
 Say "============================================" Cyan
 Say ""
 
+# Finding the game uses -LiteralPath too, as the removal below always has. A plain path is
+# read as a wildcard pattern, in which [ and ] mean "any one of these characters" - so a
+# Steam library in a folder like "D:\Games [SSD]" matched nothing, and the game was never
+# found there, nor accepted when its folder was pasted in by hand.
 function Get-SteamRoot {
     foreach ($k in @('HKCU:\Software\Valve\Steam',
                      'HKLM:\SOFTWARE\WOW6432Node\Valve\Steam',
@@ -23,7 +27,7 @@ function Get-SteamRoot {
         try {
             $p = Get-ItemProperty $k -ErrorAction Stop
             foreach ($v in @($p.SteamPath, $p.InstallPath)) {
-                if ($v -and (Test-Path $v)) { return $v }
+                if ($v -and (Test-Path -LiteralPath $v)) { return $v }
             }
         } catch { }
     }
@@ -37,8 +41,8 @@ if ($steam) { $libs.Add($steam) }
 # so this died with a raw PowerShell error instead of reaching the "type the folder in
 # yourself" prompt. The same bug was fixed in both installers; it was left here.
 $vdf = if ($steam) { Join-Path $steam 'steamapps\libraryfolders.vdf' } else { $null }
-if ($vdf -and (Test-Path $vdf)) {
-    foreach ($m in [regex]::Matches((Get-Content $vdf -Raw), '"path"\s+"([^"]+)"')) {
+if ($vdf -and (Test-Path -LiteralPath $vdf)) {
+    foreach ($m in [regex]::Matches((Get-Content -LiteralPath $vdf -Raw), '"path"\s+"([^"]+)"')) {
         $libs.Add(($m.Groups[1].Value -replace '\\\\', '\'))
     }
 }
@@ -46,18 +50,18 @@ if ($vdf -and (Test-Path $vdf)) {
 $game = $null
 foreach ($lib in $libs) {
     $man = Join-Path $lib "steamapps\appmanifest_$AppId.acf"
-    if (Test-Path $man) {
-        $c = Get-Content $man -Raw
+    if (Test-Path -LiteralPath $man) {
+        $c = Get-Content -LiteralPath $man -Raw
         if ($c -match '"installdir"\s+"([^"]+)"') {
             $d = Join-Path $lib "steamapps\common\$($Matches[1])"
-            if (Test-Path (Join-Path $d "Liar's Bar.exe")) { $game = $d; break }
+            if (Test-Path -LiteralPath (Join-Path $d "Liar's Bar.exe")) { $game = $d; break }
         }
     }
 }
 if (-not $game) {
     foreach ($lib in $libs) {
         $d = Join-Path $lib "steamapps\common\Liar's Bar"
-        if (Test-Path (Join-Path $d "Liar's Bar.exe")) { $game = $d; break }
+        if (Test-Path -LiteralPath (Join-Path $d "Liar's Bar.exe")) { $game = $d; break }
     }
 }
 
@@ -65,7 +69,7 @@ if (-not $game) {
     $typed = Read-Host "  Could not find the game. Paste the Liar's Bar folder path (Enter to cancel)"
     if ([string]::IsNullOrWhiteSpace($typed)) { Bad "Cancelled."; exit 1 }
     $game = $typed.Trim('"').Trim()
-    if (-not (Test-Path (Join-Path $game "Liar's Bar.exe"))) { Bad "Not a Liar's Bar folder."; exit 1 }
+    if (-not (Test-Path -LiteralPath (Join-Path $game "Liar's Bar.exe"))) { Bad "Not a Liar's Bar folder."; exit 1 }
 }
 Good "Game: $game"
 
@@ -78,42 +82,82 @@ if (Get-Process -Name "Liar's Bar" -ErrorAction SilentlyContinue) {
 Say ""
 Say "Removing mod files..."
 
-# This mod's own files first.
+# This mod's own files first: the plugin, its settings, and any older copy of either -
+# the same set the installer clears, so a leftover copy of this mod cannot be mistaken
+# below for somebody else's plugin and keep the loader installed.
 $removed = 0
-foreach ($f in @('BepInEx\plugins\LiarsBar8P.dll',
-                 'BepInEx\config\liarsbar.eightplayers.cfg')) {
-    $p = Join-Path $game $f
-    if (Test-Path $p) {
-        try { Remove-Item $p -Force; Good "removed $(Split-Path $f -Leaf)"; $removed++ }
-        catch { Bad "could not remove $(Split-Path $f -Leaf) : $($_.Exception.Message)" }
-    }
+$plugDir = Join-Path $game 'BepInEx\plugins'
+$cfgDir  = Join-Path $game 'BepInEx\config'
+$mine = @()
+if (Test-Path -LiteralPath $plugDir) {
+    $mine += @(Get-ChildItem -LiteralPath $plugDir -Filter '*LiarsBar8P*' -File -Force -ErrorAction SilentlyContinue)
+}
+if (Test-Path -LiteralPath $cfgDir) {
+    $mine += @(Get-ChildItem -LiteralPath $cfgDir -Filter '*liarsbar.eightplayers.cfg' -File -Force -ErrorAction SilentlyContinue)
+}
+foreach ($f in $mine) {
+    try { Remove-Item -LiteralPath $f.FullName -Force; Good "removed $($f.Name)"; $removed++ }
+    catch { Bad "could not remove $($f.Name) : $($_.Exception.Message)" }
 }
 
 # BepInEx itself is shared, so it only goes if nothing else is using it.
 #
 # This used to delete the whole BepInEx and dotnet trees unconditionally, while the header
 # promised it "only removes files the installer added". BepInEx is a loader other mods sit
-# in: uninstalling this one silently took every other mod in the plugins folder with it. If
-# somebody else's plugin is there, the loader stays and only this mod's own files go.
-$plugDir = Join-Path $game 'BepInEx\plugins'
+# in: uninstalling this one silently took every other mod in the plugins folder with it.
+#
+# Then "nothing else" meant no .dll left in plugins, which was not enough either: a mod
+# switched off by renaming it to .dll.disabled or .dll.old, or a preloader patcher in
+# patchers, is not a .dll in plugins - so the loader was deleted from under it, and with it
+# every other mod's settings in BepInEx\config. With this mod's own files gone, anything
+# still in plugins\ or patchers\ is somebody else's - a DLL, one switched off by renaming
+# it, a folder of them, a link to one kept elsewhere - and keeps the loader installed.
 $others = @()
-if (Test-Path $plugDir) {
-    $others = @(Get-ChildItem $plugDir -File -Recurse -ErrorAction SilentlyContinue |
-                Where-Object { $_.Extension -eq '.dll' })
+foreach ($d in @('plugins', 'patchers')) {
+    $dir = Join-Path $game "BepInEx\$d"
+    if (-not (Test-Path -LiteralPath $dir)) { continue }
+    $root = (Get-Item -LiteralPath $dir -Force).FullName.TrimEnd('\')
+    $others += @(Get-ChildItem -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue |
+                 Where-Object { -not $_.PSIsContainer -or ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) } |
+                 ForEach-Object { "$d\" + $_.FullName.Substring($root.Length + 1) })
 }
 
+$kept = @()
 if ($others.Count -gt 0) {
     Say ""
-    Say "Leaving BepInEx in place - $($others.Count) other plugin(s) are using it:" Yellow
-    $others | ForEach-Object { Say "         $($_.Name)" Gray }
+    Say "Leaving BepInEx in place - $($others.Count) other mod file(s) are using it:" Yellow
+    $others | ForEach-Object { Say "         $_" Gray }
 } else {
-    foreach ($t in @('BepInEx', 'dotnet', 'winhttp.dll', 'doorstop_config.ini',
-                     '.doorstop_version', 'changelog.txt')) {
+    foreach ($t in @('dotnet', 'winhttp.dll', 'doorstop_config.ini', '.doorstop_version', 'changelog.txt')) {
         $p = Join-Path $game $t
-        if (Test-Path $p) {
-            try { Remove-Item $p -Recurse -Force; Good "removed $t"; $removed++ }
+        if (Test-Path -LiteralPath $p) {
+            try { Remove-Item -LiteralPath $p -Recurse -Force; Good "removed $t"; $removed++ }
             catch { Bad "could not remove $t : $($_.Exception.Message)" }
         }
+    }
+    # The rest of BepInEx is the loader's own - its core, the interop it generated, its
+    # cache, its log, its own settings - except for other mods' settings files, which
+    # outlive their mods and are kept in case the mod comes back.
+    if (Test-Path -LiteralPath $cfgDir) {
+        $kept = @(Get-ChildItem -LiteralPath $cfgDir -Force -ErrorAction SilentlyContinue |
+                  Where-Object { $_.Name -ne 'BepInEx.cfg' })
+    }
+    $bep = Join-Path $game 'BepInEx'
+    if (Test-Path -LiteralPath $bep) {
+        try {
+            if ($kept.Count -eq 0) {
+                Remove-Item -LiteralPath $bep -Recurse -Force
+                Good "removed BepInEx"
+            } else {
+                Get-ChildItem -LiteralPath $bep -Force | Where-Object { $_.Name -ne 'config' } |
+                    ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
+                $bepCfg = Join-Path $cfgDir 'BepInEx.cfg'
+                if (Test-Path -LiteralPath $bepCfg) { Remove-Item -LiteralPath $bepCfg -Force }
+                Good "removed BepInEx, keeping other mods' settings:"
+                $kept | ForEach-Object { Say "         config\$($_.Name)" Gray }
+            }
+            $removed++
+        } catch { Bad "could not remove all of BepInEx : $($_.Exception.Message)" }
     }
 }
 
@@ -125,11 +169,13 @@ if ($removed -eq 0) {
     if ($others.Count -gt 0) {
         Say "  8 Player mod removed. BepInEx and your other" Green
         Say "  mods were left alone." Green
+    } elseif ($kept.Count -gt 0) {
+        Say "  Uninstalled. The game is back to vanilla; other" Green
+        Say "  mods' settings were kept in BepInEx\config." Green
     } else {
         Say "  Uninstalled. The game is back to vanilla." Green
     }
     Say "============================================" Green
     Say ""
-    Say "  Game files themselves were never modified, so Steam's" Gray
-    Say "  'Verify integrity of game files' is also always available." Gray
+    Say "  The game's own files were never modified." Gray
 }

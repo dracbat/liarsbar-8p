@@ -16,6 +16,160 @@ Versions that were once numbered 1.x and 2.x were folded into the same 0.x line 
 room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order is unchanged: what
 was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v1.1.0 — Linux and the Steam Deck
+
+People play Liar's Bar on Linux, and asked for the mod there. There is no Linux version of
+the game to port it to: Steam lists Liar's Bar as Windows-only, and on Linux and the Steam Deck
+it is the Windows game running through Proton. So this is the same mod, running through Proton
+with it — the same files, the same version number on both. **What the mod does in game is
+unchanged from v1.0.0**; only its version number has moved.
+
+That is also why Windows and Linux players should be able to share a table. Every player in a
+lobby must run the same version, and here they literally do.
+
+**Windows players: update too.** The version check compares version numbers, so a player
+still on 1.0.0 is flagged as a mismatch at a table of 1.1.0 players, even though nothing they
+would see has changed. **Download `Install-LiarsBar8P.bat` again from this release** rather
+than re-running the copy you kept: it would fetch 1.1.0 too, but the 1.0.0 copy also deletes
+any other mod with "LiarsBar" in its file name on the way, which this release's copy no longer
+does.
+
+### What Linux needed
+
+- **An installer.** `install.sh` and `uninstall.sh` in the zip, and `Install-LiarsBar8P.sh` on
+  the release page, doing what the Windows ones do: find the game through Steam's own library
+  files, clear out the previous copy, install, verify. They look in every place Steam lives on
+  Linux — the normal client, the Debian package, Flatpak, Snap, every library, SD cards — and
+  when the game turns up under two Steams at once they ask which one, rather than install into
+  the copy that never gets launched. The online one downloads from this project's own release
+  files on GitHub and nowhere else, over https all the way. The uninstaller removes the loader
+  only when nothing else is using it — any other mod's file in `plugins/` or `patchers/`, even
+  one switched off by renaming it, keeps it — and never deletes another mod's settings. None of
+  them need `sudo`, and they refuse to run with it, because files root leaves in a game folder
+  are files neither the game nor Steam can replace.
+- **One launch option.** Proton has a `winhttp.dll` of its own and uses it in preference to the
+  one the mod puts beside the game, so the loader never starts — no error, just a game that is
+  quietly not modded. `WINEDLLOVERRIDES="winhttp=n,b" %command%` tells it otherwise. A loader
+  under some other DLL name would not escape it: the game loads only two that the loader can
+  stand in for early enough, `winhttp` and `version`, and Proton has its own copy of both. (The same override set inside the game's Proton prefix
+  with protontricks works too; the launch option is simply the easier of the two.) The
+  installer says what to paste, and reads Steam's settings — for the Steam and the accounts
+  that actually have the game — to tell you whether it is set, and whether it is set *right*.
+  It does not set it for you: Steam rewrites that file while it runs, and an edit made
+  underneath it would be undone.
+
+### The zip used Windows paths
+
+Windows PowerShell's `Compress-Archive` writes every path inside a zip with backslashes —
+`BepInEx\core\0Harmony.dll` — where the zip format says forward slashes. v1.0.0 shipped that
+way: 225 of its 235 entries. Windows does not mind, and neither does Linux's usual `unzip`,
+which repairs them with a warning. But some Linux tools — Python's among them — take the format
+at its word and unpack one flat folder full of files with backslashes in their names, where the
+loader finds nothing. The zip is now written entry by entry with forward slashes, the shell
+scripts inside it carry the permission that lets them run, packaging refuses to finish if
+either has picked up Windows line endings, and a zip that fails any check on the way is never
+left lying where a release could pick it up.
+
+### The Windows installers now do what the Linux ones do
+
+Reviewing the Linux installers turned up three things the Windows ones had always done wrong.
+
+- **Installing deleted other Liar's Bar mods.** Clearing out an old copy of this mod removed
+  everything in `BepInEx\plugins` with `LiarsBar` in its name, so another mod like
+  `LiarsBarEnhance.dll` went with it. The plugin has only ever been `LiarsBar8P.dll`, so only
+  names containing `LiarsBar8P` are touched now. This applies to `install.bat` and
+  `Install-LiarsBar8P.bat`.
+- **Uninstalling could take the loader from under another mod.** It decided BepInEx was unused
+  when no `.dll` was left in `plugins`, so a mod switched off by renaming it (`.dll.disabled`,
+  `.dll.old`) or a patcher in `patchers` did not count. The whole of `BepInEx` was then deleted,
+  including every other mod's settings. Now any file left in `plugins\` or `patchers\` keeps
+  the loader, and when it does go, other mods' files in `BepInEx\config` stay.
+- **The online installer accepted any repository's release.** It checked only that the download
+  link was on GitHub, and every repository's release files are. The link now has to be this
+  project's own release file for the tag GitHub named, and the version is not printed until
+  that check has passed.
+
+The `.bat` files are also now checked out with Windows line endings. With bare line feeds,
+`cmd.exe` can misread a batch file and jump to the wrong place.
+
+A review before this release found three more, all there since v1.0.0:
+
+- **An apostrophe in the folder stopped every `.bat` file at once.** Each handed its own path
+  to PowerShell inside a quoted string, so a folder like `C:\Users\O'Brien\Downloads`, or the
+  zip unpacked into the game's own `Liar's Bar` folder, ended the string early and the window
+  closed on an error. The path now reaches PowerShell without being quoted into anything.
+- **Asking for administrator rights could repeat for ever.** The `.bat` files checked with
+  `net session`, which also fails when Windows' Server service is switched off — so the
+  elevated copy believed it was not elevated and started another, which did the same, with no
+  prompt to stop it. They now ask `fltmc`, and a copy that has already been elevated says it
+  could not get the rights and stops instead of asking again.
+- **A Steam library with `[` or `]` in its folder name was invisible.** PowerShell reads
+  `[SSD]` in `D:\Games [SSD]\SteamLibrary` as a wildcard, so the game was never found there,
+  and pasting its folder in by hand was refused. Both installers and the uninstaller now take
+  every path literally.
+
+### The licences travel with it now
+
+Everything in the download apart from the mod itself is BepInEx and what BepInEx needs, and
+v1.0.0 shipped all of it without a single licence text — the notices file in the repository
+pointed at a `licenses/` folder that did not exist, and was never put in the zip either. Now
+`LICENSE`, `THIRD-PARTY-NOTICES.txt` and `licenses/` ship in the zip, with every text fetched
+from its official source and checked byte for byte. Going through it properly also corrected
+the notices themselves: every one of the 226 third-party files was matched to BepInEx's
+official be.697 build, and several were credited to the wrong project or not listed at all.
+One file is now left out: `Microsoft.DiaSymReader.Native.amd64.dll`, from BepInEx's .NET
+folder, is under a Microsoft licence whose terms for passing it on cannot be met by
+including a text file. It only adds line numbers to .NET stack traces; the loader and the
+mod were run without it, on a Steam Deck, and loaded every patch.
+
+### Why nothing in the mod had to change
+
+Everything the mod does that other players' machines have to agree with — seat numbers, the
+size of the table, the aim, the turn order, the deck sizes written into the game's own code —
+is whole numbers, sent over the network or written as constants. The arithmetic with
+fractions in it only places things on your own screen. The mod's memory patches search for
+the same bytes in the same `GameAssembly.dll`, because under Proton it *is* the same file, and
+Wine supports the memory call they make. That was checked line by line rather than assumed.
+
+### What a real Steam Deck showed
+
+A Steam Deck (SteamOS 3.7, Proton 11), driven over SSH:
+
+- **The game is the same game.** `GameAssembly.dll`, `UnityPlayer.dll` and the IL2CPP metadata
+  are byte-for-byte the files on a Windows PC — so the code the mod patches is the same code.
+- **The installer found the game and installed first time**, and the shell scripts came out of
+  the zip already executable.
+- **Without the launch option, nothing happens** — exactly as documented. The game started
+  unmodded, and no `BepInEx/LogOutput.log` appeared at all.
+- **With it, everything loaded.** BepInEx reported "Windows 10 (Wine 11.0) 64-bit", fetched
+  Unity's base libraries and built its interop assemblies without trouble, and the mod applied
+  all 25 of its patch groups and the same rewrites of the game's compiled code it makes on
+  Windows. Its 61 start-up
+  lines match a Windows run of v1.0.0 word for word. The version showed in the corner.
+- **An eight-seat table played.** The mod's developer mode hosted a private lobby, filled it
+  with bots and started Liar's Deck: all eight dealt five cards, the turn walked 1 → 7 and
+  wrapped to 0 again and again, liar calls resolved, no errors from the mod.
+- **The online installer and the uninstaller** did their jobs against the real release and the
+  real game folder. The online one found a real bug on the way: Linux's `unzip` repairs
+  v1.0.0's backslash paths but reports that as a warning, which had been taken for a failure.
+
+And one thing Deck players need to know: **on Ultra graphics, the table never loads.** The
+Deck's GPU can use about 9 GB, and loading the table at Ultra wanted more — with four players
+as well as eight, so it is the setting, not the size of the table. The game sits on its
+loading screen while the graphics driver logs that it is out of memory. At High an
+eight-player table takes about 7 GB, at Low about 6 GB. The installer now says so when it
+finds itself on a Deck.
+
+### Not yet true
+
+A Windows player and a Linux player have not yet shared a table. They run the same game and
+the same mod, byte for byte, so nothing on the mod's side should tell them apart — but that is
+reasoning, not a result. Shots fired at the Deck table were not seen either: a bot that loses a
+liar call cannot pull its own trigger, because that runs on the loser's own machine and a bot
+has none — the same on Windows. The installers are covered by
+`tools/test-linux-installers.sh` — every Steam layout above, a download link pointing anywhere
+but this project's releases, a release from before Linux support, a game that is still running.
+
 ## v1.0.0 — two modes were broken in ways nothing had ever looked at
 
 A player asked whether, in the Chaos deck at eight players, they would be able to choose any

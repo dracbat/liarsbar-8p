@@ -8,6 +8,7 @@
   <a href="../../releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/dracbat/liarsbar-8p?style=flat-square&color=e03131&label=release"></a>
   <img alt="Players" src="https://img.shields.io/badge/players-8-e03131?style=flat-square">
   <img alt="Loader" src="https://img.shields.io/badge/BepInEx-6%20IL2CPP-444?style=flat-square">
+  <img alt="Platforms" src="https://img.shields.io/badge/Windows%20%7C%20Linux%20%7C%20Steam%20Deck-444?style=flat-square">
   <img alt="Licence" src="https://img.shields.io/badge/licence-MIT-444?style=flat-square">
 </p>
 
@@ -22,12 +23,17 @@ Liar's Bar is at its best when somebody is lying to your face. This puts seven o
 instead of three.
 
 Built with [BepInEx 6 (IL2CPP)](https://github.com/BepInEx/BepInEx) + Harmony. **No game files
-are modified on disk** — everything is patched at runtime, and Steam's *Verify integrity of
-game files* undoes the install completely.
+are modified on disk** — everything is patched at runtime, and the uninstaller takes the mod
+away completely. (Steam's *Verify integrity of game files* is no substitute: it only repairs
+the game's own files, and leaves the mod's where they are.)
 
 **Everyone playing together must install this and run the same version.** A vanilla client in a
 modded lobby will desync. The version you are running is drawn in the top-left corner in game,
 and every player is warned when somebody's build differs.
+
+**On Linux or a Steam Deck?** It is the same mod, running through Proton — tested on a Steam
+Deck — so Windows and Linux players should be able to share a table, though that part is not
+yet confirmed. See [Linux and Steam Deck](#linux-and-steam-deck).
 
 ---
 
@@ -129,7 +135,7 @@ drop the connection, which is what used to end the session for everybody.
 nothing visibly misbehaves; the cause is not isolated.
 
 `docs/PLAYER-LIMITS.md` maps every hard-coded four in the game, what it broke, and what was
-done about it — including the two found this release.
+done about it — including the two found in v1.0.0.
 
 ---
 
@@ -193,7 +199,9 @@ installs the current one. It asks for administrator permission because the game 
 `Program Files`.
 
 **Keep the file — running it again is how you update.** It asks GitHub for the newest release
-every time it runs, so it never goes stale.
+every time it runs. **Updating from v1.0.0?** Download it once more from the latest release
+rather than re-running your old copy: the 1.0.0 installer also deleted other mods with
+"LiarsBar" in their file name.
 
 It is a plain text file — open it in Notepad first if you want to see what it does.
 
@@ -223,6 +231,82 @@ and look for:
 
 That last line should appear **seven times**, once per mode — if one of them says it was left
 as shipped, that mode will deal to the first four seats and go quiet.
+
+## Linux and Steam Deck
+
+Liar's Bar has no Linux version: on Linux and the Steam Deck it is the Windows game running
+through Proton, and this mod runs through Proton with it. It is the same download, the same
+files and the same version number as on Windows — which is what should let Windows and Linux
+players sit at the same table.
+
+> **Tested on a Steam Deck** (SteamOS 3.7, Proton 11): installed with `install.sh` from the zip,
+> loaded, applied every one of its patches exactly as it does on Windows — the same 61 lines in
+> the log, word for word — and played an eight-seat table of Liar's Deck with the empty seats
+> filled by the mod's test bots: all eight dealt, the turn round every seat, liar calls
+> resolved. **Not yet tested: a Windows player and a Linux player
+> at the same table.** Both run byte-for-byte the same game and the same mod, so they should;
+> if you try it, please say how it went — a [log](#sending-a-log) is the most useful thing you
+> can send.
+
+1. Download **`Install-LiarsBar8P.sh`** from the [latest release](../../releases/latest).
+2. Open a terminal where it downloaded, and run it:
+
+   ```bash
+   bash Install-LiarsBar8P.sh
+   ```
+
+   It finds Liar's Bar through Steam — the normal client, Flatpak or Snap, any library, SD
+   cards included — and installs the newest release exactly as the Windows installer does.
+   **Keep the file — running it again is how you update.** It does not need `sudo`, and
+   refuses to run with it.
+3. **Set the launch option.** In Steam, right-click Liar's Bar → **Properties → General →
+   Launch Options**, and paste in exactly:
+
+   ```
+   WINEDLLOVERRIDES="winhttp=n,b" %command%
+   ```
+
+   Proton has a `winhttp.dll` of its own and uses it instead of the mod's loader unless told
+   otherwise. Without this the game starts exactly as if the mod were not installed — no
+   error, just no mod. If the game already has launch options, keep one `%command%`, at the
+   end: `WINEDLLOVERRIDES="winhttp=n,b" gamemoderun %command%`.
+4. Launch the game. The first launch is slow while BepInEx sets up; let it reach the main menu.
+   The mod's version in the top-left corner means it loaded.
+
+**Steam Deck:** do steps 1 and 2 in Desktop Mode (Steam button → Power → Switch to Desktop).
+The terminal is called Konsole, and Steam + X brings up the keyboard. Step 3 also works in Game
+Mode: select Liar's Bar, press the cog → Properties.
+
+**On a Steam Deck, set the game's graphics to High or lower** (Settings → Graphics). On Ultra,
+the Deck runs out of graphics memory as the table loads and the game hangs on its loading
+screen for good — with four players as well as eight, so it is the setting rather than the
+table size. At High an eight-player table needs about 7 GB of the 9 GB the Deck's GPU can use,
+and at Low about 6 GB.
+
+<details>
+<summary>From the zip instead</summary>
+
+1. Download `LiarsBar-8P.zip` from the [latest release](../../releases/latest) and extract it
+   into a folder of its own.
+2. Open a terminal in that folder — in the file manager, right-click an empty space and choose
+   Open Terminal Here or Open in Terminal, depending on your desktop — and run
+   `bash install.sh`.
+3. Set the launch option, as above.
+
+Or fully by hand: copy `winhttp.dll`, `doorstop_config.ini`, `.doorstop_version`, `BepInEx/`
+and `dotnet/` next to `Liar's Bar.exe` — Steam's **Manage → Browse local files** opens that
+folder — and set the launch option.
+</details>
+
+**If the version never appears in game:**
+
+- Check the launch option is exactly as above: straight quotes, and `%command%` at the end.
+- Look in the game folder for `BepInEx/LogOutput.log`. **No file at all** means the loader never
+  started, which is the launch option. A file means it did start — send it in (see
+  [Sending a log](#sending-a-log)).
+- If the game hangs on its loading screen when a match starts, lower the graphics (see above).
+  If it freezes anywhere else, try another Proton version (Properties → Compatibility) — and
+  report it either way, saying which versions you tried. Proton 11 is the one tested.
 
 ## Configure
 
@@ -268,10 +352,15 @@ launching again.
 Tell us three things with it: **how many players**, **which mode**, and **what looked wrong**.
 The host's log is the most useful one, but a log from any player helps.
 
+**On Linux or a Steam Deck** it is the same file in the same place: `BepInEx/LogOutput.log` in
+the game folder, which **Manage → Browse local files** opens. Say that you are on Linux, and
+which Proton version the game uses (Properties → Compatibility).
+
 > **Read it before you post it.** The log records the Steam names of everyone in your lobby,
 > because that is what the game calls them. It contains no passwords, keys or addresses — but
 > it does have your friends' names in it, so treat it the way you would a screenshot of your
-> friends list.
+> friends list. It also records where the game is installed, and on most computers that path
+> includes the name of your user account.
 
 What the log will already have told us before you say a word: which of the mod's fixes
 applied, how many people were at the table, where everyone was sitting, what each seat was
@@ -279,11 +368,15 @@ dealt, and the exact name of any networked call that failed.
 
 ## Uninstall
 
-Run `uninstall.bat` from the zip, or delete `winhttp.dll`, `doorstop_config.ini`,
-`.doorstop_version`, `changelog.txt`, and the `BepInEx/` and `dotnet/` folders.
+Run `uninstall.bat` from the zip (on Linux, `bash uninstall.sh`), or delete `winhttp.dll`,
+`doorstop_config.ini`, `.doorstop_version`, `changelog.txt`, and the `BepInEx/` and `dotnet/`
+folders.
 
-Since no game files are ever modified, Steam's **Verify integrity of game files** also
-restores everything.
+On Linux, take the `WINEDLLOVERRIDES` launch option out as well. Left in, it does nothing once
+the loader is gone — and taking it out *without* uninstalling is a quick way to play unmodded.
+
+Steam's **Verify integrity of game files** does *not* remove the mod: it checks only the
+game's own files, which the mod never changes, and leaves everything above in place.
 
 ## Building from source
 
@@ -297,8 +390,9 @@ dotnet build -c Release
 
 `deploy.ps1` builds and copies the plugin into the game. `tools/sweep.ps1` runs the whole test
 matrix — every mode, every table size, every bar. `package.ps1` produces the distributable zip
-and refuses to run if any file about to ship carries the build account's name. `release.ps1`
-does the whole release in one command.
+and refuses to run if any file about to ship carries the build account's name.
+`tools/test-linux-installers.sh` tests the Linux installers against fake Steam layouts, in Git
+Bash or on Linux. `release.ps1` does the whole release in one command.
 
 ## Notes
 
@@ -311,5 +405,10 @@ No game assets or binaries are included in this repository.
 
 ## Licence
 
-MIT, covering this mod's own source only. Liar's Bar is the property of Curve Animation;
-BepInEx is redistributed under LGPL-2.1. You must own the game.
+MIT, covering this mod's own source only. Liar's Bar is the property of Curve Animation. You
+must own the game.
+
+The download also carries BepInEx and everything it needs, unmodified: BepInEx and Doorstop
+under LGPL-2.1, Il2CppInterop under LGPL-3.0, Dobby under Apache-2.0, a set of MIT libraries,
+and Microsoft's .NET runtime. [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) says which
+file is which, and the licence texts are in [`licenses/`](licenses/) — both are in the zip.

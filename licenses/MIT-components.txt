@@ -1,0 +1,468 @@
+MIT-LICENSED COMPONENTS
+==============================================================================
+
+This file accompanies THIRD-PARTY-NOTICES.txt. It reproduces the copyright
+notices and licence texts of the MIT-licensed libraries that are redistributed,
+unmodified, in BepInEx/core/ of this download.
+
+Each section names the component, the files shipped, the upstream project, and
+the exact upstream file the licence text was copied from. Wherever possible the
+licence is taken from the same tag or commit the shipped binary was built from.
+The text below each dashed line is the upstream licence, verbatim.
+
+==============================================================================
+HarmonyX
+==============================================================================
+Shipped files:  BepInEx/core/0Harmony.dll  (HarmonyX 2.10.2)
+Upstream:       https://github.com/BepInEx/HarmonyX
+Licence from:   https://github.com/BepInEx/HarmonyX/blob/v2.10.2/LICENSE
+------------------------------------------------------------------------------
+MIT License
+
+Copyright (c) 2020 BepInEx
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+HarmonyX is a fork of Harmony (https://github.com/pardeike/Harmony). The
+HarmonyX repository also carries Harmony's original licence, reproduced here:
+Licence from:   https://github.com/BepInEx/HarmonyX/blob/v2.10.2/LICENSE.Harmony
+------------------------------------------------------------------------------
+MIT License
+
+Copyright (c) 2017 Andreas Pardeike
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+==============================================================================
+MonoMod
+==============================================================================
+Shipped files:  BepInEx/core/MonoMod.RuntimeDetour.dll  (22.05.01.01)
+                BepInEx/core/MonoMod.Utils.dll          (22.05.01.01)
+Upstream:       https://github.com/MonoMod/MonoMod
+Licence from:   https://github.com/MonoMod/MonoMod/blob/v22.05.01.01/LICENSE
+------------------------------------------------------------------------------
+The MIT License (MIT)
+
+Copyright (c) 2015 - 2020 0x0ade
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+==============================================================================
+Cpp2IL (Cpp2IL.Core, LibCpp2IL, StableNameDotNet, WasmDisassembler)
+==============================================================================
+Shipped files:  BepInEx/core/Cpp2IL.Core.dll        (2022.1.0-development.972)
+                BepInEx/core/LibCpp2IL.dll          (2022.1.0-development.972)
+                BepInEx/core/StableNameDotNet.dll   (0.1.0-development.972)
+                BepInEx/core/WasmDisassembler.dll   (2022.1.0-development.972)
+Upstream:       https://github.com/SamboyCoding/Cpp2IL
+                All four assemblies are built from that one repository, commit
+                ba1003aa6e2d406b212e08818974fc83fe846fd7, where LibCpp2IL,
+                StableNameDotNet and WasmDisassembler are subdirectories
+                covered by the repository's single LICENSE file.
+Licence from:   https://github.com/SamboyCoding/Cpp2IL/blob/ba1003aa6e2d406b212e08818974fc83fe846fd7/LICENSE
+------------------------------------------------------------------------------
+MIT License
+
+Copyright (c) 2020 Sam Byass
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Cpp2IL's README states that it is based on Il2CppDumper and that code from
+Il2CppDumper remains, mostly in LibCpp2IL. Il2CppDumper's licence:
+Upstream:       https://github.com/Perfare/Il2CppDumper
+Licence from:   https://github.com/Perfare/Il2CppDumper/blob/master/LICENSE
+------------------------------------------------------------------------------
+MIT License
+
+Copyright (c) 2016 Perfare
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+==============================================================================
+AsmResolver
+==============================================================================
+Shipped files:  BepInEx/core/AsmResolver.dll          (5.5.0)
+                BepInEx/core/AsmResolver.DotNet.dll   (5.5.0)
+                BepInEx/core/AsmResolver.PE.dll       (5.5.0)
+                BepInEx/core/AsmResolver.PE.File.dll  (5.5.0)
+Upstream:       https://github.com/Washi1337/AsmResolver
+Licence from:   https://github.com/Washi1337/AsmResolver/blob/6f0a38370372ffc8029a5c1409ea6611bdd4c6a8/LICENSE.md
+------------------------------------------------------------------------------
+The MIT License (MIT)
+=====================
+
+Copyright © `2016-2021 Washi`
+
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the “Software”), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+
+==============================================================================
+AssetRipper.CIL
+==============================================================================
+Shipped files:  BepInEx/core/AssetRipper.CIL.dll  (1.0.0)
+Upstream:       https://github.com/AssetRipper/AssetRipper.CIL
+                (a standalone MIT library; not the AssetRipper application,
+                which is licensed separately under the GPL)
+Licence from:   https://github.com/AssetRipper/AssetRipper.CIL/blob/1bbd32dd87c262b6690a7814a12b0fc550fa520c/LICENSE
+------------------------------------------------------------------------------
+MIT License
+
+Copyright (c) 2024 ds5678
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+==============================================================================
+AssetRipper.Primitives
+==============================================================================
+Shipped files:  BepInEx/core/AssetRipper.Primitives.dll  (3.1.3)
+Upstream:       https://github.com/AssetRipper/AssetRipper.Primitives
+                (a standalone MIT library; not the AssetRipper application,
+                which is licensed separately under the GPL)
+Licence from:   https://github.com/AssetRipper/AssetRipper.Primitives/blob/9c4a7d8127cc9af1e5f61edee8eeb90bd90676aa/License.md
+------------------------------------------------------------------------------
+MIT License
+
+Copyright (c) 2022 ds5678
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+The AssetRipper.Primitives README states that its code forked from uTinyRipper
+(https://github.com/mafaca/UtinyRipper) is MIT licensed, and the repository
+carries that licence:
+Licence from:   https://github.com/AssetRipper/AssetRipper.Primitives/blob/9c4a7d8127cc9af1e5f61edee8eeb90bd90676aa/Licenses/uTinyRipper.md
+------------------------------------------------------------------------------
+MIT License
+
+Copyright (c) 2020 mafaca
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+==============================================================================
+Mono.Cecil
+==============================================================================
+Shipped files:  BepInEx/core/Mono.Cecil.dll        (0.11.4)
+                BepInEx/core/Mono.Cecil.Mdb.dll    (0.11.4)
+                BepInEx/core/Mono.Cecil.Pdb.dll    (0.11.4)
+                BepInEx/core/Mono.Cecil.Rocks.dll  (0.11.4)
+Upstream:       https://github.com/jbevain/cecil
+Licence from:   https://github.com/jbevain/cecil/blob/0.11.4/LICENSE.txt
+------------------------------------------------------------------------------
+Copyright (c) 2008 - 2015 Jb Evain
+Copyright (c) 2008 - 2011 Novell, Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Mono.Cecil.Pdb.dll includes the Microsoft.Cci.Pdb reader, which the Cecil
+repository carries under its own licence:
+Licence from:   https://github.com/jbevain/cecil/blob/0.11.4/symbols/pdb/Microsoft.Cci.Pdb/LICENSE
+------------------------------------------------------------------------------
+The MIT License (MIT)
+
+Copyright (c) Microsoft
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Mono.Cecil.Mdb.dll includes Mono's symbol-file code
+(symbols/mdb/Mono.CompilerServices.SymbolWriter in the Cecil repository at tag
+0.11.4). Those source files carry the same MIT permission notice as above, with
+these copyright lines:
+  (C) 2002 Ximian, Inc.  http://www.ximian.com
+  (C) 2003 Ximian, Inc.  http://www.ximian.com
+  (C) 2005 Novell, Inc.  http://www.novell.com
+  Copyright (C) 2012 Xamarin Inc (http://www.xamarin.com)
+
+==============================================================================
+Iced
+==============================================================================
+Shipped files:  BepInEx/core/Iced.dll  (1.21.0)
+Upstream:       https://github.com/icedland/iced
+Licence from:   https://github.com/icedland/iced/blob/601c40570d6c986c8e1a6a2e483dd2fdf5ade552/LICENSE.txt
+------------------------------------------------------------------------------
+https://github.com/icedland/iced
+Copyright (C) 2018-present iced project and contributors
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+==============================================================================
+Capstone.NET
+==============================================================================
+Shipped files:  BepInEx/core/Gee.External.Capstone.dll  (2.3.1)
+Upstream:       https://github.com/ds5678/Capstone.NET
+                The shipped build is the AssetRipper.Gee.External.Capstone 2.3.1
+                package, built from this fork at commit
+                de241200f81723ab7cc317d0e81433a3f9e80ca6. It is a fork of
+                https://github.com/9ee1/Capstone.NET, whose LICENSE is identical.
+Licence from:   https://github.com/ds5678/Capstone.NET/blob/de241200f81723ab7cc317d0e81433a3f9e80ca6/LICENSE
+
+Capstone.NET is a binding for the native Capstone disassembly engine, which is
+under a separate BSD licence. The native engine (capstone.dll) is NOT included
+in this download, so no Capstone engine code is redistributed here.
+------------------------------------------------------------------------------
+MIT License
+
+Copyright (c) Ahmed Garhy
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+==============================================================================
+Disarm
+==============================================================================
+Shipped files:  BepInEx/core/Disarm.dll  (2022.1.0-master.26)
+Upstream:       https://github.com/SamboyCoding/Disarm
+                The shipped build comes from commit
+                cb8877f0dc1eecd6cbfba219991f8b00be2d41bc (December 2022). At
+                that commit the repository had no LICENSE file; the project
+                file declared the licence as MIT, with the copyright notice
+                "Copyright © Samboy063 2022". The repository's LICENSE file was
+                added later and is reproduced here.
+Licence from:   https://github.com/SamboyCoding/Disarm/blob/8574010015c8c56bb7faad7e407c50b0abe9cc72/LICENSE
+------------------------------------------------------------------------------
+MIT License
+
+Copyright (c) 2025 Sam Byass
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+==============================================================================
+SemanticVersioning
+==============================================================================
+Shipped files:  BepInEx/core/SemanticVersioning.dll  (2.0.2)
+Upstream:       https://github.com/adamreeve/semver.net
+Licence from:   https://github.com/adamreeve/semver.net/blob/2.0.2/LICENSE
+------------------------------------------------------------------------------
+Copyright (c) 2016 Adam Reeve
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

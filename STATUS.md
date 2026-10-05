@@ -161,9 +161,16 @@ Confirmed in `BepInEx/LogOutput.log` on a live host, current build:
   then no game scene loads — it stays in the lobby. Not yet established whether that is the
   harness's way of choosing a mode or something about the mode itself; nothing in the mod is
   implicated either way, since it takes no part in mode selection.
+- **A Windows player and a Linux player at the same table.** Linux itself is proven on a Steam
+  Deck (SteamOS 3.7, Proton 11 — see the CHANGELOG): same game files byte for byte, the mod's
+  61 start-up lines identical to Windows, an eight-seat bot table dealt and played. What has
+  not happened is a mixed lobby. Checks to make when it does: no version warning for the Linux
+  player, and the same `[seatring]` seat count and `[dealarray]`/`[turn]` lines in both logs.
+  Deck players must use High graphics or lower — on Ultra the table never loads (out of
+  graphics memory, at four players as well as eight).
 - **A real eight-person table.** Eight *connections* have been proven, all from one machine.
-  Eight people on eight machines, over Steam rather than loopback, is still untested — and
-  it is the only thing left before v1.0.0.
+  Eight people on eight machines, over Steam rather than loopback, is still untested — v1.0.0
+  shipped without it, and it remains the open question.
 
 ## Known structural limits
 
