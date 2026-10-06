@@ -34,6 +34,12 @@ internal static class Loopback
     private static bool _started;
     private static float _next;
 
+    // Where a client dials: this machine, unless told otherwise. Told otherwise, a copy on one
+    // machine can join a host on another over the network - which is how a Windows copy and a
+    // Linux one under Proton get put at one table when both machines are signed into the same
+    // Steam account, and so cannot meet in a Steam lobby.
+    private static string _address = "127.0.0.1";
+
     internal static bool Active => _role != Role.Off;
     internal static Role Mine => _role;
 
@@ -162,15 +168,32 @@ internal static class Loopback
             else return;
 
             string want = System.Environment.GetEnvironmentVariable("LIARSBAR8P_EXPECT");
+            string address = System.Environment.GetEnvironmentVariable("LIARSBAR8P_ADDRESS");
+
+            // The same two as command line options, for a copy started by Steam - on a Steam
+            // Deck, say - where the environment cannot be set but extra options can be passed:
+            // steam -applaunch 3097560 -lbhost -lbexpect 2
+            var args = System.Environment.GetCommandLineArgs();
+            for (int i = 0; i + 1 < args.Length; i++)
+            {
+                if (string.Equals(args[i], "-lbexpect", StringComparison.OrdinalIgnoreCase)) want = args[i + 1];
+                else if (string.Equals(args[i], "-lbaddress", StringComparison.OrdinalIgnoreCase)) address = args[i + 1];
+            }
+
             if (!string.IsNullOrEmpty(want) && int.TryParse(want, out int n) && n > 1) _expect = n;
+
+            if (!string.IsNullOrWhiteSpace(address) && address.IndexOfAny(new[] { ' ', '/', ':' }) < 0)
+                _address = address.Trim();
 
             string p = System.Environment.GetEnvironmentVariable("LIARSBAR8P_PORT");
             if (!string.IsNullOrEmpty(p) && int.TryParse(p, out int parsed) && parsed > 1024 && parsed < 65535)
                 _port = parsed;
 
             Plugin.Log.LogWarning(
-                $"[loopback] this copy is a {_role} on 127.0.0.1:{_port} - Steam is not used for " +
-                "networking in this mode");
+                $"[loopback] this copy is a {_role}" +
+                (_role == Role.Client ? $", joining {_address}:{_port}" : $" on port {_port}") +
+                (_expect > 0 ? $", waiting for {_expect} players" : "") +
+                " - Steam is not used for networking in this mode");
         }
         catch (Exception e)
         {
@@ -202,7 +225,7 @@ internal static class Loopback
             if (tp == null) { _started = true; return; }
 
             nm.maxConnections = Limits.Max;
-            nm.networkAddress = "127.0.0.1";
+            nm.networkAddress = _address;
 
             // Extra copies are here to be a connection, not to be watched: no sound, and a
             // modest frame rate so eight of them do not fight over the machine. The game's
@@ -233,7 +256,7 @@ internal static class Loopback
             }
             else
             {
-                Plugin.Log.LogWarning($"[loopback] joining 127.0.0.1:{_port}");
+                Plugin.Log.LogWarning($"[loopback] joining {_address}:{_port}");
                 nm.StartClient();
             }
         }

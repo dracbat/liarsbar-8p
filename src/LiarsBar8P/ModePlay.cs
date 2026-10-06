@@ -119,6 +119,31 @@ internal static class ModePlay
     /// </summary>
     private sealed class DicePlayer : IModePlayer
     {
+        /// <summary>
+        /// How many dice the first bid of a round names: one, unless <c>LIARSBAR8P_DICE_OPEN</c>
+        /// says otherwise.
+        ///
+        /// Steady raises from one never get anywhere near twenty, and twenty is where the game's
+        /// spoken bids run out - a bid past it is what disconnected a player in a real game of
+        /// six. Opening high is how a harness run reaches those bids on purpose.
+        /// </summary>
+        private static readonly int OpenCount = ReadOpenCount();
+
+        private static int ReadOpenCount()
+        {
+            try
+            {
+                string raw = Environment.GetEnvironmentVariable("LIARSBAR8P_DICE_OPEN");
+                if (!string.IsNullOrEmpty(raw) && int.TryParse(raw, out int n) && n >= 1 && n <= 40)
+                {
+                    Plugin.Log.LogWarning($"[play] Liar's Dice rounds open at {n} dice for this run");
+                    return n;
+                }
+            }
+            catch { }
+            return 1;
+        }
+
         private static DiceGamePlayManager Mgr
         {
             get { try { return Manager.Instance != null ? Manager.Instance.DiceGame : null; } catch { return null; } }
@@ -155,8 +180,8 @@ internal static class ModePlay
             if (!anyBid || count <= 0)
             {
                 int openFace = 2 + (p.Slot % 4);
-                Dev.Log("play", $"{p.PlayerName} (seat {p.Slot}) opens the bidding: 1 x {openFace}");
-                Bid(p, gp, 1, openFace);
+                Dev.Log("play", $"{p.PlayerName} (seat {p.Slot}) opens the bidding: {OpenCount} x {openFace}");
+                Bid(p, gp, OpenCount, openFace);
                 return;
             }
 
