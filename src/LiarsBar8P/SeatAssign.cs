@@ -37,6 +37,13 @@ internal static class SeatAssign
             }
             Plugin.Log.LogInfo($"[seatassign] {when}:{sb}");
 
+            // Only a fault once the match is on. Table seats are handed out by StartGame, so in
+            // the lobby every player still reads seat 0 - and this used to print "DUPLICATE
+            // seat 0" for every lobby of two or more, which sent a player's bug report looking
+            // for a seating fault that was not there.
+            var m = Manager.Instance;
+            if (m == null || !m.GameStarted) return;
+
             // duplicates mean two players share a seat - worth shouting about
             for (int i = 0; i < seen.Count; i++)
                 for (int j = i + 1; j < seen.Count; j++)

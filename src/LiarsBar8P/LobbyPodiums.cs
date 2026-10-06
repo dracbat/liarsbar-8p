@@ -1003,6 +1003,13 @@ internal static class LobbyPodiums
     private const float BlendSeconds = 1.4f;
 
     private static bool _pulledBack;
+
+    /// <summary>True while the wider shot for five or more is being held.</summary>
+    internal static bool PulledBack => _pulledBack;
+
+    /// <summary>The lobby camera this is holding, or null before it has been found.</summary>
+    internal static Camera HeldCamera => _cam;
+
     private static float _blendStarted;
     private static Vector3 _blendFrom;
     private static Quaternion _blendFromRot;

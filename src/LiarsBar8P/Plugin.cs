@@ -94,6 +94,7 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(SeatAssign),     "seat assignment");
         Apply(harmony, typeof(TransportCap),   "steam transport cap");
         Apply(harmony, typeof(LobbyPodiums),   "lobby podiums beyond four");
+        Apply(harmony, typeof(LobbySkinClick), "clicking your character in a lobby of five or more");
         Apply(harmony, typeof(TurnOrderFix),   "turn order");
         Apply(harmony, typeof(SeatExpansion),  "table seat expansion");
         Apply(harmony, typeof(SeatRing),       "seat spacing");
@@ -110,6 +111,7 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(DealTrace),      "deal trace");
         Apply(harmony, typeof(DevLogging),     "developer logging");
         Apply(harmony, typeof(RpcTrace),       "naming a remote call that throws");
+        Apply(harmony, typeof(BetVoiceGuard),  "dice bids beyond the recorded voice lines");
         Apply(harmony, typeof(ResetAnimFix),   "reset animation beyond four seats");
         Apply(harmony, typeof(AimRing),        "aiming at every seat, not three");
         Apply(harmony, typeof(MechanicsTrace),  "devil and chaos mechanics trace");
