@@ -16,6 +16,57 @@ Versions that were once numbered 1.x and 2.x were folded into the same 0.x line 
 room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order is unchanged: what
 was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v1.1.1 — Fixes from the first real six-player games
+
+The first bug report from people playing it for real: six players on six machines. Thank you
+for it, and for the log that came with it — every fix below was found by reading it.
+
+**Everyone at the table needs to update.** The version check compares version numbers, so a
+player still on 1.1.0 is flagged as a mismatch. Players on Windows can run their saved
+`Install-LiarsBar8P.bat` again, and players on Linux their `Install-LiarsBar8P.sh` — both fetch
+the newest release.
+
+### Fixed
+
+- **A big bid in Liar's Dice disconnected people.** The game has a spoken line for each bid
+  from one to twenty — as many dice as four players hold. From five players up there are more
+  dice than that, and the first bid past twenty asked every game at the table to play a line
+  that does not exist. Players running the mod carried on; anyone whose mod was not loading
+  was disconnected on the spot. The host now leaves out the spoken line when there is none to
+  play. The bid itself is unchanged — it is on the table and on everybody's screen as before.
+- **With five or more in the lobby, changing your character meant hunting for the right
+  spot.** The camera pulls back for the bigger lobby and the name plates lift above the
+  players, and the game's click-to-change spot went up with them — over somebody else's head,
+  and for players on the extra podiums, not reachable at all. Now your own character lights
+  up under the mouse and changes when clicked (left for the next, right for the one before),
+  on every podium, the way it does with four. The old spot up by the name no longer answers
+  the mouse. With four or fewer, nothing is different.
+- **The log warned "DUPLICATE seat 0" in every lobby.** Nobody has a table seat until the
+  match starts, so in the lobby everybody reads seat 0. It was never a fault, and it sent a
+  bug report looking for one. It now only warns once a match is under way.
+
+### If one player's game misbehaves
+
+If the warning in the top-left says somebody is on **OLD or NO MOD**, their copy of the mod is
+not running — and that player's game will fight the others over where everyone sits. Every
+player should see **Liar's Bar 8P v1.1.1** in the top-left corner. Anyone who does not should
+install again.
+
+### What was checked
+
+- Liar's Dice with six copies of the game holding six real network connections, every round
+  opening at twenty-five dice: no errors on any copy, nobody disconnected, the match played to
+  a winner. One copy was then closed in the middle of a round, and the turn went on round the
+  table in seat order, skipping the seat that had gone.
+- The lobby with five copies: hovering and clicking your own character on an original podium
+  and on an extra one, and the old spot by the name staying quiet.
+
+### Not yet true
+
+- **A reveal of a bid past twenty does not finish drawing the dice.** When somebody calls a
+  bid of more than twenty, the panel that lays out the dice has room for twenty and stops
+  there. The round itself carries on normally. Next on the list.
+
 ## v1.1.0 — Linux and the Steam Deck
 
 People play Liar's Bar on Linux, and asked for the mod there. There is no Linux version of
