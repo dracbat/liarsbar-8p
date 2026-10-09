@@ -55,6 +55,9 @@ internal static class ModePlay
         var player = For(kind);
         if (player == null) return;                 // Liar's Deck and Chaos Deck: BotBehaviour's job
 
+        // A Texas swap spans several ticks: the menu held open, the choice, the animation.
+        if (kind == TableHand.Kind.Texas) _texas.Continue();
+
         // Count turns the same way BotBehaviour does, so "already acted this turn" survives the
         // active seat coming round again a lap later.
         int active = m.ActivePlayerSlot;
@@ -251,7 +254,7 @@ internal static class ModePlay
     }
 
     /// <summary>
-    /// Liar's Texas: put a bullet in, or get out.
+    /// Liar's Texas: swap a card, put a bullet in, or get out.
     ///
     /// A betting round rather than a bidding one. A seat either matches what is on the table -
     /// which the game calls rising, and which costs a bullet - or folds, which is free and
@@ -262,13 +265,35 @@ internal static class ModePlay
     /// the stake and <c>CMDRised</c> is what tells the table the seat has acted and hands the
     /// turn on. Sending the second without the first bets nothing; sending the first without
     /// the second leaves the table waiting on a player who has already moved.
+    ///
+    /// Before betting in the first round, every other seat swaps a card, the way a person does
+    /// it: open the switch on one of its two cards (<c>SetSwitch</c>, which tells every machine
+    /// which card is going back), hold the menu open for three seconds as a person reading the
+    /// options would, choose one (<c>SwitchCmd</c>), let the animation finish, then bet. The
+    /// report this tests was "after changing cards you can see the next player's cards; if you
+    /// don't change, question marks" - so which seats swap alternates hand by hand, and every
+    /// hand has seats that swapped sitting next to seats that did not. The end of the swap is
+    /// deliberately left to the game, which is half of what is being tested;
+    /// <see cref="TexasSwap"/> ends it if the game does not.
     /// </summary>
     private sealed class TexasPlayer : IModePlayer
     {
+        /// <summary>How long the switch menu stays open before a choice is made.</summary>
+        private const float SwapHold = 3f;
+
+        /// <summary>How long to wait for the swap animation to end before betting anyway.</summary>
+        private const float SwapSettle = 3f;
+
         private static TexasGamePlayManager Mgr
         {
             get { try { return Manager.Instance != null ? Manager.Instance.TexasGame : null; } catch { return null; } }
         }
+
+        // The swap in progress. There is only one turn at a time, so only ever one of these.
+        private PlayerStats _swapper;
+        private TexasGamePlay _swapGp;
+        private int _swapSlot, _swapIdx, _swapOld, _swapMove;
+        private float _openedAt, _chosenAt;
 
         /// <summary>
         /// The all-in question is answered by everyone at once rather than in turn, so it is
@@ -287,6 +312,15 @@ internal static class ModePlay
             var gp = p.GetComponent<TexasGamePlay>();
             if (t == null || gp == null) return;
 
+            try { if (gp.Folded || gp.Rised) return; }
+            catch { return; }
+
+            if (StartSwap(p, gp, t, moveNo)) return;    // the bet follows once the swap is over
+            Bet(p, gp, t, moveNo);
+        }
+
+        private static void Bet(PlayerStats p, TexasGamePlay gp, TexasGamePlayManager t, int moveNo)
+        {
             try { if (gp.Folded || gp.Rised) return; }
             catch { return; }
 
@@ -324,6 +358,143 @@ internal static class ModePlay
 
             gp.UserCode_AddBullet__Boolean(allIn);
             gp.UserCode_CMDRised__Boolean(allIn);
+        }
+
+        /// <summary>
+        /// Open the switch, if this seat is one that swaps this hand and could swap now.
+        ///
+        /// The card going back is the server's own record of the seat's hand. The card objects'
+        /// numbers are only filled in once the owner's machine answers the deal, which a seat
+        /// with no machine behind it never does.
+        /// </summary>
+        private bool StartSwap(PlayerStats p, TexasGamePlay gp, TexasGamePlayManager t, int moveNo)
+        {
+            if (_swapper != null) return false;
+            try
+            {
+                if (t.TexasRound != 0 || t.AllInMode) return false;
+                if (!gp.HaveCards || gp.Switched || gp.isSwitching) return false;
+
+                int hand = TexasSwap.HandsDealt;
+                if (((p.Slot + hand) & 1) != 0) return false;
+
+                var options = gp.SwitchCards;
+                var types = gp.CardTypes;
+                if (options == null || options.Count == 0 || types == null || types.Count < 2) return false;
+
+                int idx = ((p.Slot >> 1) + hand) & 1;
+                int old = types[idx];
+                if (old <= 0) return false;
+
+                // The game's own key path: SetSwitch, then the menu opening plays the sound.
+                gp.UserCode_SetSwitch__Int32__Int32(idx, old);
+                try { gp.UserCode_SwitchStartSFXCMD(); } catch { }
+
+                _swapper = p;
+                _swapGp = gp;
+                _swapSlot = p.Slot;
+                _swapIdx = idx;
+                _swapOld = old;
+                _swapMove = moveNo;
+                _openedAt = Time.time;
+                _chosenAt = 0f;
+
+                Dev.Log("play", $"{p.PlayerName} (seat {p.Slot}) opens the switch on card {idx} ({old}), " +
+                                $"{options.Count} to choose from - choosing in {SwapHold:0} s");
+                return true;
+            }
+            catch (Exception e)
+            {
+                Dev.Warn("play", $"seat {p.Slot} could not open the switch: {e.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>Move a swap in progress on, from <see cref="ModePlay.Tick"/>.</summary>
+        internal void Continue()
+        {
+            if (_swapper == null) return;
+            try { Step(); }
+            catch (Exception e)
+            {
+                Dev.Warn("play", $"seat {_swapSlot}'s swap failed: {e.Message}");
+                Forget();
+            }
+        }
+
+        private void Step()
+        {
+            var p = _swapper;
+            var gp = _swapGp;
+            var t = Mgr;
+
+            string cut = null;
+            if (p == null || gp == null || t == null) cut = "the table went away";
+            else if (p.Dead) cut = "the seat is out";
+            else if (!p.HaveTurn) cut = "the turn ended";
+            else if (t.AllInMode) cut = "the table went all in";
+
+            if (cut != null)
+            {
+                Dev.Warn("play", $"seat {_swapSlot}'s swap was cut short - {cut}");
+
+                // A menu that was never chosen from is closed rather than left for the watchdog.
+                if (_chosenAt == 0f && gp != null && gp.isSwitching) gp.UserCode_EndSwitchCmd();
+                Forget();
+                return;
+            }
+
+            float now = Time.time;
+            if (_chosenAt == 0f)
+            {
+                if (now - _openedAt < SwapHold) return;
+
+                var options = gp.SwitchCards;
+                int offered = t.TexasRound == 0 ? 4 : t.TexasRound == 1 ? 3 : 2;
+                int choices = Math.Min(offered, options != null ? options.Count : 0);
+                if (choices <= 0)
+                {
+                    Dev.Warn("play", $"seat {_swapSlot} has nothing to switch to - closing the switch and betting");
+                    if (gp.isSwitching) gp.UserCode_EndSwitchCmd();
+                    BetNow(p, gp, t);
+                    return;
+                }
+
+                int opt = (_swapSlot + TexasSwap.HandsDealt) % choices;
+                int incoming = options[opt];
+                gp.UserCode_SwitchCmd__Int32__Int32(_swapIdx, opt);
+                _chosenAt = now;
+
+                Dev.Log("play", $"{p.PlayerName} (seat {_swapSlot}) swaps card {_swapIdx} ({_swapOld}) for option " +
+                                $"{opt} of {choices} ({incoming}) - {(gp.Switched ? "accepted" : "NOT accepted")}");
+                return;
+            }
+
+            // Bet once the animation has ended the swap, as a person would - or, if it has not,
+            // after a few seconds, leaving the stuck flag for the watchdog to find.
+            float waited = now - _chosenAt;
+            if (gp.isSwitching && waited < SwapSettle) return;
+
+            if (gp.isSwitching)
+                Dev.Warn("play", $"seat {_swapSlot} is still marked mid-swap {waited:0.0} s after choosing - betting anyway");
+            else
+                Dev.Log("play", $"seat {_swapSlot}'s swap ended within {waited:0.0} s of choosing");
+
+            BetNow(p, gp, t);
+        }
+
+        private void BetNow(PlayerStats p, TexasGamePlay gp, TexasGamePlayManager t)
+        {
+            int move = _swapMove;
+            Forget();
+            Bet(p, gp, t, move);
+        }
+
+        private void Forget()
+        {
+            _swapper = null;
+            _swapGp = null;
+            _chosenAt = 0f;
         }
     }
 

@@ -342,7 +342,20 @@ internal static class Loopback
 
             var nm = UnityEngine.Object.FindObjectOfType<CustomNetworkManager>();
             if (nm == null || nm.GamePlayers == null) return;
-            if (nm.GamePlayers.Count < _expect) return;
+
+            // Not everybody asked for may come: a launcher that runs short of memory stops
+            // starting copies rather than drive the machine into the page file. Once nobody
+            // new has arrived for a couple of minutes, go with whoever is here - the bots in
+            // LIARSBAR8P_FILL make up the rest of the table.
+            int here = nm.GamePlayers.Count;
+            if (here != _lastHere) { _lastHere = here; _lastArrival = Time.time; }
+            bool givenUp = here >= 2 && Time.time - _lastArrival > 150f;
+            if (here < _expect && !givenUp) return;
+            if (here < _expect && !_announcedShort)
+            {
+                _announcedShort = true;
+                Plugin.Log.LogWarning($"[loopback] {here} of {_expect} copies arrived and nobody new for a while - going ahead");
+            }
 
             // The mode first, before anybody is marked ready. Choosing it last looked right
             // and did nothing: the call went through and the lobby still reported Liar's Deck,
@@ -357,11 +370,32 @@ internal static class Loopback
                 return;
             }
 
+            // Bots to make up the table, from LIARSBAR8P_FILL. Eight copies of the game want
+            // about six gigabytes each, which a machine does not always have spare; four copies
+            // and four bots still put eight characters round the table, and four of them can
+            // be looked through. Added once, in the lobby, where bots have to be added.
+            if (!_filled)
+            {
+                _filled = true;
+                string fill = Environment.GetEnvironmentVariable("LIARSBAR8P_FILL");
+                if (!string.IsNullOrEmpty(fill) && int.TryParse(fill, out int table) && table > nm.GamePlayers.Count)
+                {
+                    BotManager.FillTo(Math.Min(table, Limits.Max));
+                    Plugin.Log.LogWarning($"[loopback] filled the table to {nm.GamePlayers.Count} with bots");
+                    _readyAt = 0f;
+                    return;
+                }
+            }
+
             // Everyone ready, including the copies with nobody at the keyboard.
+            // Bots are readied but not waited for: the lobby clears a bot's flag again every
+            // frame, because it has no client holding the button, so counting them made the
+            // start wait for ever.
             int waiting = 0;
             foreach (var p in nm.GamePlayers)
             {
                 if (p == null) continue;
+                if (BotManager.IsBot(p)) { if (!p.Ready) p.NetworkReady = true; continue; }
                 if (!p.Ready) { p.NetworkReady = true; waiting++; }
             }
 
@@ -393,6 +427,10 @@ internal static class Loopback
     private static int _expect;
     private static bool _matchStarted;
     private static bool _modeChosen;
+    private static bool _filled;
+    private static int _lastHere = -1;
+    private static float _lastArrival;
+    private static bool _announcedShort;
     private static float _readyAt;
 
     /// <summary>
