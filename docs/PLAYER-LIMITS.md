@@ -161,8 +161,10 @@ table of four seats by three directions:
 
 Any seat above the third falls off the end and the method returns nothing at all.
 
-**`LeftAim()` / `RightAim()`** — the arrow keys. They walk a single number between −1 and 1
-and refuse to move past either end. Three values, three targets.
+**`LeftAim()` / `RightAim()`** — and a copy of their bodies compiled straight into the per-frame
+update, which is what the aiming keys (A / D, LB / RB, the D-pad) actually run. Both walk a
+single number between −1 and 1 and refuse to move past either end. Three values, three
+targets.
 
 Together those break the mechanic in two directions at once above four players. Seats four
 to seven cannot aim at anybody: the table has no row for them, so the shot resolves against

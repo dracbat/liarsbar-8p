@@ -28,7 +28,7 @@ away completely. (Steam's *Verify integrity of game files* is no substitute: it 
 the game's own files, and leaves the mod's where they are.)
 
 **Everyone playing together must install this and run the same version.** A vanilla client in a
-modded lobby will desync. The version you are running is drawn in the top-left corner in game,
+modded lobby will desync. The version you are running is drawn at the top of the screen in game,
 and every player is warned when somebody's build differs.
 
 **On Linux or a Steam Deck?** It is the same mod, running through Proton — tested on a Steam
@@ -75,9 +75,10 @@ every mode the lobby can reach.
 
 And this is the fix this release exists for. Before it, at eight players, the revolver could
 only be pointed at three fixed chairs — and if you were sitting in seat four or later you could
-not aim at anybody at all. Now every seat can choose any other, and because the game only has
-three aiming animations and never turns anyone to face a particular chair, the mod tells you
-who you have actually picked:
+not aim at anybody at all. Now every seat can choose any other with the game's own aiming
+keys (A / D, LB / RB or the D-pad), going round the table past either end, and because the
+game only has three aiming animations and never turns anyone to face a particular chair, the
+mod tells you who you have picked and where they sit:
 
 ![Aiming at a named player at a table of eight](docs/images/aiming-at-eight.jpg)
 
@@ -184,7 +185,7 @@ terms.
 | **Eight in the lobby** | Four extra podiums, a second row, the camera pulled back so everyone is in frame, and each name plate lifted above the player it belongs to. |
 | **The turn reaches everyone** | Six separate places wrap the seat number at three. All six are rewritten, including two that only matter when somebody dies or drops mid-round. |
 | **Everyone is dealt** | Nine routines allocate room for exactly four hands. Every one is widened, and the deck grows with the table so nobody is short. |
-| **You can shoot anyone** | In the Chaos deck the revolver could only be pointed at three fixed chairs. Now every seat can choose any other, and the mod names your target on screen — three canned aiming poses cannot identify one of seven people. |
+| **You can shoot anyone** | In the Chaos deck the revolver could only be pointed at three fixed chairs. Now every seat can choose any other with the aiming keys, and the mod names your target and where they sit on screen — three canned aiming poses cannot identify one of seven people. |
 | **It says what it did** | The version is drawn in the corner, everyone is warned if somebody's build differs, and the log names the exact networked call behind any failure instead of leaving you guessing. |
 
 ---
@@ -271,7 +272,7 @@ players sit at the same table.
    error, just no mod. If the game already has launch options, keep one `%command%`, at the
    end: `WINEDLLOVERRIDES="winhttp=n,b" gamemoderun %command%`.
 4. Launch the game. The first launch is slow while BepInEx sets up; let it reach the main menu.
-   The mod's version in the top-left corner means it loaded.
+   The mod's version at the top of the screen means it loaded.
 
 **Steam Deck:** do steps 1 and 2 in Desktop Mode (Steam button → Power → Switch to Desktop).
 The terminal is called Konsole, and Steam + X brings up the keyboard. Step 3 also works in Game
@@ -317,6 +318,7 @@ stale setting once silently disabled a fix for a whole session.
 | Setting | Default | Meaning |
 |---|---|---|
 | `MaxPlayers` | `8` | Lobby size. **Must match across all players.** |
+| `AutoReadyJoiners` | `true` | When you host, each player is marked ready once as they join and when everyone comes back from a match, so you only have to press Start. They can un-ready with the game's button. Only the host's setting matters. |
 | `VerboseDiagnostics` | `true` | Log seat, podium and deck counts. Leave on — it is what makes a bad round diagnosable. |
 | `DeveloperMode` | `false` | Test tools: bots, an F8 panel, and a running account of everything. Leave off for normal play. |
 | `SelfTest*` | `false` | Developer only. Leave off. |

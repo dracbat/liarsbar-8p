@@ -1,5 +1,6 @@
 using System;
 using HarmonyLib;
+using Mirror;
 
 namespace LiarsBar8P;
 
@@ -11,9 +12,9 @@ namespace LiarsBar8P;
 /// out who that is, and both were written for exactly four chairs:
 ///
 /// <list type="number">
-/// <item><b>How far the aim can move.</b> <c>LeftAim</c> and <c>RightAim</c> walk a single
-/// number between -1 and 1 and refuse to go past either end. Three values, three targets -
-/// which is every opponent when there are four players and nobody else.</item>
+/// <item><b>How far the aim can move.</b> The aiming keys walk a single number between -1 and
+/// 1 and refuse to go past either end. Three values, three targets - which is every opponent
+/// when there are four players and nobody else.</item>
 /// <item><b>Who that number means.</b> <c>GetAimTargetSlot</c> is a hand-written table of four
 /// seats by three directions. Seats 0-3 are listed; anything else falls off the end and the
 /// method returns nothing at all.</item>
@@ -43,6 +44,15 @@ namespace LiarsBar8P;
 /// replacement is not a new rule that happens to agree at four - it is the shipped rule with
 /// the four taken out of it. Aim 0 still means the player opposite whatever the size, which is
 /// what keeps the controls feeling like the ones people already know.
+///
+/// <b>Where the keys are.</b> In Liar's Poker the keys call <c>LeftAim</c> and
+/// <c>RightAim</c>, so patching those two is enough there. In the Chaos deck - the variant the
+/// chaos card belongs to - it is not: the game's build compiled a copy of both methods
+/// straight into <c>ChaosDeckGameplay.UpdateCall</c>, so the real methods are never called and
+/// a patch on them never runs when a person presses a key. Version 1.1.1 patched only those
+/// methods, which is why the arithmetic here was right and players at seven still could only
+/// reach the three people furthest away. The Chaos deck's keys are handled by
+/// <see cref="AimKeys"/>, which reads the same keys and steps with <see cref="Step"/> below.
 ///
 /// <b>What the aim still cannot do.</b> The pose is an animation, not a rotation: the game
 /// plays one of three canned looking-left / ahead / right clips and never turns anyone to face
@@ -80,16 +90,16 @@ internal static class AimRing
     }
 
     /// <summary>Chairs round the table from me to the target: 1 is the next one, n-1 the previous.</summary>
-    private static int Offset(int n, int aim) => n / 2 - aim;
+    internal static int Offset(int n, int aim) => n / 2 - aim;
 
     /// <summary>The aim that points this far round. The inverse of <see cref="Offset"/>.</summary>
     private static int AimFor(int n, int offset) => n / 2 - offset;
 
     /// <summary>Furthest right the aim goes: the next chair round.</summary>
-    private static int Highest(int n) => n / 2 - 1;
+    internal static int Highest(int n) => n / 2 - 1;
 
     /// <summary>Furthest left the aim goes: the chair before mine.</summary>
-    private static int Lowest(int n) => n / 2 - (n - 1);
+    internal static int Lowest(int n) => n / 2 - (n - 1);
 
     /// <summary>The seat an aim points at, or -1 when it points at nobody - or at me.</summary>
     private static int TargetSlot(int me, int aim, int n)
@@ -127,7 +137,7 @@ internal static class AimRing
     /// lives on the player object, so its own <c>playerStats</c> is the one seat that is
     /// certainly right, on a client as much as on the host.
     /// </summary>
-    private static bool Who(CharController self, out Manager m, out int me, out int n)
+    internal static bool Who(CharController self, out Manager m, out int me, out int n)
     {
         m = null; me = -1; n = 0;
         try
@@ -148,8 +158,14 @@ internal static class AimRing
         catch { return false; }
     }
 
+    /// <summary>
+    /// The same question for the readout: this player's seat and the size of the ring, or
+    /// false at four players and below, where the shipped game needs no help.
+    /// </summary>
+    internal static bool Ring(CharController self, out int me, out int n) => Who(self, out _, out me, out n);
+
     /// <summary>The player an aim points at, or null - the same question the shipped code asks.</summary>
-    private static PlayerStats Target(Manager m, int me, int aim, int n, bool skipOut)
+    internal static PlayerStats Target(Manager m, int me, int aim, int n, bool skipOut)
     {
         int slot = TargetSlot(me, aim, n);
         if (slot < 0) return null;
@@ -164,18 +180,32 @@ internal static class AimRing
     /// targets and a game that kills people steadily, an aim that could rest on a corpse would
     /// spend much of a match pointing at nobody - and the player would have no way to tell,
     /// because the pose is the same either way. Four seats could get away without this; seven
-    /// is the difference between choosing a target and hunting for one.
+    /// is the difference between choosing a target and hunting for one. It also matters to
+    /// the shot: the server refuses to kill somebody who is already dead, so a live chamber
+    /// fired at an empty chair is a chaos card thrown away.
+    ///
+    /// <paramref name="wrap"/> carries the aim on round the table past either end - from the
+    /// chair on your right straight to the chair on your left, the way the seats actually sit
+    /// - instead of stopping there. The Chaos deck's keys ask for it: with seven people to
+    /// choose from, two neighbours who are a single press apart at the table were five presses
+    /// apart on a range with hard ends. Liar's Poker keeps the shipped hard stops.
     ///
     /// False means there was nowhere further to go, which is also what the shipped code does at
     /// either end of its range: it stays where it is.
     /// </summary>
-    private static bool Step(Manager m, int me, int n, int from, int direction, out int landed)
+    internal static bool Step(Manager m, int me, int n, int from, int direction, bool wrap, out int landed)
     {
         landed = from;
         int lo = Lowest(n), hi = Highest(n);
+        int span = hi - lo + 1;                      // every aim that names somebody else
+        if (span < 1 || direction == 0) return false;
 
-        for (int a = from + direction; a >= lo && a <= hi; a += direction)
+        for (int i = 1; i <= span; i++)
         {
+            int a = from + direction * i;
+            if (wrap) a = lo + (((a - lo) % span) + span) % span;
+            else if (a < lo || a > hi) break;
+            if (a == from) break;                    // all the way round and back
             if (Target(m, me, a, n, true) == null) continue;
             landed = a;
             return true;
@@ -188,9 +218,10 @@ internal static class AimRing
     /// way until somebody is found.
     ///
     /// The shipped code tries 0, then 1, then -1. Working outwards from zero reproduces that
-    /// order exactly at four players, and extends it the only way it can.
+    /// order exactly at four players, and extends it the only way it can. Every aim it can
+    /// answer with is inside the range the keys walk, and names somebody still in the game.
     /// </summary>
-    private static int First(Manager m, int me, int n)
+    internal static int First(Manager m, int me, int n)
     {
         int lo = Lowest(n), hi = Highest(n);
 
@@ -208,7 +239,7 @@ internal static class AimRing
     }
 
     /// <summary>Tell the animator which of its three poses to play, if there is one to tell.</summary>
-    private static void ShowPose(CharController self, int n, int aim)
+    internal static void ShowPose(CharController self, int n, int aim)
     {
         try
         {
@@ -346,6 +377,10 @@ internal static class AimRing
         return false;
     }
 
+    // Nothing in the game calls these two - the keys are compiled into UpdateCall, see
+    // AimKeys - so in normal play these prefixes never run. They stay so that the methods
+    // still mean what the keys mean if a later build of the game starts calling them.
+
     [HarmonyPrefix]
     [HarmonyPatch(typeof(ChaosDeckGameplay), "LeftAim")]
     private static bool DeckLeft(ChaosDeckGameplay __instance) => !DeckMove(__instance, -1);
@@ -354,65 +389,99 @@ internal static class AimRing
     [HarmonyPatch(typeof(ChaosDeckGameplay), "RightAim")]
     private static bool DeckRight(ChaosDeckGameplay __instance) => !DeckMove(__instance, +1);
 
-    /// <summary>
-    /// Move the aim one chair and tell the other machines about it.
-    ///
-    /// The shipped method sets the value locally so the pose does not wait for the network,
-    /// then sends it on - and both halves matter. Setting only the SyncVar would move nothing
-    /// anywhere else, because a client writing a SyncVar writes it locally and no further;
-    /// sending only the command would leave the local pose a round trip behind every keypress.
-    ///
-    /// Returns whether it handled the call.
-    /// </summary>
+    /// <summary>A move asked for through <c>LeftAim</c> / <c>RightAim</c>. Returns whether it handled the call.</summary>
     private static bool DeckMove(ChaosDeckGameplay self, int direction)
     {
         if (!Who(self, out var m, out int me, out int n)) return false;
 
-        int from;
-        try
-        {
-            if (self.AimLocked) return true;                 // the server will refuse it anyway
-            from = self.Aim;
-        }
+        try { if (self.AimLocked) return true; }             // the server will refuse it anyway
         catch { return false; }
 
-        if (!Step(m, me, n, from, direction, out int to)) return true;
+        MoveDeck(self, m, me, n, direction, out _, out _);
+        return true;
+    }
+
+    /// <summary>
+    /// Move the aim one chair - one person still in the game - and tell the other machines.
+    ///
+    /// The shipped key code sets the value locally so the pose does not wait for the network,
+    /// then sends it on - and both halves matter. Setting only the SyncVar would move nothing
+    /// anywhere else, because a client writing a SyncVar writes it locally and no further;
+    /// sending only the command would leave the local pose a round trip behind every keypress.
+    ///
+    /// The caller has already decided the aim may move; whether it is locked is not asked
+    /// again here, because <see cref="AimKeys"/> holds the lock up while it calls this.
+    /// Returns whether the aim moved.
+    /// </summary>
+    internal static bool MoveDeck(ChaosDeckGameplay self, Manager m, int me, int n, int direction,
+                                  out int from, out int to)
+    {
+        from = to = 0;
+        try { from = self.Aim; }
+        catch { return false; }
+
+        if (!Step(m, me, n, from, direction, true, out to)) { to = from; return false; }
 
         try
         {
             self.NetworkAim = to;
             ShowPose(self, n, to);
             SendAim(self, to);
+            return true;
         }
-        catch (Exception e) { Dev.Warn("aim", $"could not move the aim: {e.Message}"); }
-        return true;
+        catch (Exception e)
+        {
+            Dev.Warn("aim", $"could not move the aim: {e.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Make sure an aim that is just opening points at somebody the keys can reach and who is
+    /// still in the game - and move it there if not.
+    ///
+    /// The server picks the opening aim with <see cref="First"/>, which only ever answers with
+    /// a live seat inside the range the keys walk, so in practice this finds nothing to do. It
+    /// is here because the cost of being wrong is a whole aiming phase: a player whose aim
+    /// opened on an empty chair and who did not touch the keys would fire at nobody, and before
+    /// this release an opening outside the range the shipped keys walked could not be moved
+    /// at all. One look per aiming phase, on the machine of the person aiming.
+    /// </summary>
+    internal static bool FixOpening(ChaosDeckGameplay self, Manager m, int me, int n)
+    {
+        try
+        {
+            int aim = self.Aim;
+            if (aim >= Lowest(n) && aim <= Highest(n) && Target(m, me, aim, n, true) != null) return false;
+
+            int a = First(m, me, n);
+            if (a == aim || Target(m, me, a, n, true) == null) return false;
+
+            self.NetworkAim = a;
+            ShowPose(self, n, a);
+            SendAim(self, a);
+            Plugin.Log.LogInfo($"[aimkeys] the aim opened on an empty or unreachable chair ({aim}) - moved to {a}");
+            return true;
+        }
+        catch (Exception e)
+        {
+            Dev.Warn("aim", $"could not check the opening aim: {e.Message}");
+            return false;
+        }
     }
 
     /// <summary>
     /// Push the new aim to the server the way the shipped code does.
     ///
-    /// <c>SyncAimToServer</c> is private, so it is called by reflection rather than
-    /// reimplemented. It picks between writing the SyncVar directly and sending
-    /// <c>CmdSetAim</c> depending on which machine this is, and the command carries Mirror's
-    /// authority check and its own serialisation with it - a hand-written stand-in would be a
-    /// second copy of all of that to keep correct.
+    /// <c>SyncAimToServer</c> is the game's own: on the host it writes the SyncVar, on a client
+    /// that owns the seat it sends <c>CmdSetAim</c>, which carries Mirror's authority check and
+    /// its own serialisation with it - a hand-written stand-in would be a second copy of all of
+    /// that to keep correct. It is private in the game, but the interop assembly exposes it, so
+    /// it is called directly rather than by reflection.
     /// </summary>
-    private static System.Reflection.MethodInfo _sync;
-    private static bool _syncLooked;
-
     private static void SendAim(ChaosDeckGameplay self, int aim)
     {
-        if (!_syncLooked)
-        {
-            _syncLooked = true;
-            _sync = AccessTools.Method(typeof(ChaosDeckGameplay), "SyncAimToServer",
-                                       new Type[] { typeof(int) });
-            if (_sync == null)
-                Plugin.Log.LogWarning("[aim] SyncAimToServer is missing - aim changes will not leave this machine");
-        }
-
-        if (_sync == null) return;
-        try { _sync.Invoke(self, new object[] { aim }); }
+        try { self.SyncAimToServer(aim); }
         catch (Exception e) { Dev.Warn("aim", $"could not send the aim: {e.Message}"); }
     }
 
@@ -431,7 +500,14 @@ internal static class AimRing
         return false;
     }
 
+    // The same correction for the moment an aiming phase opens is the last patch in this
+    // class, below Liar's Poker - see DeckAimOpened for why it is down there.
+
     // ------------------------------------------------------------------- the Chaos mode
+    //
+    // The standalone mode, which players cannot currently pick. Its keys are compiled into its
+    // UpdateCall the same way the Chaos deck's are, so the two key prefixes below do not run
+    // either; left as they were until the mode is reachable and its aim path can be checked.
 
     [HarmonyPrefix]
     [HarmonyPatch(typeof(ChaosGamePlay), "GetAim")]
@@ -489,6 +565,9 @@ internal static class AimRing
         return false;
     }
 
+    // Poker's UpdateCall really does call these two when A or D is pressed, so here the
+    // patch is on the key path.
+
     [HarmonyPrefix]
     [HarmonyPatch(typeof(PokerGamePlay), "LeftAim")]
     private static bool PokerLeft(PokerGamePlay __instance)
@@ -504,12 +583,13 @@ internal static class AimRing
     ///
     /// Chaos and Poker set <c>NetworkAim</c> and stop; neither has a <c>CmdSetAim</c>, so this
     /// does not invent one. Sending a message the game has no handler for would be dropped at
-    /// best and would disconnect the sender at worst.
+    /// best and would disconnect the sender at worst. The ends of the range stay hard stops,
+    /// as they are in the shipped game.
     /// </summary>
     private static bool Move(CharController self, int direction, int from, Action<int> set)
     {
         if (!Who(self, out var m, out int me, out int n)) return false;
-        if (!Step(m, me, n, from, direction, out int to)) return true;
+        if (!Step(m, me, n, from, direction, false, out int to)) return true;
 
         try
         {
@@ -518,5 +598,41 @@ internal static class AimRing
         }
         catch (Exception e) { Dev.Warn("aim", $"could not move the aim: {e.Message}"); }
         return true;
+    }
+
+    // ------------------------------------------------- the Chaos deck, as an aiming phase opens
+
+    /// <summary>
+    /// The Chaos deck's pose correction (<see cref="DeckAimChanged"/>) for the moment an aiming
+    /// phase opens.
+    ///
+    /// When the server starts somebody aiming it tells every machine with
+    /// <c>RpcStartMasterProcesses</c>, and that, too, hands the raw aim to the animator. The
+    /// hook on aim changes does not cover it: the call usually arrives before the new aim value
+    /// does, and if the aim is the same as last time no change arrives at all, so nothing would
+    /// come along afterwards to replace a raw 2 or -3 with a clip that exists.
+    ///
+    /// Patched on Mirror's handler for the call rather than on the method with the body in it,
+    /// because the game's build compiled that body straight into the handler - a patch on the
+    /// method itself would never run.
+    ///
+    /// Kept last in the class on purpose. Every patch here is applied in the order it is
+    /// written, and the first one that fails stops the rest. This is the only one on a
+    /// generated network handler rather than an ordinary method, and the only one whose loss
+    /// costs nothing but a pose; written any higher, a failure here would quietly take the
+    /// Liar's Poker and Chaos mode aim fixes down with it.
+    /// </summary>
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(ChaosDeckGameplay), nameof(ChaosDeckGameplay.InvokeUserCode_RpcStartMasterProcesses__Boolean))]
+    private static void DeckAimOpened(NetworkBehaviour obj)
+    {
+        try
+        {
+            var deck = obj != null ? obj.TryCast<ChaosDeckGameplay>() : null;
+            if (deck == null) return;
+            if (!Who(deck, out _, out _, out int n)) return;
+            ShowPose(deck, n, deck.Aim);
+        }
+        catch (Exception e) { Dev.Warn("aim", $"could not set the opening pose: {e.Message}"); }
     }
 }

@@ -4,7 +4,7 @@ using UnityEngine;
 namespace LiarsBar8P;
 
 /// <summary>
-/// Says whose turn it is, in words, in the top left corner.
+/// Says whose turn it is, in words, in the top left corner (not in Liar's Texas, which says it itself).
 ///
 /// The game's own answer to that question is the markings on the table, and at eight players
 /// they are worse than nothing: there are four of them for eight seats, so the one nearest
@@ -40,6 +40,12 @@ internal sealed class TurnHud : MonoBehaviour
         {
             var m = Manager.Instance;
             if (m == null || !m.GameStarted) { _line = null; return; }
+
+            // Liar's Texas says whose turn it is itself, by name, in the top right - and
+            // keeps a ranking ladder down the left edge, which this line was drawn straight
+            // across. Two answers to the same question in two corners, one of them on top of
+            // something else, is worse than the game's one.
+            if (TableHand.Playing() == TableHand.Kind.Texas) { _line = null; return; }
 
             // Not Manager.Players: that is the server's roster and is empty on a client, so
             // reading it left this readout permanently blank on every screen but the host's -

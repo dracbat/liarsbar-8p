@@ -78,6 +78,9 @@ internal sealed class ModTicker : MonoBehaviour
         try { TurnPointer.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[arrow] tick failed: {e.Message}"); }
 
+        try { TexasSwap.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[texasswap] tick failed: {e.Message}"); }
+
         try { VersionCheck.ForgetWhenSessionEnds(); }
         catch (Exception e) { Plugin.Log.LogError($"[version] banner check failed: {e.Message}"); }
 
@@ -87,5 +90,19 @@ internal sealed class ModTicker : MonoBehaviour
         // The automatic test stops driving seats the moment its match is over.
         try { if (Manager.Instance == null) { DevAutoTest.MatchEnded(); MechanicsTrace.MatchOver(); } }
         catch (Exception e) { Plugin.Log.LogError($"[auto] match-end check failed: {e.Message}"); }
+    }
+
+    /// <summary>
+    /// Every frame, after the game's animations have been applied. A few things the game
+    /// animates have to be corrected after the animator writes them, or the animator simply
+    /// writes over the correction - the Liar's Dice centre panel's angle is one. Update is too
+    /// early for that; LateUpdate is the first moment the animator's work is done.
+    ///
+    /// Whatever runs here runs every frame, so it does its own throttling and never throws.
+    /// </summary>
+    private void LateUpdate()
+    {
+        try { DiceTable.LateTick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[dicetable] late tick failed: {e.Message}"); }
     }
 }

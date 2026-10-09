@@ -10,10 +10,11 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "liarsbar.eightplayers";
-    public const string Version = "1.1.1";
+    public const string Version = "1.1.2";
 
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
+    public static ConfigEntry<bool> AutoReadyJoiners;
     public static ConfigEntry<bool> Verbose;
     public static ConfigEntry<bool> DiagAutoHost;
     public static ConfigEntry<bool> DiagSoloStart;
@@ -34,6 +35,11 @@ public class Plugin : BasePlugin
         MaxPlayers = Config.Bind("General", "MaxPlayers", 8,
             new ConfigDescription("Maximum players per lobby. Every player must run the same value.",
                 new AcceptableValueRange<int>(2, 16)));
+        AutoReadyJoiners = Config.Bind("General", "AutoReadyJoiners", true,
+            "When you host: mark each player ready once as they arrive in your lobby - when they join, and " +
+            "again when everyone comes back to the lobby after a match - so you only have to press Start. " +
+            "They can still un-ready with the game's own button, and being ready locks nothing in the lobby. " +
+            "Never applies to you, the host. Only the host's setting matters.");
 
         Verbose = Config.Bind("Debug", "VerboseDiagnostics", true,
             "Dump runtime seat/prefab/slot counts to the log. Needed while the mod is still being built out.");
@@ -95,6 +101,8 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(TransportCap),   "steam transport cap");
         Apply(harmony, typeof(LobbyPodiums),   "lobby podiums beyond four");
         Apply(harmony, typeof(LobbySkinClick), "clicking your character in a lobby of five or more");
+        Apply(harmony, typeof(AutoReady),      "readying players as they arrive in the lobby");
+        Apply(harmony, typeof(SpinBoard),      "every player on the Liar's Spin leaderboard");
         Apply(harmony, typeof(TurnOrderFix),   "turn order");
         Apply(harmony, typeof(SeatExpansion),  "table seat expansion");
         Apply(harmony, typeof(SeatRing),       "seat spacing");
@@ -114,6 +122,10 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(BetVoiceGuard),  "dice bids beyond the recorded voice lines");
         Apply(harmony, typeof(ResetAnimFix),   "reset animation beyond four seats");
         Apply(harmony, typeof(AimRing),        "aiming at every seat, not three");
+        Apply(harmony, typeof(AimKeys),        "aim keys reaching every seat in the Chaos deck");
+        Apply(harmony, typeof(TexasSwap),      "Liar's Texas card swaps and the deck at eight");
+        Apply(harmony, typeof(DiceRevealRows), "Liar's Dice reveals of more than twenty dice");
+        Apply(harmony, typeof(DiceRowOrder),   "Liar's Dice reveal rows lit in reading order");
         Apply(harmony, typeof(MechanicsTrace),  "devil and chaos mechanics trace");
 
         // Only does anything when the loopback harness is running.

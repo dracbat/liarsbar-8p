@@ -1,7 +1,7 @@
 # Changelog
 
-Every player in a lobby must run the **same version**. The running version is shown in
-the top-left corner in game, and every player is warned when someone's build differs.
+Every player in a lobby must run the **same version**. The running version is shown at
+the top of the screen in game, and every player is warned when someone's build differs.
 
 **What v1.0.0 means here.** It was going to be reserved for the first release proven with
 eight people in a Steam lobby. It is not that, and saying so plainly is better than quietly
@@ -15,6 +15,89 @@ build's predecessor over Steam. The eight-machine test comes next, with the peop
 Versions that were once numbered 1.x and 2.x were folded into the same 0.x line to make
 room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order is unchanged: what
 was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
+
+## v1.1.2 — Fixes from a real eight-player game
+
+The second report from real tables, this time with all eight seats filled. Thank you again.
+
+**Everyone at the table needs to update.** The version check compares version numbers, so a
+player still on 1.1.1 is flagged as a mismatch. Run your saved `Install-LiarsBar8P.bat` (or
+`Install-LiarsBar8P.sh` on Linux) again; both fetch the newest release.
+
+### Fixed
+
+- **In the Chaos deck you could only aim at three people.** The game's aiming keys (A / D,
+  LB / RB or the D-pad) are handled inside the game's own per-frame code, and that code can only
+  move the aim between three positions. The mod's eight-seat aiming was never reached by a key
+  press, so at five to eight players three opponents could not be chosen at all. The mod now
+  handles those keys itself while you are choosing: every opponent can be picked, players who
+  are out are skipped, and pressing past the last seat wraps round to the first. The line on
+  screen now says who you are aiming at, where they sit ("2 seats to your right"), and which
+  keys move it, and shows "Locked on" when the choice closes. With four or fewer, aiming is
+  exactly the game's own.
+- **Liar's Texas could show other players' cards after a swap.** The game stops hiding a
+  player's cards while they are mid-swap, and a swap that never finished left them unhidden for
+  the rest of the match. The host now ends any swap the game refused, clears a leftover swap at
+  every deal, and ends one still open eight seconds after it went through; and every machine
+  puts the question mark back on every card it does not own, every frame, until the showdown.
+  The one card the game deliberately shows everyone mid-swap — the card being given up — is
+  left as the game has it at any table size.
+- **Liar's Texas at eight ran out of cards.** Eight players need 53 cards from a 52-card deck,
+  so the fifth table card was never dealt. One player is now offered three cards to switch to
+  instead of four in the first betting round, which leaves the deck enough.
+- **Liar's Dice: the panel in the middle of the table faced the wrong way.** It is turned by an
+  animation that only knows the four original seats, so at eight most seats saw the bid total,
+  "LIAR!" and the loser's name sideways or upside down. It now faces every seat.
+- **Liar's Dice: the dice shown at a reveal sat under the neighbour's arm.** With eight seats
+  the row of dice icons in front of each player was covered by the next player's hand and
+  bottles. It now sits a little higher and further in. The dice themselves never move.
+- **Liar's Dice: a reveal of more than twenty dice stopped drawing.** The panel had room for
+  twenty. It now adds rows, so every die is shown.
+- **Liar's Dice: the camera after you are poisoned out could sit inside someone.** Two of the
+  spectator cameras were placed for four seats; at five or more they are moved out from behind
+  the seat they were sitting in.
+- **The version in the corner covered the game's own text** — the table card in Liar's Deck,
+  the last bid in Liar's Dice, the last call in Texas. It is now at the top of the screen, in
+  the middle.
+- **In Liar's Texas the mod's "whose turn" line was drawn over the ranking down the left
+  edge**, and could disagree with the game's own turn display. Texas says whose turn it is
+  itself, so the mod's line is no longer shown there.
+- **Liar's Spin only listed four players on its leaderboard.** The board has four rows built
+  into the scene and stopped there, so the fifth player onwards was missing or stacked on the
+  fourth row. It now has a row for every player, continuing the column at the game's spacing
+  and drawn a little smaller if eight rows would not fit on screen.
+
+### Added
+
+- **Players are readied for you when they join.** When you host, everyone who arrives in your
+  lobby is marked ready once — and again when the table comes back from a match — so you only
+  have to press Start instead of waiting for whoever is reading the rules. They can still
+  un-ready with the game's own button, and being ready locks nothing in the lobby. It never
+  applies to you, only the host's setting matters, and it can be turned off with
+  `AutoReadyJoiners` in the config.
+
+### What was checked
+
+Copies of the game running together on one machine, with the table filled out by the mod's
+test bots:
+
+- Liar's Texas at seven and eight seats: swaps made on every seat, every machine checking for
+  any face it should not see (none), and at eight the deck message and all five table cards.
+- Liar's Dice at eight: the centre panel's angle logged for each seat against the rule, a
+  reveal of twenty-two dice drawn in full, and screenshots of the result from the extra seats.
+- Chaos deck at seven: every seat can reach all six opponents with the keys, where the game's
+  own keys reached three.
+- Liar's Spin at eight: the leaderboard grows from four rows to eight, with no errors on any
+  copy.
+- A player joining a hosted lobby was marked ready about a second after reaching their podium.
+
+### Not yet true
+
+- **Two of these fixes have not been seen with five real players yet**, because the test machine
+  cannot run five copies of the game at once and the test bots are not real network players:
+  - the new Chaos aiming has been checked seat by seat, not played with real key presses;
+  - the extra rows on the Liar's Spin leaderboard are added, but only real players fill them,
+    so rows five to eight have not been seen filled.
 
 ## v1.1.1 — Fixes from the first real six-player games
 
