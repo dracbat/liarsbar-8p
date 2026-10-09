@@ -35,14 +35,12 @@ namespace LiarsBar8P;
 /// mark back on every card of every seat it does not own. That closes the host's own flashes
 /// (the new card painted on the swapper's card by the animation, the real faces painted at
 /// each deal before the next physics tick hides them) and any swap that is stuck however it got
-/// stuck. One thing is deliberately left alone: the card held up mid-swap still shows the card
-/// being swapped out. That is the game's own rule, not a leak - the networked value it reads,
-/// <c>CardValueForSwitch</c>, exists for nothing else, so the developers send the discarded
-/// card to every machine on purpose. It happens at four players too, and the bigger table makes
-/// it no easier to see: a neighbour at eight looks at the card more edge-on than at four (about
-/// 67 degrees off its face rather than 45), only from closer. Hiding it above four would make
-/// five-plus a different game from four. If testing shows that reveal is what players are
-/// reporting, <see cref="ShowSwappedOutCard"/> is the switch.
+/// stuck. That includes the card a player holds up while swapping. The game paints it with the
+/// card being given up - <c>CardValueForSwitch</c>, which it sends to every machine for nothing
+/// else - and at four players nobody is close enough to read it. At eight they are: players
+/// reported seeing "the actual card" on their neighbour's swap where every other card of theirs
+/// shows the blank template. Above four it gets the template like the rest
+/// (<see cref="ShowSwappedOutCard"/>); at four the game's own reveal is untouched.
 ///
 /// The table cards in front of each seat are handled on the host only, because only the host
 /// ever paints real cards on them before the showdown - at the deal and at the swap. For seats
@@ -65,10 +63,22 @@ namespace LiarsBar8P;
 internal static class TexasSwap
 {
     /// <summary>
-    /// Keep the game's own swap reveal: the card held up mid-swap shows the card going back.
-    /// See the class summary for why this stays on.
+    /// Whether the card held up mid-swap may show the card going back, above four players. Off:
+    /// at a table that close, the neighbours can read it. See the class summary.
     /// </summary>
-    private const bool ShowSwappedOutCard = true;
+    /// <remarks>
+    /// Off for everybody. A test run can turn it back on for one copy of the game with
+    /// <c>LIARSBAR8P_TEXAS_REVEAL=1</c>, so the same match shows the leak on one screen and the
+    /// fix on the one beside it.
+    /// </remarks>
+    /// <summary>
+    /// Developer-only: hide at any table size, so a test with fewer than five copies of the game
+    /// (and no bots, which stall a Texas fold) can still watch the hiding work. Needs both the
+    /// harness's developer mode and <c>LIARSBAR8P_TEXAS_ANYSIZE=1</c>.
+    /// </summary>
+    private static bool TestAtAnySize => Dev.Enabled && Environment.GetEnvironmentVariable("LIARSBAR8P_TEXAS_ANYSIZE") == "1";
+
+    private static readonly bool ShowSwappedOutCard = Environment.GetEnvironmentVariable("LIARSBAR8P_TEXAS_REVEAL") == "1";
 
     // The deal's own numbers, read from watiforGiveCard: two cards each ("RandomCards(card1,
     // card2)"), four to switch to ("cmp r14d,4"), five for the table ("cmp r15d,5").
@@ -688,7 +698,7 @@ internal static class TexasSwap
         }
 
         // The seats in the scene are a seated count of their own, needing no SyncVar.
-        _bigger = Math.Max(count, _seats.Count) > Limits.VanillaPlayers;
+        _bigger = Math.Max(count, _seats.Count) > Limits.VanillaPlayers || TestAtAnySize;
 
         bool cards = _bigger || Dev.Enabled;
         for (int i = 0; i < _seats.Count; i++)
@@ -856,7 +866,7 @@ internal static class TexasSwap
     /// <summary>
     /// Once a frame, after every animation event, coroutine and network message of the frame
     /// has had its turn: the question mark on every card of every seat this machine does not
-    /// own, except the game's own swap reveal on the held card.
+    /// own, the card held up mid-swap included.
     ///
     /// Nothing here may allocate, at up to two dozen cards a frame. Whose a seat is was asked
     /// once a second (<see cref="Refresh"/>); whether an object is still there is read off its

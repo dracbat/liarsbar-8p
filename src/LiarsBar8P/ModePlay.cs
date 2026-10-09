@@ -293,6 +293,7 @@ internal static class ModePlay
         private PlayerStats _swapper;
         private TexasGamePlay _swapGp;
         private int _swapSlot, _swapIdx, _swapOld, _swapMove;
+        private bool _swapOwned;
         private float _openedAt, _chosenAt;
 
         /// <summary>
@@ -386,9 +387,28 @@ internal static class ModePlay
                 int old = types[idx];
                 if (old <= 0) return false;
 
-                // The game's own key path: SetSwitch, then the menu opening plays the sound.
-                gp.UserCode_SetSwitch__Int32__Int32(idx, old);
-                try { gp.UserCode_SwitchStartSFXCMD(); } catch { }
+                // The seat this machine owns goes through the player's own path: the switch menu
+                // is what raises the card in the character's hand, and that raised card is what the
+                // neighbours see - the server-side calls alone never show it. Seats owned by another
+                // copy, and bots, can only be driven from the server.
+                _swapOwned = false;
+                if (gp.isOwned)
+                {
+                    try
+                    {
+                        gp.switchcard = idx;
+                        gp.SetSwitch(idx, old);
+                        gp.OpenSwitchMenu();
+                        _swapOwned = true;
+                    }
+                    catch (Exception e) { Dev.Warn("play", $"seat {p.Slot}: the player's own switch path failed ({e.Message}) - using the server's"); }
+                }
+                if (!_swapOwned)
+                {
+                    // The game's own key path: SetSwitch, then the menu opening plays the sound.
+                    gp.UserCode_SetSwitch__Int32__Int32(idx, old);
+                    try { gp.UserCode_SwitchStartSFXCMD(); } catch { }
+                }
 
                 _swapper = p;
                 _swapGp = gp;
@@ -462,7 +482,14 @@ internal static class ModePlay
 
                 int opt = (_swapSlot + TexasSwap.HandsDealt) % choices;
                 int incoming = options[opt];
-                gp.UserCode_SwitchCmd__Int32__Int32(_swapIdx, opt);
+                bool viaMenu = false;
+                if (_swapOwned)
+                {
+                    // What confirming in the menu does: send the choice and lower the raised card.
+                    try { gp.selectedcard = opt; gp.Switch(_swapIdx, opt); viaMenu = true; }
+                    catch (Exception e) { Dev.Warn("play", $"seat {_swapSlot}: confirming through the menu failed ({e.Message})"); }
+                }
+                if (!viaMenu) gp.UserCode_SwitchCmd__Int32__Int32(_swapIdx, opt);
                 _chosenAt = now;
 
                 Dev.Log("play", $"{p.PlayerName} (seat {_swapSlot}) swaps card {_swapIdx} ({_swapOld}) for option " +

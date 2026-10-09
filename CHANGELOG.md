@@ -16,6 +16,14 @@ Versions that were once numbered 1.x and 2.x were folded into the same 0.x line 
 room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order is unchanged: what
 was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## Unreleased
+
+- **Liar's Texas: the card held up mid-swap now gets the blank template above four players.**
+  Every other card of another player's shows the blank template, but while a player swaps, the
+  game paints the card they are giving up with its real face for everyone. At four players
+  nobody sits close enough to read it; at eight the neighbours can. Not yet confirmed in a real
+  game — it needs players to watch a neighbour swap at a table of five or more.
+
 ## v1.1.2 — Fixes from a real eight-player game
 
 The second report from real tables, this time with all eight seats filled. Thank you again.
