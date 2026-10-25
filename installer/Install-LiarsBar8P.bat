@@ -97,6 +97,7 @@ function Get-GameDir ($SteamRoot) {
         }
     }
     foreach ($lib in $libs) {
+        if (-not (Test-Path -LiteralPath $lib -PathType Container)) { continue }
         $man = Join-Path $lib "steamapps\appmanifest_$AppId.acf"
         if (Test-Path -LiteralPath $man) {
             $c = Get-Content -LiteralPath $man -Raw
@@ -107,6 +108,7 @@ function Get-GameDir ($SteamRoot) {
         }
     }
     foreach ($lib in $libs) {
+        if (-not (Test-Path -LiteralPath $lib -PathType Container)) { continue }
         $d = Join-Path $lib "steamapps\common\Liar's Bar"
         if (Test-Path -LiteralPath (Join-Path $d "Liar's Bar.exe")) { return $d }
     }

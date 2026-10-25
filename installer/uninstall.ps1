@@ -49,6 +49,7 @@ if ($vdf -and (Test-Path -LiteralPath $vdf)) {
 
 $game = $null
 foreach ($lib in $libs) {
+        if (-not (Test-Path -LiteralPath $lib -PathType Container)) { continue }
     $man = Join-Path $lib "steamapps\appmanifest_$AppId.acf"
     if (Test-Path -LiteralPath $man) {
         $c = Get-Content -LiteralPath $man -Raw
@@ -60,6 +61,7 @@ foreach ($lib in $libs) {
 }
 if (-not $game) {
     foreach ($lib in $libs) {
+        if (-not (Test-Path -LiteralPath $lib -PathType Container)) { continue }
         $d = Join-Path $lib "steamapps\common\Liar's Bar"
         if (Test-Path -LiteralPath (Join-Path $d "Liar's Bar.exe")) { $game = $d; break }
     }
