@@ -127,6 +127,7 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(ResetAnimFix),   "reset animation beyond four seats");
         Apply(harmony, typeof(AimRing),        "aiming at every seat, not three");
         Apply(harmony, typeof(AimKeys),        "aim keys reaching every seat in the Chaos deck");
+        Apply(harmony, typeof(EmoteTargets),   "middle finger at every seat, not three directions");
         Apply(harmony, typeof(TexasSwap),      "Liar's Texas card swaps and the deck at eight");
         Apply(harmony, typeof(DiceRevealRows), "Liar's Dice reveals of more than twenty dice");
         Apply(harmony, typeof(DiceRowOrder),   "Liar's Dice reveal rows lit in reading order");

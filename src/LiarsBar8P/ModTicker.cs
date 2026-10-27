@@ -81,6 +81,9 @@ internal sealed class ModTicker : MonoBehaviour
         try { TexasSwap.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[texasswap] tick failed: {e.Message}"); }
 
+        try { EmoteTargets.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[emote] tick failed: {e.Message}"); }
+
         try { VersionCheck.ForgetWhenSessionEnds(); }
         catch (Exception e) { Plugin.Log.LogError($"[version] banner check failed: {e.Message}"); }
 
@@ -110,5 +113,8 @@ internal sealed class ModTicker : MonoBehaviour
     {
         try { DiceTable.LateTick(); }
         catch (Exception e) { Plugin.Log.LogError($"[dicetable] late tick failed: {e.Message}"); }
+
+        try { EmoteTargets.LateTick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[emote] late tick failed: {e.Message}"); }
     }
 }
