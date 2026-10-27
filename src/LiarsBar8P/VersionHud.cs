@@ -64,6 +64,16 @@ internal sealed class VersionHud : MonoBehaviour
             GUI.DrawTexture(new Rect(x - 5f, y - 2f, size.x + 10f, size.y + 6f), _backdrop);
             GUI.Label(new Rect(x, y, size.x + 4f, 22f), label, _style);
 
+            string note = AutoUpdate.Note;
+            if (!string.IsNullOrEmpty(note))
+            {
+                y += size.y + 8f;
+                Vector2 nsize = _style.CalcSize(new GUIContent(note));
+                float nx = Mathf.Round((Screen.width - nsize.x) / 2f);
+                GUI.DrawTexture(new Rect(nx - 5f, y - 2f, nsize.x + 10f, nsize.y + 6f), _backdrop);
+                GUI.Label(new Rect(nx, y, nsize.x + 4f, 22f), note, _style);
+            }
+
             if (!string.IsNullOrEmpty(Mismatch))
             {
                 float wy = y + size.y + 8f;

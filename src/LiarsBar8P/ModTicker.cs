@@ -100,6 +100,12 @@ internal sealed class ModTicker : MonoBehaviour
     ///
     /// Whatever runs here runs every frame, so it does its own throttling and never throws.
     /// </summary>
+    // A downloaded update the game was holding open goes in once the game has closed.
+    private void OnApplicationQuit()
+    {
+        try { AutoUpdate.OnQuit(); } catch { }
+    }
+
     private void LateUpdate()
     {
         try { DiceTable.LateTick(); }

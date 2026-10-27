@@ -15,6 +15,7 @@ public class Plugin : BasePlugin
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
     public static ConfigEntry<bool> AutoReadyJoiners;
+    public static ConfigEntry<bool> AutoUpdateEnabled;
     public static ConfigEntry<bool> Verbose;
     public static ConfigEntry<bool> DiagAutoHost;
     public static ConfigEntry<bool> DiagSoloStart;
@@ -40,6 +41,9 @@ public class Plugin : BasePlugin
             "again when everyone comes back to the lobby after a match - so you only have to press Start. " +
             "They can still un-ready with the game's own button, and being ready locks nothing in the lobby. " +
             "Never applies to you, the host. Only the host's setting matters.");
+        AutoUpdateEnabled = Config.Bind("General", "AutoUpdate", true,
+            "Check this mod's GitHub releases each time the game starts and, if there is a newer version, " +
+            "download it and put it in place for the next start. Everyone at a table must run the same version.");
 
         Verbose = Config.Bind("Debug", "VerboseDiagnostics", true,
             "Dump runtime seat/prefab/slot counts to the log. Needed while the mod is still being built out.");
@@ -148,6 +152,9 @@ public class Plugin : BasePlugin
         DiceRevealGuard.Listen();
 
         SpawnHud();
+
+        // In the background: the game never waits on the network to start.
+        LiarsBar8P.AutoUpdate.Start();
 
         Log.LogInfo("=== Liar's Bar 8P loaded ===");
     }

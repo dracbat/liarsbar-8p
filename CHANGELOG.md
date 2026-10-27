@@ -18,6 +18,17 @@ was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
 ## Unreleased
 
+- **The mod now updates itself.** Each time the game starts it asks this mod's GitHub releases
+  for the newest version; if there is a newer one it downloads it and puts it in place for the
+  next start, and a line at the top of the screen says to restart. Only this mod's own release
+  files are accepted, only the plugin is replaced (BepInEx and your settings are left alone),
+  and the downloaded file has to be this mod at exactly the release's version. Copies from
+  anywhere - including mod sites that take days to approve a new upload - catch up on their
+  own. `AutoUpdate` in the config turns it off.
+- **The Windows installer and uninstaller no longer stop on a missing drive.** Steam can keep
+  listing a library on a drive that is no longer there (after moving games to another disk),
+  and the search for the game failed on it before looking anywhere else. Such libraries are now
+  skipped. Found and fixed by @BreezeDelegate in pull request #3 - thank you.
 - **Liar's Texas: the card held up mid-swap now gets the blank template above four players.**
   Every other card of another player's shows the blank template, but while a player swaps, the
   game paints the card they are giving up with its real face for everyone. At four players
