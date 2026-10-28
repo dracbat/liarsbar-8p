@@ -10,7 +10,7 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "liarsbar.eightplayers";
-    public const string Version = "1.1.2";
+    public const string Version = "1.1.3";
 
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
@@ -220,7 +220,7 @@ public class Plugin : BasePlugin
             // seven people, so the choice is named as well as posed.
             Il2CppInterop.Runtime.Injection.ClassInjector.RegisterTypeInIl2Cpp<AimHud>();
             go.AddComponent<AimHud>();
-            Log.LogInfo("  version HUD attached (top left)");
+            Log.LogInfo("  version HUD attached (top centre)");
 
             if (Dev.Enabled)
             {

@@ -220,7 +220,7 @@ and `BepInEx/` sit next to `Liar's Bar.exe`.
 **The first launch after installing is slow** — up to a few minutes while BepInEx prepares
 the game. This happens once. Let it reach the main menu.
 
-To confirm it worked, look at the top-left corner in game, or open `BepInEx/LogOutput.log`
+To confirm it worked, look at the top of the screen in game, or open `BepInEx/LogOutput.log`
 and look for:
 
 ```

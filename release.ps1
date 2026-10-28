@@ -64,7 +64,7 @@ The first game launch after installing is slow (a few minutes) while the loader 
 itself up. That happens once.
 
 **Everyone playing together must install this, and must be on the same version.** The
-version you are running is shown in the top-left corner in game. Linux support is tested on
+version you are running is shown at the top of the screen in game. Linux support is tested on
 a Steam Deck. Windows and Linux players run the very same mod, so they should be able to
 share a lobby - but that part has not yet been confirmed.
 '@

@@ -16,7 +16,7 @@ Versions that were once numbered 1.x and 2.x were folded into the same 0.x line 
 room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order is unchanged: what
 was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
-## Unreleased
+## v1.1.3 — The finger reaches everyone, and updates ask first
 
 - **The mod can now update itself - when you say so.** Each time the game starts it asks this
   mod's GitHub releases for the newest version. If there is a newer one, a window in the game
@@ -28,6 +28,8 @@ was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
   plugin is replaced (BepInEx and your settings are left alone), and the downloaded file has to
   be this mod at exactly the release's version. Copies from anywhere - including mod sites that
   take days to approve a new upload - can catch up without anyone downloading anything by hand.
+  This is the first release that can do it, so it is installed the usual way; the ones after it
+  are offered in the game.
 - **The Windows installer and uninstaller no longer stop on a missing drive.** Steam can keep
   listing a library on a drive that is no longer there (after moving games to another disk),
   and the search for the game failed on it before looking anywhere else. Such libraries are now

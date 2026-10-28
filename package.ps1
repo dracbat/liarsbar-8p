@@ -147,7 +147,7 @@ LINUX AND STEAM DECK
   Uninstall: bash uninstall.sh
 
 CHECK IT WORKED
-  The mod's version is drawn in the top left corner in game. For more detail, open
+  The mod's version is drawn at the top of the screen in game. For more detail, open
   BepInEx\LogOutput.log  in the game folder (BepInEx/LogOutput.log on Linux) and look for:
      === Liar's Bar 8P loaded ===
      [cap] maxConnections 4 -> 8
