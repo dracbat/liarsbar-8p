@@ -20,14 +20,26 @@ namespace LiarsBar8P;
 /// it to reach everybody (issue #4).
 ///
 /// <b>What a player gets.</b> At five or more, the row of keys under the finger grows to one
-/// key per other player, laid out left to right in the order they sit round the table from
-/// where you are. 1, 2 and 3 keep the meaning they always had - the person on your left, the
-/// person across, the person on your right - so nothing anybody already knows changes, and the
-/// D-pad still reaches those three. The people in between get 6, 7, 8 and 9 (and 0 at nine
-/// players). At eight the row reads 1 6 7 2 8 9 3: press the key under where somebody sits.
-/// The new keys are copies of the game's own key 3 - the same key cap, the same press
-/// animation, the same place in the panel - with the number changed, so the panel looks like
-/// the game's own panel with more keys in it rather than something laid over it.
+/// key per other player, numbered in plain order left to right as they sit round the table from
+/// where you are: 1 is the person on your left, the last number the person on your right. The
+/// game's other two emotes, 4 and 5 at four players, move up to the next two numbers so the
+/// whole panel still reads in order - at six the finger is 1 to 5 and the others 6 and 7, at
+/// eight the finger is 1 to 7 and the others 8 and 9 - and answer only to those. The D-pad is
+/// left as the game has it: left, up and right are the neighbours and the person across, down
+/// is the first of the other two - and the pad arrows the game draws on its keys 1 to 4 go
+/// with those meanings, onto the keys that now do the same thing as each direction of the pad.
+/// If the extra keys cannot be made, the panel and the number keys both stay the game's, so
+/// the panel never shows a number that means something else. Where the game has a key picture for a number (1 to 5) its
+/// own key is used, moved to its new place; past 5 the key is a copy of the game's key 3 - the
+/// same cap, the same press animation - with the number changed, so the panel looks like the
+/// game's own panel with more keys in it rather than something laid over it. Nine players is
+/// as far as the number row goes (finger 1 to 8, the others 9 and 0); past that the panel and
+/// keys stay the game's, with 1, 2 and 3 meaning left, across and right.
+///
+/// <b>The cooldown</b> between emotes is the game's own counter - 12 seconds, counted on the
+/// player's own machine; the server passes emotes on without checking - run faster, so that it
+/// fills in <c>EmoteCooldownSeconds</c> (10 unless set) at every table size, because that is a
+/// change the mod's owner asked for rather than something the table size needs.
 ///
 /// <b>How it travels.</b> The game sends the direction as a plain number to the server, which
 /// hands it to everybody without looking at it. At five or more, the number sent is the target
@@ -59,11 +71,20 @@ internal static class EmoteTargets
     /// <summary>Which way each clip points, in degrees to the right - where the neighbours sit at four.</summary>
     private static readonly float[] ClipBearing = { 0f, -45f, 0f, 45f };
 
-    /// <summary>The keys for the people between your neighbours and across, in the order they are handed out.</summary>
-    private static readonly int[] ExtraDigits = { 6, 7, 8, 9, 0 };
+    /// <summary>
+    /// The largest table the number row covers: n-1 keys for the finger and two for the other
+    /// emotes, out of 1 to 9 and 0.
+    /// </summary>
+    private const int MostSeats = 9;
 
-    private static readonly KeyCode[] ExtraKeys =
-        { KeyCode.Alpha6, KeyCode.Alpha7, KeyCode.Alpha8, KeyCode.Alpha9, KeyCode.Alpha0 };
+    /// <summary>The game's own wait between emotes, in seconds - the number its counter runs up to.</summary>
+    private const float ShippedCooldown = 12f;
+
+    /// <summary>Whether the keys are numbered by this class at a table of <paramref name="n"/>.</summary>
+    private static bool Renumbered(int n) => n > Limits.VanillaPlayers && n <= MostSeats;
+
+    /// <summary>The number on the i-th key of the number row: 1 to 9, then 0.</summary>
+    private static int Digit(int i) => i % 10;
 
     /// <summary>Errors reported so far. Some of this runs every frame; one fault must not fill the log.</summary>
     private static int _errors;
@@ -148,9 +169,11 @@ internal static class EmoteTargets
     // ----------------------------------------------------------------- sending a gesture
 
     /// <summary>
-    /// 1, 2 or 3 - pressed, or the D-pad - at five or more: send the person on your left, the
-    /// person across, or the person on your right, as a seat. The game's own key handling is
-    /// left to decide whether and when; this only changes what it sends.
+    /// The game's own three finger directions at five or more - the D-pad's left, up and right,
+    /// or the number keys 1 to 3 wherever the panel keeps the game's numbers (past nine
+    /// players, or if its extra keys could not be made) - sent as the person on your left, the
+    /// person across, or the person on your right. The game's own handling decides whether and
+    /// when; this only changes what it sends.
     /// </summary>
     [HarmonyPrefix]
     [HarmonyPatch(typeof(CharController), nameof(CharController.PlayEmote1Sfx))]
@@ -162,96 +185,124 @@ internal static class EmoteTargets
             if (!Ready() || !AimRing.Ring(__instance, out int me, out int n)) return;   // four or fewer
 
             int target = (me + OffsetFor(direction, n)) % n;
-            Plugin.Log.LogInfo($"[emote] seat {me} pressed {direction}: the finger at seat {target} of {n}");
+            Plugin.Log.LogInfo($"[emote] seat {me} gave direction {direction}: the finger at seat {target} of {n}");
             direction = Code + target;
         }
         catch (Exception e) { Report("could not aim the finger", e); }
     }
 
     /// <summary>
-    /// The keys the game does not have: 6, 7, 8, 9 and 0, for the people between. Only ever
-    /// called by the game when an emote may be sent this frame - alive, emotes on, not cooling
-    /// down - so all of that is already decided. A press is sent the way the game sends 1 to 3
-    /// and starts the same cooldown; nothing pressed, and the game's own handling runs as
-    /// shipped. Not while typing in the chat or paused - the same rule the game's own keys on
-    /// the panel follow for their press animation - because these are digits people type.
+    /// The number keys at five to nine players: 1 up to n-1 for the finger, left to right as the
+    /// other players sit, then n and n+1 for the game's other two emotes.
+    ///
+    /// The game reads its keys 1 to 5 inside this same method, with its two other emotes' sends
+    /// compiled straight into it, so there is no smaller call to catch them at. Instead, whenever
+    /// a number key is down at this size of table, this handles it and the game's own reading is
+    /// skipped for that frame - so 4 and 5 can never fire their old emotes here. With no number
+    /// key down the game's reading runs as shipped, and by then all it can answer is the D-pad.
+    ///
+    /// Only ever called by the game when an emote may be sent this frame - alive, emotes on, not
+    /// cooling down - so all of that is already decided. A press sends exactly what the game
+    /// sends and starts the same cooldown. Number keys are swallowed while typing in the chat or
+    /// paused - the same rule the panel's keys follow for their press animation - because they
+    /// are digits people type.
     /// </summary>
     [HarmonyPrefix]
     [HarmonyPatch(typeof(CharController), nameof(CharController.ProcessEmoteInput))]
-    private static bool Extra(CharController __instance)
+    private static bool Keys(CharController __instance)
     {
         try
         {
-            int digit = ExtraKeyDown();
-            if (digit < 0) return true;
-            if (!Ready() || !AimRing.Who(__instance, out var m, out int me, out int n)) return true;
-            if (m.Chatting || m.GamePaused) return true;
+            int key = NumberKeyDown();
+            if (key == 0) return true;
+            if (!Ready() || !AimRing.Who(__instance, out var m, out int me, out int n)) return true;   // four or fewer
+            if (!Renumbered(n)) return true;   // past the number row: the game's own keys
+            if (_numberedFor != n) return true;   // the panel shows the game's numbers, so the keys keep them
 
-            int off = OffsetForDigit(digit, n);
-            if (off < 1) return true;   // no seat has that key at this size of table
+            if (m.Chatting || m.GamePaused) return false;
 
-            int target = (me + off) % n;
-            Plugin.Log.LogInfo($"[emote] seat {me} pressed {digit}: the finger at seat {target} of {n}");
-            __instance.PlayEmote1Sfx(Code + target);
+            if (key <= n - 1)
+            {
+                int target = (me + n - key) % n;
+                Plugin.Log.LogInfo($"[emote] seat {me} pressed {Digit(key)}: the finger at seat {target} of {n}");
+                __instance.PlayEmote1Sfx(Code + target);
+            }
+            else if (key == n)
+            {
+                Plugin.Log.LogInfo($"[emote] seat {me} pressed {Digit(key)}: the game's key-4 emote");
+                __instance.PlayEmote2Sfx();
+            }
+            else if (key == n + 1)
+            {
+                Plugin.Log.LogInfo($"[emote] seat {me} pressed {Digit(key)}: the game's key-5 emote");
+                __instance.PlayEmote3Sfx();
+            }
+            else return true;   // a number nothing uses at this size; the game's reading, for the D-pad
+
             __instance.EmoteReadyy = false;
             return false;
         }
         catch (Exception e)
         {
-            Report("could not read the extra keys", e);
+            Report("could not read the emote keys", e);
             return true;
         }
     }
 
-    private static int ExtraKeyDown()
+    /// <summary>Which key of the number row went down this frame, 1 to 10 (10 is the 0 key), or 0 for none.</summary>
+    private static int NumberKeyDown()
     {
-        for (int i = 0; i < ExtraKeys.Length; i++)
-            if (Input.GetKeyDown(ExtraKeys[i])) return ExtraDigits[i];
-        return -1;
+        for (int i = 1; i <= 10; i++)
+            if (Input.GetKeyDown(KeyCode.Alpha0 + Digit(i))) return i;
+        return 0;
     }
 
     // ---------------------------------------------------------------- who each key means
 
-    /// <summary>Chairs round from me for 1, 2 and 3: the one before me, the one across, the next one.</summary>
+    /// <summary>Chairs round from me for directions 1, 2 and 3: the one before me, the one across, the next one.</summary>
     private static int OffsetFor(int direction, int n) =>
         direction == 1 ? n - 1 : direction == 2 ? n / 2 : 1;
 
+    // ---------------------------------------------------------------------- the cooldown
+
+    private static bool _cooldownReported;
+
     /// <summary>
-    /// The key for each chair round from me (index 1 to n-1), or -1 for none. 1 is the chair on
-    /// the left, 3 the chair on the right, 2 the one across - the seat the revolver's aim calls
-    /// straight ahead - and the rest are handed 6, 7, 8, 9, 0 from left to right.
+    /// Run the game's emote cooldown faster, so that it fills in <c>EmoteCooldownSeconds</c>
+    /// rather than 12.
+    ///
+    /// The wait is a counter on the player's own object: after any emote the game adds the
+    /// frame's time to it every frame, draws the panel's fill from it, and makes emotes ready
+    /// again when it reaches 12. The 12 is a constant shared with other code in the game's
+    /// compiled program, so it is not changed; the counter is given the extra time it needs to
+    /// reach 12 sooner, just before the game adds its own. The fill on the panel then runs at
+    /// the new speed as well. The server does not check the wait at all - it passes every emote
+    /// on as it comes - so nothing there needs to agree.
+    ///
+    /// This is every player object's every frame, so it stops at the first check on all of them
+    /// but the one whose emotes are cooling down.
     /// </summary>
-    private static int[] KeysFor(int n)
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(CharController), nameof(CharController.Update))]
+    private static void Cooldown(CharController __instance)
     {
-        if (_keysFor == n && _keys != null) return _keys;
+        var setting = Plugin.EmoteCooldownSeconds;
+        if (setting == null) return;
+        float want = setting.Value;
+        if (want <= 0f || Mathf.Approximately(want, ShippedCooldown)) return;
 
-        var keys = new int[n];
-        for (int i = 0; i < n; i++) keys[i] = -1;
-        keys[n - 1] = 1;
-        keys[n / 2] = 2;
-        keys[1] = 3;
-
-        int next = 0;
-        for (int off = n - 1; off >= 1; off--)
+        try
         {
-            if (keys[off] != -1) continue;
-            if (next < ExtraDigits.Length) keys[off] = ExtraDigits[next++];
+            if (__instance.EmoteReadyy || !__instance.isOwned) return;
+            __instance.EmoteCooldown += Time.deltaTime * (ShippedCooldown / want - 1f);
+
+            if (!_cooldownReported)
+            {
+                _cooldownReported = true;
+                Plugin.Log.LogInfo($"[emote] emote cooldown {want:0.#} s (the game's own is {ShippedCooldown:0} s)");
+            }
         }
-
-        _keys = keys;
-        _keysFor = n;
-        return keys;
-    }
-
-    private static int[] _keys;
-    private static int _keysFor;
-
-    private static int OffsetForDigit(int digit, int n)
-    {
-        var keys = KeysFor(n);
-        for (int off = 1; off < n; off++)
-            if (keys[off] == digit) return off;
-        return -1;
+        catch (Exception e) { Report("could not change the emote cooldown", e); }
     }
 
     // ------------------------------------------------------------ which clip, which turn
@@ -392,16 +443,36 @@ internal static class EmoteTargets
 
     private static GameObject _panel;
     private static IntPtr _panelKey;
-    private static RectTransform _one, _two, _three;
-    private static Vector2 _onePos, _twoPos, _threePos;
+
+    /// <summary>The game's own keys 1 to 5 (index 1 to 5) and where each one sits in the panel.</summary>
+    private static readonly RectTransform[] _own = new RectTransform[6];
+    private static readonly Vector2[] _ownAt = new Vector2[6];
     private static bool _found;
+
+    /// <summary>The keys made here, by number: 6 to 9 and 0.</summary>
     private static readonly Dictionary<int, RectTransform> _extra = new();
     private static int _laidFor;
     private static int _announcedFor;
     private static bool _noKeysReported;
 
     /// <summary>
-    /// Four times a second, from <see cref="ModTicker"/>: lay the row of keys out for the size
+    /// The table size the panel is numbered for, or 0 while it shows the game's own numbers.
+    /// The number keys follow it, so a key never means something other than what it shows.
+    /// </summary>
+    private static int _numberedFor;
+
+    // The game's GamepadButtonType values for the four directions of the pad.
+    private const int PadRight = 8, PadLeft = 9, PadDown = 10, PadUp = 11;
+
+    /// <summary>
+    /// The D-pad arrows the game draws on its keys 1 to 4, by the way they point, each with the
+    /// key it came on. At five or more they are moved onto the keys that do what that direction
+    /// of the pad does, and put back where they came from at four or fewer.
+    /// </summary>
+    private static readonly Dictionary<int, (Transform Arrow, RectTransform Home)> _arrows = new();
+
+    /// <summary>
+    /// Four times a second, from <see cref="ModTicker"/>: number the panel's keys for the size
     /// of table, once per match. Does nothing once that is done.
     /// </summary>
     internal static void Tick()
@@ -418,7 +489,7 @@ internal static class EmoteTargets
         if (!_found) return;
 
         int n = AimRing.Seats(m);
-        int want = n > Limits.VanillaPlayers ? n : 0;
+        int want = Renumbered(n) ? n : 0;
         if (want == _laidFor) return;
         if (want > 0 && !Ready()) return;
 
@@ -426,28 +497,61 @@ internal static class EmoteTargets
         _laidFor = want;
     }
 
-    /// <summary>A new table, a new panel: find the game's three keys and remember where they sit.</summary>
+    /// <summary>A new table, a new panel: find the game's five keys and remember where they sit.</summary>
     private static void Adopt(GameObject panel)
     {
         _panel = panel;
         _panelKey = panel.Pointer;
         _extra.Clear();
+        _arrows.Clear();
         _laidFor = 0;
         _announcedFor = 0;
+        _numberedFor = 0;
         _found = false;
         _font = null;
         _fontLooked = false;
 
         var t = panel.transform;
-        _one = Key(t, "1");
-        _two = Key(t, "2");
-        _three = Key(t, "3");
-        if (_one == null || _two == null || _three == null) return;
-
-        _onePos = _one.anchoredPosition;
-        _twoPos = _two.anchoredPosition;
-        _threePos = _three.anchoredPosition;
+        for (int d = 1; d <= 5; d++)
+        {
+            _own[d] = Key(t, d.ToString());
+            if (_own[d] == null) return;
+            _ownAt[d] = _own[d].anchoredPosition;
+        }
         _found = true;
+
+        // The arrows are only pictures: a panel without them still gets its numbers.
+        try
+        {
+            for (int d = 1; d <= 4; d++)
+            {
+                var arrow = ArrowOn(_own[d], out int way);
+                if (arrow != null && !_arrows.ContainsKey(way)) _arrows[way] = (arrow, _own[d]);
+            }
+        }
+        catch (Exception e) { Report("could not find the pad arrows on the panel", e); }
+    }
+
+    /// <summary>The D-pad arrow drawn on a key and the way it points, or null if the key has none.</summary>
+    private static Transform ArrowOn(RectTransform key, out int way)
+    {
+        way = -1;
+        for (int i = 0; i < key.childCount; i++)
+        {
+            var child = key.GetChild(i);
+            var effect = child != null ? child.GetComponent<GamepadButtonEffect>() : null;
+            if (effect == null) continue;
+            way = (int)effect.buttonType;
+            return child;
+        }
+        return null;
+    }
+
+    /// <summary>Put the arrow for one direction of the pad on a key, keeping its place on the cap.</summary>
+    private static void MoveArrow(int way, RectTransform onto)
+    {
+        if (onto == null || !_arrows.TryGetValue(way, out var a) || a.Arrow == null) return;
+        if (a.Arrow.parent != onto) a.Arrow.SetParent(onto, false);
     }
 
     private static RectTransform Key(Transform panel, string name)
@@ -456,31 +560,36 @@ internal static class EmoteTargets
         return t != null ? t.GetComponent<RectTransform>() : null;
     }
 
+    /// <summary>The key showing a number: the game's own for 1 to 5, one made here for the rest.</summary>
+    private static RectTransform KeyShowing(int digit) =>
+        digit >= 1 && digit <= 5 ? _own[digit] : _extra.TryGetValue(digit, out var k) ? k : null;
+
     /// <summary>
-    /// One key per other player, left to right as they sit, ending where key 3 always was -
-    /// tucked under the finger - and growing to the left at the game's own spacing. At four or
-    /// fewer (<paramref name="n"/> zero) the game's three keys go back where they came from.
+    /// Number the panel for a table of <paramref name="n"/>. The finger's keys 1 to n-1 go in a
+    /// row left to right as the other players sit, ending where key 3 always was - tucked under
+    /// the finger - and growing to the left at the game's own spacing. The other two emotes'
+    /// keys n and n+1 go exactly where 4 and 5 were, and the pad's arrows onto the keys that do
+    /// what each direction of the pad does. At four or fewer (<paramref name="n"/> zero) the
+    /// game's five keys and their arrows go back where they came from.
     /// </summary>
     private static void Lay(int n)
     {
         if (n == 0)
         {
-            _one.anchoredPosition = _onePos;
-            _two.anchoredPosition = _twoPos;
-            _three.anchoredPosition = _threePos;
+            for (int d = 1; d <= 5; d++)
+                if (_own[d] != null) _own[d].anchoredPosition = _ownAt[d];
             foreach (var kv in _extra)
                 if (kv.Value != null) kv.Value.gameObject.SetActive(false);
+            foreach (var kv in _arrows) MoveArrow(kv.Key, kv.Value.Home);
+            _numberedFor = 0;
             return;
         }
 
-        var keys = KeysFor(n);
-
-        // Every key the row needs, before anything moves: half a row is worse than the game's.
-        for (int off = 1; off < n; off++)
+        // Every key the panel needs, before anything moves: half a panel is worse than the game's.
+        for (int i = 1; i <= n + 1; i++)
         {
-            int d = keys[off];
-            if (d < 0 || (d >= 1 && d <= 3)) continue;   // none, or one of the game's own three
-            if (_extra.TryGetValue(d, out var have) && have != null) continue;
+            int d = Digit(i);
+            if (KeyShowing(d) != null) continue;
 
             var made = MakeKey(d);
             if (made == null)
@@ -488,43 +597,56 @@ internal static class EmoteTargets
                 if (!_noKeysReported)
                 {
                     _noKeysReported = true;
-                    Plugin.Log.LogWarning("[emote] could not make the extra keys for the panel - " +
-                                          "6 to 9 still work, the row shows the game's three");
+                    Plugin.Log.LogWarning("[emote] could not make the extra keys for the panel - the panel and " +
+                                          "the number keys stay as the game has them (1, 2, 3 left, across, right)");
                 }
+                Lay(0);
                 return;
             }
             _extra[d] = made;
         }
 
-        float step = (_threePos.x - _onePos.x) / 2f;
+        float step = (_ownAt[3].x - _ownAt[1].x) / 2f;
         var used = new HashSet<int>();
-        var order = new System.Text.StringBuilder();
+        var finger = new System.Text.StringBuilder();
 
-        int slot = 0, slots = 0;
-        for (int off = n - 1; off >= 1; off--) if (keys[off] >= 0) slots++;
-
-        for (int off = n - 1; off >= 1; off--)
+        for (int i = 1; i <= n - 1; i++)
         {
-            int d = keys[off];
-            if (d < 0) continue;
-
-            var rt = d == 1 ? _one : d == 2 ? _two : d == 3 ? _three : _extra[d];
-            rt.anchoredPosition = new Vector2(_threePos.x - (slots - 1 - slot) * step, _threePos.y);
-            if (!rt.gameObject.activeSelf) rt.gameObject.SetActive(true);
-            used.Add(d);
-            order.Append(order.Length == 0 ? "" : " ").Append(d);
-            slot++;
+            Place(Digit(i), new Vector2(_ownAt[3].x - (n - 1 - i) * step, _ownAt[3].y), used);
+            finger.Append(i == 1 ? "" : " ").Append(Digit(i));
         }
+        Place(Digit(n), _ownAt[4], used);
+        Place(Digit(n + 1), _ownAt[5], used);
 
         foreach (var kv in _extra)
             if (!used.Contains(kv.Key) && kv.Value != null) kv.Value.gameObject.SetActive(false);
 
+        // The pad does what it always did (OffsetFor): left and right are the neighbours, up the
+        // person across, down the first of the other two emotes. Key k points n-k chairs round.
+        int up = n - n / 2;
+        MoveArrow(PadLeft, KeyShowing(Digit(1)));
+        MoveArrow(PadUp, KeyShowing(Digit(up)));
+        MoveArrow(PadRight, KeyShowing(Digit(n - 1)));
+        MoveArrow(PadDown, KeyShowing(Digit(n)));
+        _numberedFor = n;
+
         if (_announcedFor != n)
         {
             _announcedFor = n;
-            Plugin.Log.LogInfo($"[emote] middle finger at a table of {n}: keys {order} under the finger, " +
-                               "left to right as the other players sit");
+            Plugin.Log.LogInfo($"[emote] emote keys at a table of {n}: middle finger {finger} (left to right " +
+                               $"as the other players sit), the other two emotes {Digit(n)} and {Digit(n + 1)}; " +
+                               $"pad arrows ({_arrows.Count} found) left on {Digit(1)}, up on {Digit(up)}, " +
+                               $"right on {Digit(n - 1)}, down on {Digit(n)}");
         }
+    }
+
+    private static void Place(int digit, Vector2 at, HashSet<int> used)
+    {
+        var rt = KeyShowing(digit);
+        if (rt == null) return;
+        rt.anchoredPosition = at;
+        if (!rt.gameObject.activeSelf) rt.gameObject.SetActive(true);
+        used.Add(digit);
     }
 
     // ----------------------------------------------------------- making a key the game has not got
@@ -538,11 +660,12 @@ internal static class EmoteTargets
     private static bool _fontLooked;
 
     /// <summary>
-    /// A copy of the game's key 3 - its cap, its press animation, its place in the panel - with
-    /// another number on it. The game draws its numbers into each key's picture and has none
-    /// past 5, so the copy gets a blank cap made from key 3's own picture, and the number is
-    /// written on in the panel's own font and the key's own yellow. The D-pad arrow that comes
-    /// with key 3 is left off: no pad button reaches these seats.
+    /// A copy of the game's key 3 - its cap, its press animation - with another number on it.
+    /// The game draws its numbers into each key's picture and has none past 5, so the copy gets
+    /// a blank cap made from key 3's own picture, and the number is written on in the panel's
+    /// own font and the key's own yellow. Any D-pad arrow that comes with the copy is left off:
+    /// it would be a second one, and the game's own arrows are moved onto whichever keys match
+    /// the pad (see <see cref="Lay"/>).
     /// </summary>
     private static RectTransform MakeKey(int digit)
     {
@@ -551,7 +674,7 @@ internal static class EmoteTargets
             if (_blank == null && !_blankTried)
             {
                 _blankTried = true;
-                var image = _three.GetComponent<Image>();
+                var image = _own[3].GetComponent<Image>();
                 _blank = image != null && image.sprite != null ? BlankCap(image.sprite) : null;
             }
             if (_blank == null) return null;
@@ -559,10 +682,10 @@ internal static class EmoteTargets
             if (!_fontLooked)
             {
                 _fontLooked = true;
-                _font = PanelFont(_three);
+                _font = PanelFont(_own[3]);
             }
 
-            var go = UnityEngine.Object.Instantiate(_three.gameObject, _three.parent, false);
+            var go = UnityEngine.Object.Instantiate(_own[3].gameObject, _own[3].parent, false);
             go.name = digit.ToString();
 
             for (int i = go.transform.childCount - 1; i >= 0; i--)

@@ -29,6 +29,21 @@ was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
   listing a library on a drive that is no longer there (after moving games to another disk),
   and the search for the game failed on it before looking anywhere else. Such libraries are now
   skipped. Found and fixed by @BreezeDelegate in pull request #3 - thank you.
+- **The middle finger reaches everyone at the table.** The emote panel has three keys under
+  the finger - left, across, right - which at four players are the other three people, and at
+  eight left most of the table out of reach (issue #4). At five to nine players there is now one
+  key per other player, numbered left to right as they sit: 1 is the person on your left, the
+  last number the person on your right. The game's other two emotes move up to the next two
+  numbers, so the panel still reads in order - at six the finger is 1 to 5 and the others 6 and
+  7, at eight the finger is 1 to 7 and the others 8 and 9. Everyone else sees the finger land on
+  the person it was meant for. The D-pad does what it always did - left and right are your
+  neighbours, up the person across, down the first of the other two emotes - and its arrows on
+  the panel move onto the keys that match. At four or fewer nothing changes. Everyone at the
+  table needs this version: on an older one the gesture arrives as the sound with no finger.
+  Tested with copies of the game on one machine at six and eight seats, not yet with real players.
+- **Emotes come back sooner: after 10 seconds instead of the game's 12.** `EmoteCooldownSeconds`
+  in the config sets it, from 1 to 60. The wait is counted on each player's own machine, as the
+  game counts it, so your setting is yours whatever the others have.
 - **Liar's Texas: the card held up mid-swap now gets the blank template above four players.**
   Every other card of another player's shows the blank template, but while a player swaps, the
   game paints the card they are giving up with its real face for everyone. At four players
