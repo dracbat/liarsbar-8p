@@ -41,6 +41,7 @@ was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
   the panel move onto the keys that match. At four or fewer nothing changes. Everyone at the
   table needs this version: on an older one the gesture arrives as the sound with no finger.
   Tested with copies of the game on one machine at six and eight seats, not yet with real players.
+  The idea was @BreezeDelegate's, in issue #4 - thank you.
 - **Emotes come back sooner: after 10 seconds instead of the game's 12.** `EmoteCooldownSeconds`
   in the config sets it, from 1 to 60. The wait is counted on each player's own machine, as the
   game counts it, so your setting is yours whatever the others have.
