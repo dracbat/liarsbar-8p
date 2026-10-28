@@ -319,7 +319,7 @@ stale setting once silently disabled a fix for a whole session.
 |---|---|---|
 | `MaxPlayers` | `8` | Lobby size. **Must match across all players.** |
 | `AutoReadyJoiners` | `true` | When you host, each player is marked ready once as they join and when everyone comes back from a match, so you only have to press Start. They can un-ready with the game's button. Only the host's setting matters. |
-| `AutoUpdate` | `true` | Each time the game starts, check this mod's GitHub releases and install a newer version for the next start. Only the plugin is replaced. |
+| `Updates` | `Ask` | What to do when a newer version of this mod is out, checked each time the game starts. `Ask`: a window in the game asks whether to install it - yes downloads it and restarts the game with it - with tick boxes to switch to either of the others. `Automatic`: install it without asking; it loads the next time the game starts. `Off`: never check. Only the plugin is replaced. |
 | `EmoteCooldownSeconds` | `10` | Seconds between your own emotes; the game's own wait is 12. Counted on your machine, as the game counts it, at every table size (1 to 60). |
 | `VerboseDiagnostics` | `true` | Log seat, podium and deck counts. Leave on — it is what makes a bad round diagnosable. |
 | `DeveloperMode` | `false` | Test tools: bots, an F8 panel, and a running account of everything. Leave off for normal play. |

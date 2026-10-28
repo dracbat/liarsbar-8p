@@ -26,6 +26,10 @@ internal sealed class VersionHud : MonoBehaviour
 
     private void OnGUI()
     {
+        // In front of every other window of the mod's while the update window is up, and first
+        // to be offered the clicks.
+        GUI.depth = UpdatePrompt.Showing ? -100 : 0;
+
         try
         {
             if (_style == null)
@@ -84,5 +88,9 @@ internal sealed class VersionHud : MonoBehaviour
             }
         }
         catch { /* never let a HUD draw break the game */ }
+
+        // Last, so it is drawn over the rest, and outside the catch above: whatever goes wrong
+        // there, the window still gets the chance to switch the game's menus back on.
+        UpdatePrompt.Draw();
     }
 }

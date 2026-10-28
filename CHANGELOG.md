@@ -18,13 +18,16 @@ was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
 ## Unreleased
 
-- **The mod now updates itself.** Each time the game starts it asks this mod's GitHub releases
-  for the newest version; if there is a newer one it downloads it and puts it in place for the
-  next start, and a line at the top of the screen says to restart. Only this mod's own release
-  files are accepted, only the plugin is replaced (BepInEx and your settings are left alone),
-  and the downloaded file has to be this mod at exactly the release's version. Copies from
-  anywhere - including mod sites that take days to approve a new upload - catch up on their
-  own. `AutoUpdate` in the config turns it off.
+- **The mod can now update itself - when you say so.** Each time the game starts it asks this
+  mod's GitHub releases for the newest version. If there is a newer one, a window in the game
+  says so and asks whether to install it: yes downloads it and restarts the game with it, not
+  now asks again next time. Two tick boxes in the window stop the asking - one installs updates
+  automatically from then on (they load the next time the game starts), the other stops the mod
+  checking at all - and the same three choices are `Updates` in the config (`Ask`,
+  `Automatic`, `Off`). Only this mod's own release files are accepted, only the
+  plugin is replaced (BepInEx and your settings are left alone), and the downloaded file has to
+  be this mod at exactly the release's version. Copies from anywhere - including mod sites that
+  take days to approve a new upload - can catch up without anyone downloading anything by hand.
 - **The Windows installer and uninstaller no longer stop on a missing drive.** Steam can keep
   listing a library on a drive that is no longer there (after moving games to another disk),
   and the search for the game failed on it before looking anywhere else. Such libraries are now

@@ -15,7 +15,7 @@ public class Plugin : BasePlugin
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
     public static ConfigEntry<bool> AutoReadyJoiners;
-    public static ConfigEntry<bool> AutoUpdateEnabled;
+    public static ConfigEntry<UpdateMode> Updates;
     public static ConfigEntry<float> EmoteCooldownSeconds;
     public static ConfigEntry<bool> Verbose;
     public static ConfigEntry<bool> DiagAutoHost;
@@ -42,9 +42,10 @@ public class Plugin : BasePlugin
             "again when everyone comes back to the lobby after a match - so you only have to press Start. " +
             "They can still un-ready with the game's own button, and being ready locks nothing in the lobby. " +
             "Never applies to you, the host. Only the host's setting matters.");
-        AutoUpdateEnabled = Config.Bind("General", "AutoUpdate", true,
-            "Check this mod's GitHub releases each time the game starts and, if there is a newer version, " +
-            "download it and put it in place for the next start. Everyone at a table must run the same version.");
+        Updates = Config.Bind("General", "Updates", UpdateMode.Ask,
+            "What to do when a newer version of this mod is out, checked each time the game starts. Ask: a " +
+            "window in the game asks whether to install it. Automatic: install it without asking. Off: never " +
+            "check. Either way it loads the next time the game starts. Everyone at a table must run the same version.");
         EmoteCooldownSeconds = Config.Bind("General", "EmoteCooldownSeconds", 10f,
             new ConfigDescription("Seconds between your emotes - the game's own wait is 12. It is counted on " +
                 "your own machine, as the game counts it, and applies at every table size.",
