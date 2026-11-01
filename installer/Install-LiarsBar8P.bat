@@ -317,7 +317,7 @@ Say "=================================================" Green
 Say ""
 Say "NEXT:" Cyan
 Say "  1. Launch Liar's Bar."
-Say "  2. Check the TOP LEFT of the screen - it must read $tag."
+Say "  2. Check the top of the screen - it must read $tag."
 Say "     Everyone playing together must show the same version."
 Say ""
 Say "  The first launch after installing can take a few minutes." Gray

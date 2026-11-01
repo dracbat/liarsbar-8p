@@ -30,11 +30,50 @@ internal sealed class TurnHud : MonoBehaviour
     private GUIStyle _yours;
     private Texture2D _backdrop;
 
+    private static ModCanvas.Line _row;
+    private static bool _plain;
+
+    /// <summary>The left edge, and the same height on any screen, because that block scales with the window.</summary>
+    private static readonly Vector2 Corner = new(0f, 1f);
+    private const float Inset = 6f;
+    private const float Down = 224f;
+
     /// <summary>
-    /// Work out the line to show. Called four times a second from the ticker, because
-    /// <c>OnGUI</c> runs several times per frame and this walks the roster.
+    /// Work out the line to show. Called four times a second from the ticker, because this
+    /// walks the roster.
     /// </summary>
     internal static void Refresh()
+    {
+        Work();
+        Publish();
+    }
+
+    /// <summary>For the self test.</summary>
+    internal static void Pretend(string line) => _pretend = line;
+    private static string _pretend;
+
+    private static void Publish()
+    {
+        if (!ModCanvas.Ready) return;
+
+        try
+        {
+            if (!string.IsNullOrEmpty(_pretend)) _line = _pretend;
+
+            if (_row == null)
+            {
+                _row = ModCanvas.NewLine("turn", Corner, 40f, 26f, ModCanvas.Cream, rule: true);
+                _row.Box.anchoredPosition = new Vector2(Inset, -Down);
+            }
+
+            _plain = !ModCanvas.Fits(_line);
+            _row.Text.color = _isYou ? ModCanvas.Gold : ModCanvas.Cream;
+            _row.Set(_plain ? null : _line);
+        }
+        catch (Exception e) { ModCanvas.Fail("the turn line", e); }
+    }
+
+    private static void Work()
     {
         try
         {
@@ -140,11 +179,12 @@ internal sealed class TurnHud : MonoBehaviour
         return false;
     }
 
+    /// <summary>The plain version, for when <see cref="ModCanvas"/> is not up.</summary>
     private void OnGUI()
     {
         try
         {
-            if (string.IsNullOrEmpty(_line)) return;
+            if ((ModCanvas.Ready && !_plain) || string.IsNullOrEmpty(_line)) return;
 
             if (_style == null)
             {

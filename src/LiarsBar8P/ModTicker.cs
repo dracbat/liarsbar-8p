@@ -22,6 +22,9 @@ internal sealed class ModTicker : MonoBehaviour
 
     private void Update()
     {
+        try { WhatsNew.Frame(); }
+        catch (Exception e) { Plugin.Log.LogError($"[update] changelog frame failed: {e.Message}"); }
+
         // Four times a second is far more often than any of this changes, and cheap enough
         // that it does not matter.
         if (Time.time < _next) return;
@@ -86,6 +89,21 @@ internal sealed class ModTicker : MonoBehaviour
 
         try { VersionCheck.ForgetWhenSessionEnds(); }
         catch (Exception e) { Plugin.Log.LogError($"[version] banner check failed: {e.Message}"); }
+
+        try { Matchmaking.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[matchmaking] tick failed: {e.Message}"); }
+
+        try { QuickMatch.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[matchmaking] quick join tick failed: {e.Message}"); }
+
+        try { VersionTag.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[version] tag tick failed: {e.Message}"); }
+
+        try { WhatsNew.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[update] changelog tick failed: {e.Message}"); }
+
+        try { MatchmakingSelfTest.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[matchmaking] self test tick failed: {e.Message}"); }
 
         try { DevLogging.PollClientState(); }
         catch (Exception e) { Plugin.Log.LogError($"[seen] client poll failed: {e.Message}"); }

@@ -101,10 +101,12 @@ internal static class AutoUpdate
             if (string.IsNullOrEmpty(here)) return;
             _here = here;
 
+            string before = Environment.GetEnvironmentVariable("LIARSBAR8P_RESTARTED");
+            WhatsNew.Decide(before, File.Exists(here + ".old"));
+
             // Leftovers from an update that has now been loaded.
             TryDelete(here + ".old");
 
-            string before = Environment.GetEnvironmentVariable("LIARSBAR8P_RESTARTED");
             if (!string.IsNullOrEmpty(before))
                 Plugin.Log.LogInfo($"[update] started again by the update from v{before} - running v{Plugin.Version} now");
 
@@ -187,6 +189,14 @@ internal static class AutoUpdate
             bool ok = await Install(here, newest, url).ConfigureAwait(false);
             _stage = ok ? Stage.Installed : Stage.Failed;
         });
+    }
+
+    /// <summary>For the self test: the window, with nothing behind it.</summary>
+    internal static void Pretend(Stage stage)
+    {
+        Offered = new Version(9, 9, 9);
+        AcceptedByPlayer = true;
+        _stage = stage;
     }
 
     /// <summary>"Restart later" after a yes: the update stays installed and loads at the next start.</summary>

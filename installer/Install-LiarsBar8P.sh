@@ -463,7 +463,7 @@ LB8P_ONLINE=1 bash "$SRC/install.sh" "$GAME" || exit $?
 
 if [ -n "$TAG" ]; then
     head_ "Installed $TAG."
-    say "  The TOP LEFT of the screen in game must read $TAG."
+    say "  The top of the screen in game must read $TAG."
 else
     head_ "Installed the latest release."
 fi

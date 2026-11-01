@@ -4,7 +4,10 @@ using UnityEngine;
 namespace LiarsBar8P;
 
 /// <summary>
-/// Draws the running mod version at the top of the screen, in the middle.
+/// The plain version of <see cref="VersionTag"/>: draws the running mod version at the top of the
+/// screen, in the middle, until the game's font has loaded, and for good if <see cref="ModCanvas"/>
+/// ever fails.
+/// Also where the update window gets drawn, because that has to be from an OnGUI.
 ///
 /// Version drift between players has repeatedly broken sessions, and spotting it meant
 /// reading each person's log by hand. Putting the version on screen means anyone can
@@ -30,21 +33,18 @@ internal sealed class VersionHud : MonoBehaviour
         // to be offered the clicks.
         GUI.depth = UpdatePrompt.Showing ? -100 : 0;
 
+        if (ModCanvas.Ready)
+        {
+            try { DrawPlainWarning(); }
+            catch { /* never let a HUD draw break the game */ }
+
+            UpdatePrompt.Draw();
+            return;
+        }
+
         try
         {
-            if (_style == null)
-            {
-                _style = new GUIStyle(GUI.skin.label)
-                {
-                    fontSize = 14,
-                    alignment = TextAnchor.UpperLeft,
-                    richText = false
-                };
-                _style.normal.textColor = new Color(1f, 1f, 1f, 0.75f);
-
-                _warnStyle = new GUIStyle(_style) { fontSize = 15 };
-                _warnStyle.normal.textColor = new Color(1f, 0.45f, 0.35f, 0.95f);
-            }
+            Styles();
 
             string label = $"Liar's Bar 8P  v{Plugin.Version}  (max {Plugin.MaxPlayers.Value})";
 
@@ -58,12 +58,6 @@ internal sealed class VersionHud : MonoBehaviour
             // A panel behind the text, because it has to stay readable over a bright menu
             // as well as a dark bar. A drop shadow alone was not enough.
             Vector2 size = _style.CalcSize(new GUIContent(label));
-            if (_backdrop == null)
-            {
-                _backdrop = new Texture2D(1, 1);
-                _backdrop.SetPixel(0, 0, new Color(0f, 0f, 0f, 0.55f));
-                _backdrop.Apply();
-            }
             float x = Mathf.Round((Screen.width - size.x) / 2f);
             GUI.DrawTexture(new Rect(x - 5f, y - 2f, size.x + 10f, size.y + 6f), _backdrop);
             GUI.Label(new Rect(x, y, size.x + 4f, 22f), label, _style);
@@ -92,5 +86,42 @@ internal sealed class VersionHud : MonoBehaviour
         // Last, so it is drawn over the rest, and outside the catch above: whatever goes wrong
         // there, the window still gets the chance to switch the game's menus back on.
         UpdatePrompt.Draw();
+    }
+
+    private void Styles()
+    {
+        if (_style == null)
+        {
+            _style = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 14,
+                alignment = TextAnchor.UpperLeft,
+                richText = false
+            };
+            _style.normal.textColor = new Color(1f, 1f, 1f, 0.75f);
+
+            _warnStyle = new GUIStyle(_style) { fontSize = 15 };
+            _warnStyle.normal.textColor = new Color(1f, 0.45f, 0.35f, 0.95f);
+        }
+
+        if (_backdrop == null)
+        {
+            _backdrop = new Texture2D(1, 1);
+            _backdrop.SetPixel(0, 0, new Color(0f, 0f, 0f, 0.55f));
+            _backdrop.Apply();
+        }
+    }
+
+    /// <summary>Under the tag, for the one case the tag's own line cannot show.</summary>
+    private void DrawPlainWarning()
+    {
+        string words = VersionTag.PlainWarning;
+        if (string.IsNullOrEmpty(words)) return;
+
+        Styles();
+        Vector2 size = _warnStyle.CalcSize(new GUIContent(words));
+        float x = Mathf.Round((Screen.width - size.x) / 2f), y = 40f * Screen.height / 1080f;
+        GUI.DrawTexture(new Rect(x - 5f, y - 2f, size.x + 10f, size.y + 6f), _backdrop);
+        GUI.Label(new Rect(x, y, size.x + 4f, 22f), words, _warnStyle);
     }
 }

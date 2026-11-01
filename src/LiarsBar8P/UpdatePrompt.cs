@@ -39,8 +39,8 @@ internal static class UpdatePrompt
     private static int _polled = -1, _answer;
     private static bool _sceneLogged;
 
-    private static GUIStyle _title, _text, _small;
-    private static Texture2D _shade, _panel;
+    private static GUIStyle _title, _text, _small, _button, _tick;
+    private static Texture2D _shade, _panel, _rule, _gold;
 
     /// <summary>Whether the window was up this frame, so the HUD can put it in front of everything.</summary>
     internal static bool Showing { get; private set; }
@@ -53,7 +53,7 @@ internal static class UpdatePrompt
             var stage = AutoUpdate.Current;
             bool countdown = stage == AutoUpdate.Stage.Installed && AutoUpdate.AcceptedByPlayer &&
                              AutoUpdate.InPlace && !_restartTried;
-            bool show = !_broken && (stage == AutoUpdate.Stage.Asking || countdown) && AtMenu();
+            bool show = !_broken && (stage == AutoUpdate.Stage.Asking || countdown) && AtMenu() && !WhatsNew.Holding;
 
             Hold(show);
             Showing = show;
@@ -146,58 +146,60 @@ internal static class UpdatePrompt
             GUI.DrawTexture(new Rect(0f, 0f, sw, sh), _shade);
 
             bool asking = stage == AutoUpdate.Stage.Asking;
-            const float w = 560f, pad = 22f;
-            float h = asking ? 300f : 200f;
+            const float w = 620f, pad = 26f;
+            float h = asking ? 372f : 250f;
             float x = Mathf.Round((sw - w) / 2f), y = Mathf.Round((sh - h) / 2f);
             GUI.DrawTexture(new Rect(x, y, w, h), _panel);
+            GUI.DrawTexture(new Rect(x, y, w, 2f), _rule);
+            GUI.DrawTexture(new Rect(x, y + h - 2f, w, 2f), _rule);
 
             float cx = x + pad, cw = w - 2f * pad, cy = y + pad;
-            var left = new Rect(cx + cw / 2f - 200f, 0f, 190f, 32f);
-            var right = new Rect(cx + cw / 2f + 10f, 0f, 190f, 32f);
+            var left = new Rect(cx, 0f, cw / 2f - 8f, 40f);
+            var right = new Rect(cx + cw / 2f + 8f, 0f, cw / 2f - 8f, 40f);
             var offered = AutoUpdate.Offered;
 
             if (asking)
             {
-                GUI.Label(new Rect(cx, cy, cw, 26f), "Liar's Bar 8 Player Mod - update available", _title);
-                cy += 40f;
-                GUI.Label(new Rect(cx, cy, cw, 72f),
+                GUI.Label(new Rect(cx, cy, cw, 34f), "LIAR'S BAR 8 PLAYER MOD - UPDATE AVAILABLE", _title);
+                cy += 46f;
+                GUI.Label(new Rect(cx, cy, cw, 96f),
                     $"v{offered} is out. You have v{Plugin.Version}.\n" +
                     "Everyone at a table needs the same version.\n" +
                     "Install it? The game restarts by itself to load it.", _text);
-                cy += 80f;
+                cy += 100f;
 
                 left.y = right.y = cy;
                 int key = Answer();
-                if (GUI.Button(left, "Yes, install   (Y / A)") || key > 0) AutoUpdate.Accept(Choice());
-                else if (GUI.Button(right, "Not now   (N / B)") || key < 0) AutoUpdate.Decline(Choice());
-                cy += 48f;
+                if (GUI.Button(left, "YES, INSTALL   (Y / A)", _button) || key > 0) AutoUpdate.Accept(Choice());
+                else if (GUI.Button(right, "NOT NOW   (N / B)", _button) || key < 0) AutoUpdate.Decline(Choice());
+                cy += 52f;
 
                 // Either, or neither: ticking one clears the other.
-                bool automatic = GUI.Toggle(new Rect(cx, cy, cw, 22f), _automatic, " Install updates automatically from now on");
+                bool automatic = Tick(new Rect(cx, cy, cw, 26f), _automatic, "Install updates automatically from now on");
                 if (automatic != _automatic) { _automatic = automatic; if (automatic) _off = false; }
-                cy += 26f;
-                bool off = GUI.Toggle(new Rect(cx, cy, cw, 22f), _off, " Don't check for updates");
+                cy += 30f;
+                bool off = Tick(new Rect(cx, cy, cw, 26f), _off, "Don't check for updates");
                 if (off != _off) { _off = off; if (off) _automatic = false; }
                 if (_off)
-                    GUI.Label(new Rect(cx + 18f, cy + 22f, cw - 18f, 20f),
+                    GUI.Label(new Rect(cx + 24f, cy + 26f, cw - 24f, 22f),
                               "Updates in the mod's config file turns checks back on, and so does reinstalling the mod.", _small);
                 return;
             }
 
             // The countdown after a yes: a few seconds to read what is happening, then the restart.
-            GUI.Label(new Rect(cx, cy, cw, 26f), "Liar's Bar 8 Player Mod - update installed", _title);
-            cy += 40f;
+            GUI.Label(new Rect(cx, cy, cw, 34f), "LIAR'S BAR 8 PLAYER MOD - UPDATE INSTALLED", _title);
+            cy += 46f;
             if (_countFrom < 0f) _countFrom = Time.realtimeSinceStartup;
             float remaining = RestartDelay - (Time.realtimeSinceStartup - _countFrom);
-            GUI.Label(new Rect(cx, cy, cw, 70f),
+            GUI.Label(new Rect(cx, cy, cw, 90f),
                 $"v{offered} is installed. Restarting the game to load it in {Mathf.Max(1, Mathf.CeilToInt(remaining))}..." + Future(),
                 _text);
 
-            left.y = right.y = y + h - pad - 32f;
+            left.y = right.y = y + h - pad - 40f;
             int answer = Answer();
-            bool now = GUI.Button(left, "Restart now   (Y / A)") || answer > 0 ||
+            bool now = GUI.Button(left, "RESTART NOW   (Y / A)", _button) || answer > 0 ||
                        (remaining <= 0f && Event.current.type == EventType.Repaint);
-            bool later = !now && (GUI.Button(right, "Restart later   (N / B)") || answer < 0);
+            bool later = !now && (GUI.Button(right, "RESTART LATER   (N / B)", _button) || answer < 0);
 
             if (now)
             {
@@ -211,6 +213,15 @@ internal static class UpdatePrompt
             }
         }
         finally { GUI.matrix = keep; }
+    }
+
+    /// <summary>A tick box drawn the way the rest of the window is. The whole line takes the click.</summary>
+    private static bool Tick(Rect line, bool on, string words)
+    {
+        var box = new Rect(line.x, line.y + 5f, 16f, 16f);
+        GUI.DrawTexture(box, _rule);
+        GUI.DrawTexture(new Rect(box.x + 2f, box.y + 2f, 12f, 12f), on ? _gold : _panel);
+        return GUI.Button(line, words, _tick) ? !on : on;
     }
 
     private static UpdateMode? Choice() => _automatic ? UpdateMode.Automatic : _off ? UpdateMode.Off : null;
@@ -229,17 +240,44 @@ internal static class UpdatePrompt
     {
         if (_title == null)
         {
-            _title = new GUIStyle(GUI.skin.label) { fontSize = 19, fontStyle = FontStyle.Bold, wordWrap = false };
-            _title.normal.textColor = new Color(0.98f, 0.82f, 0.33f, 1f);   // the emote panel's yellow
-            _text = new GUIStyle(GUI.skin.label) { fontSize = 15, wordWrap = true };
-            _text.normal.textColor = new Color(1f, 1f, 1f, 0.92f);
-            _small = new GUIStyle(_text) { fontSize = 12, wordWrap = false };
-            _small.normal.textColor = new Color(1f, 1f, 1f, 0.6f);
+            // A plain label to start from, so nothing brings the default grey box with it.
+            var plain = new GUIStyle(GUI.skin.label) { font = GameFont() };
+            _title = new GUIStyle(plain) { fontSize = 24, wordWrap = false, alignment = TextAnchor.MiddleCenter };
+            _title.normal.textColor = ModCanvas.Gold;
+            _text = new GUIStyle(plain) { fontSize = 21, wordWrap = true };
+            _text.normal.textColor = ModCanvas.Cream;
+            _small = new GUIStyle(_text) { fontSize = 15, wordWrap = false };
+            _small.normal.textColor = new Color(ModCanvas.Cream.r, ModCanvas.Cream.g, ModCanvas.Cream.b, 0.65f);
+
+            _button = new GUIStyle(plain) { fontSize = 23, alignment = TextAnchor.MiddleCenter };
+            _button.normal.textColor = ModCanvas.Cream;
+            _button.hover.textColor = ModCanvas.Gold;
+            _button.active.textColor = ModCanvas.Gold;
+
+            _tick = new GUIStyle(plain) { fontSize = 19, alignment = TextAnchor.MiddleLeft };
+            _tick.padding.left = 24;
+            _tick.normal.textColor = ModCanvas.Cream;
+            _tick.hover.textColor = ModCanvas.Gold;
+            _tick.active.textColor = ModCanvas.Gold;
         }
 
         // Made again if a scene change has thrown them away.
-        if (_shade == null) _shade = Solid(new Color(0f, 0f, 0f, 0.45f));
-        if (_panel == null) _panel = Solid(new Color(0.07f, 0.06f, 0.05f, 0.94f));
+        if (_shade == null) _shade = Solid(new Color(0f, 0f, 0f, 0.72f));
+        if (_panel == null) _panel = Solid(new Color(0.055f, 0.045f, 0.04f, 1f));
+        if (_rule == null) _rule = Solid(ModCanvas.Cream);
+        if (_gold == null) _gold = Solid(ModCanvas.Gold);
+    }
+
+    /// <summary>The game's own typeface, or nothing, which leaves Unity's default: the window matters more than its looks.</summary>
+    private static Font GameFont()
+    {
+        try
+        {
+            var face = ModCanvas.GameFont();
+            if (face != null) return face.sourceFontFile;
+        }
+        catch (Exception e) { Plugin.Log.LogWarning($"[update] could not find the game's font: {e.Message}"); }
+        return null;
     }
 
     private static Texture2D Solid(Color c)

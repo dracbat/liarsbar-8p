@@ -10,13 +10,15 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "liarsbar.eightplayers";
-    public const string Version = "1.1.3";
+    public const string Version = "2.0.0";
 
     public new static ManualLogSource Log;
     public static ConfigEntry<int> MaxPlayers;
     public static ConfigEntry<bool> AutoReadyJoiners;
     public static ConfigEntry<UpdateMode> Updates;
     public static ConfigEntry<float> EmoteCooldownSeconds;
+    public static ConfigEntry<bool> ShowUnmoddedLobbies;
+    public static ConfigEntry<string> ChangelogShownFor;
     public static ConfigEntry<bool> Verbose;
     public static ConfigEntry<bool> DiagAutoHost;
     public static ConfigEntry<bool> DiagSoloStart;
@@ -50,6 +52,14 @@ public class Plugin : BasePlugin
             new ConfigDescription("Seconds between your emotes - the game's own wait is 12. It is counted on " +
                 "your own machine, as the game counts it, and applies at every table size.",
                 new AcceptableValueRange<float>(1f, 60f)));
+        ShowUnmoddedLobbies = Config.Bind("General", "ShowUnmoddedLobbies", false,
+            "The lobby list and Quick Join only look at lobbies hosted with this mod, which is where " +
+            "eight-player tables are. Turn this on to put the game's normal list and Quick Join back: " +
+            "you then see lobbies without the mod, and not the ones with it. Lobbies you host stay " +
+            "modded either way, and friend invites and the lobby ID box work the same either way.");
+
+        ChangelogShownFor = Config.Bind("Debug", "ChangelogShownFor", "",
+            "The version whose changes were last shown after an update. The mod keeps this itself.");
 
         Verbose = Config.Bind("Debug", "VerboseDiagnostics", true,
             "Dump runtime seat/prefab/slot counts to the log. Needed while the mod is still being built out.");
@@ -138,6 +148,14 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(DiceRevealRows), "Liar's Dice reveals of more than twenty dice");
         Apply(harmony, typeof(DiceRowOrder),   "Liar's Dice reveal rows lit in reading order");
         Apply(harmony, typeof(MechanicsTrace),  "devil and chaos mechanics trace");
+
+        // Steam is stubbed in the loopback harness, and there is no lobby there to find.
+        if (!Loopback.Active)
+        {
+            Apply(harmony, typeof(Matchmaking), "matchmaking: the modded lobby pool");
+            Apply(harmony, typeof(LobbyRows),   "matchmaking: rows in the lobby list");
+            Apply(harmony, typeof(QuickMatch),  "matchmaking: Quick Join");
+        }
 
         // Only does anything when the loopback harness is running.
         if (Loopback.Active) Apply(harmony, typeof(LoopbackSteamStub), "loopback steam stub");

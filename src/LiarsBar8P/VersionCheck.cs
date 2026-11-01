@@ -23,7 +23,7 @@ namespace LiarsBar8P;
 /// </summary>
 internal static class VersionCheck
 {
-    private const string Key = "lb8p_ver";
+    internal const string Key = "lb8p_ver";
     private static float _nextReport;
 
     [HarmonyPostfix]

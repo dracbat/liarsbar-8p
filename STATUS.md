@@ -128,6 +128,35 @@ Confirmed in `BepInEx/LogOutput.log` on a live host, current build:
 | No Mirror scene corruption | no `already spawned`, no duplicate NetworkManager |
 | In-game seat ring and nameplates beyond 4 | seen in play |
 
+## Finding a game
+
+Run on real Steam with one account. One account cannot join its own lobby: it enters on Steam,
+cannot connect, and when it leaves Steam takes the account out of the lobby, which ends the
+hosting copy's lobby too.
+
+| Item | Evidence |
+|---|---|
+| A tagged lobby is found by a modded search and not by a plain one | plain search returned 12 to 13 real lobbies, none of them ours |
+| Rows | seen in screenshots |
+| JOIN at exactly 4 of 8 | only with the row count forced by a test switch |
+| A lobby stays listed past the game's old limit | still listed at 16 minutes |
+| A lobby with a stopped heartbeat drops off | gone from a search within five minutes, owner still in it |
+| Refusal for another mod version and another `MaxPlayers` | a 1.9.9 build, and a copy set to 6 seats |
+| Quick Join opens a lobby and finds one | about 5 s alone; second copy started a join |
+| Two lobbies noticing each other | the later one moved, about 9 s, boxes kept |
+| Back while looking and while opening | lobby dropped, HOST GAME still works after |
+| A real match closes the lobby and it lists again after | one bot, Liar's Dice, ended with `ForceEndGameWithWinner` |
+| Start held while somebody arrives | only with a pretend arrival from a test switch |
+| Old `SteamLobby` callbacks retired after the menu | 0 trampoline errors, each Steam answer once |
+
+**Needs a second account, never run:** a join connecting, a lobby listed with more than one real
+member, two people ending at one table, turning away a player without the mod, another version
+arriving by invite, an invite refused during a match, a crashed host's players leaving its lobby,
+and a connection reaching a running match with no character.
+
+After a host migration the game ends the table at the end of the match instead of returning to
+the lobby, so a migrated lobby is never listed again. That is the game's behaviour, not a fault.
+
 ## Not yet proven
 
 - **What the "arrow" on the table actually is.** The group named `TurnArrows` holds four

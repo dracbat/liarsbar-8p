@@ -60,6 +60,14 @@ internal sealed class AimHud : MonoBehaviour
     private GUIStyle _hintStyle;
     private Texture2D _backdrop;
 
+    private static ModCanvas.Line _aimRow, _keysRow;
+    private static bool _plain;
+
+    /// <summary>Just under the middle of the screen: where the player is already looking while turning the gun, and clear of the cards along the bottom.</summary>
+    private static readonly Vector2 TopMiddle = new(0.5f, 1f);
+    private const float Down = 670f;
+    private const float AimHeight = 46f;
+
     // The two lines as they were last measured. OnGUI runs several times a frame - once to lay
     // out, once to paint, once per input event - and the text only changes on a keypress or a
     // lock, so each line is wrapped and measured once when it changes rather than on every
@@ -87,6 +95,39 @@ internal sealed class AimHud : MonoBehaviour
 
         try { Refresh(); }
         catch { _line = null; _hint = null; }
+
+        Publish();
+    }
+
+    /// <summary>For the self test.</summary>
+    internal static void Pretend(string line) => _pretend = line;
+    private static string _pretend;
+
+    private static void Publish()
+    {
+        if (!ModCanvas.Ready) return;
+
+        try
+        {
+            if (!string.IsNullOrEmpty(_pretend))
+            {
+                _line = _pretend;
+                _hint = DeckKeys;
+            }
+
+            if (_aimRow == null)
+            {
+                _aimRow = ModCanvas.NewLine("aim", TopMiddle, AimHeight, 32f, ModCanvas.Warning, rule: true);
+                _aimRow.Box.anchoredPosition = new Vector2(0f, -Down);
+                _keysRow = ModCanvas.NewLine("keys", TopMiddle, 30f, 20f, ModCanvas.Cream);
+                _keysRow.Box.anchoredPosition = new Vector2(0f, -Down - AimHeight - 2f);
+            }
+
+            _plain = !ModCanvas.Fits(_line);
+            _aimRow.Set(_plain ? null : _line);
+            _keysRow.Set(_plain || _line == null ? null : _hint);
+        }
+        catch (Exception e) { ModCanvas.Fail("the aim line", e); }
     }
 
     // What the line was last worked out from. The line is only rebuilt when one of these
@@ -239,11 +280,12 @@ internal sealed class AimHud : MonoBehaviour
         return false;
     }
 
+    /// <summary>The plain version, for when <see cref="ModCanvas"/> is not up.</summary>
     private void OnGUI()
     {
         try
         {
-            if (string.IsNullOrEmpty(_line)) return;
+            if ((ModCanvas.Ready && !_plain) || string.IsNullOrEmpty(_line)) return;
 
             if (_style == null)
             {

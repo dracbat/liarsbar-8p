@@ -18,6 +18,8 @@ The mod's own configurable cap lives in exactly one place — `Limits.Max`, back
 | `NetworkManager.maxConnections` | The serialized inspector field. Feeds both Steam's lobby size and the transport. | Fixed since v0.1.0 (`CapPatches`) |
 | `NetworkServer.Listen(int maxConns)` | Mirror's *actual* connection check. The game always called `Listen(4)` regardless of the field. | Fixed since v0.2.0 (`JoinFix`) |
 | **`Mirror.FizzySteam.NextServer` / `LegacyServer`** | **The Steam transport's own limit, below Mirror.** `OnConnectionStatusChanged` compares `steamConnections.Count` against the server's `maxConnections` and rejects with *"Incoming connection … would exceed max connection count"*. | **This is why the 6th player could not join** — fixed in v0.21.0 (`TransportCap`) |
+| `SteamLobby.GetLobbiesList` / `GetLobbiesListMatchmaking`, numeric filter `playercount < 4` | Hides a lobby from every search the moment it reaches four, modded players included. | Dropped for the modded pool (`Matchmaking`) |
+| `LobbyDataEntry.SetLobbyData`, JOIN hidden at exactly 4 | A row at 4/8 would have no JOIN. | Decided by whether there is a seat (`LobbyRows`) |
 
 The transport limit is the one that explains the exact symptom. The host does not open a
 Steam connection to itself, so `steamConnections` holds only the remote players: a limit

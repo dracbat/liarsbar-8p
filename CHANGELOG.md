@@ -16,6 +16,85 @@ Versions that were once numbered 1.x and 2.x were folded into the same 0.x line 
 room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order is unchanged: what
 was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v2.0.0 — Find a game without seven friends
+
+- **Find a game without seven friends.** The lobby list and Quick Join now search a pool of
+  lobbies of their own for players who have the mod, worldwide, built only on Steam lobbies and
+  the game's own menus. There is no server, and nothing is hosted by anyone. A public lobby hosted
+  with the mod joins the pool by itself. A Friends Only lobby stays unlisted.
+- **This is a clean break from every earlier version.** Lobbies hosted with an older version do
+  not appear in the pool, and lobbies in the pool do not appear for older versions. Players without
+  the mod never see modded lobbies in their list or Quick Join, which was how they used to walk in
+  and desync the table.
+- **A lobby stays listed all the way to full.** The game's list only asks for lobbies under four
+  players, so a modded lobby vanished from everybody's list at four and the last seats could only
+  be filled by invitation. Its date filters could also lose a lobby after fifteen minutes of waiting
+  or around midnight UTC. All of that is gone from the pool, along with the "Lobby is not Visible"
+  line that went with it. JOIN now goes by whether there is a seat, not by the count being exactly
+  four.
+- **A lobby whose host has gone drops off the list.** Hosts in the pool send a heartbeat, on Steam's
+  clock so nobody's PC clock matters, and a lobby leaves the list within five minutes of the last
+  one. Everyone also now leaves a lobby they have lost the connection to, because nothing in the
+  game did: a crashed host left the others members of it for as long as they kept the game open.
+- **Every lobby gets a row.** The game hides any lobby whose name contains "cc" or looks like
+  another one already listed, which in a short list means a Rebecca's lobby never shows, and a
+  default name in Chinese, Japanese, Korean or Arabic can hide every other default name. Those rules
+  are off for the pool. Each row says **8 PLAYER MOD** in a copy of the count's own pill.
+- **Quick Join does something when nobody is hosting.** It used to leave "Connecting. Please
+  Wait..." on screen forever. Now it joins the fullest lobby with a seat, and if there is none it
+  opens a public lobby for you. A lobby that turns out to be full or dead is noted and the next one
+  tried. Two people pressing it together should end up at one table, as long as the lobby's mode is
+  one they ticked: a lobby it opened keeps looking for 45 seconds and one of the two moves, with a
+  line on screen to say so. Back stops it while it is looking or opening a lobby, and a connection
+  gives up by itself within 20 seconds. It respects all four mode boxes, SLOTS included.
+- **Another version is shown, not hidden.** Everyone at a table needs the same version, so a lobby
+  on another one is listed with the version it runs, and JOIN says what it needs rather than letting
+  you in. In a small pool an empty list would read as nobody playing. `MaxPlayers` is checked the
+  same way, for the first time. Quick Join only looks at your own version.
+- **Hosts turn away players without the mod.** A friend without it can still arrive through a Steam
+  invite or a lobby ID. After 12 seconds the lobby chat should say the table needs the mod, and 5
+  seconds later the host's game uses the game's own kick to send them back to the menu. The host sees
+  why, and Start stays unlit until it is settled, so nobody can be taken into a match by accident.
+  Invites and JOIN WITH ID are otherwise unchanged, including between different versions of the mod,
+  where the mismatch banner is still the warning.
+- **A lobby closes while its match runs and reopens after.** A row can sit on somebody's screen for
+  minutes, and joining from one during a match could land you in the game with no character. Start
+  also waits up to 15 seconds for anybody still arriving, and a connection that still reaches a
+  running match with no character is sent back to the menu after two minutes. An invite to a lobby
+  in a match is refused, and now says so.
+- **A lobby comes back to the list after a match.** Two things in the game write its state when
+  everyone returns, in no fixed order, and one of them could take it off the list for good.
+- **Lobby names from other players are tidied before they are shown**: one line, no markup, no
+  control characters, and a sensible length.
+- `ShowUnmoddedLobbies` in the config, off by default, puts the game's normal list and Quick Join
+  back. Lobbies you host stay in the pool either way.
+- **An old error after returning to the menu is gone.** The game never told its old lobby code to
+  stop listening to Steam, so after your first trip back to the menu every message from Steam went
+  to something that no longer existed, and threw an error, before reaching the live code. Only the
+  live code listens now.
+- **See what changed after an update.** When the mod has updated itself, the main menu shows that
+  version's changelog, once, in a window that says it is the mod's. It comes inside the mod, so it
+  needs no internet.
+- **The mod's own text now looks like part of the game.** The tag at the top of the screen, the turn
+  and aiming lines and the update window all use the game's type and colours, and the lines scale
+  with the screen.
+- **What has run, and what has not.** One Steam account cannot join its own lobby, so nobody has yet
+  joined anybody through any of this. Testers wanted.
+  - *Seen on real Steam:* a public lobby published with its tag and found by a modded search and not
+    by a plain one, among real lobbies; rows with their label, and two lobbies with the same name; a
+    lobby still listed after 16 minutes; a lobby with a stopped heartbeat dropping off the list; the
+    refusal for another mod version and for another `MaxPlayers`; Quick Join looking, opening a lobby,
+    and starting a join in a lobby it found; two lobbies noticing each other, one leaving with its line
+    on screen and its boxes kept, up to the join; Back while looking and while opening; a failed join
+    ending cleanly; a real match closing the lobby, and the lobby reopening and listing again after it;
+    the normal list with `ShowUnmoddedLobbies` on.
+  - *Seen only with a test switch:* JOIN on a row forced to read 4/8, and Start held by a pretend
+    arrival.
+  - *Never run, needs a second account:* a join connecting; a lobby listed with more than one real member; two people ending at one
+    table; a friend without the mod being told and sent back; another version arriving by invite;
+    an invite refused during a match; a crashed host's players leaving its lobby; a connection
+    reaching a running match with no character.
+
 ## v1.1.3 — The finger reaches everyone, and updates ask first
 
 - **The mod can now update itself - when you say so.** Each time the game starts it asks this

@@ -13,7 +13,9 @@
 </p>
 
 > **Written by an AI.** Every line of this mod was produced by Claude, directed by one person,
-> as a for-fun experiment. Nothing here shipped on the strength of "it should work" — see
+> as a for-fun experiment. Nothing about playing a match shipped on the strength of "it should
+> work", and the parts of finding a game that have not been tried yet are listed under
+> [What still is not true](#what-still-is-not-true). See
 > [How this was made](#how-this-was-made) for what was actually tested, and where the limits
 > still are.
 
@@ -28,8 +30,12 @@ away completely. (Steam's *Verify integrity of game files* is no substitute: it 
 the game's own files, and leaves the mod's where they are.)
 
 **Everyone playing together must install this and run the same version.** A vanilla client in a
-modded lobby will desync. The version you are running is drawn at the top of the screen in game,
-and every player is warned when somebody's build differs.
+modded lobby will desync, so a host running the mod turns them away. The version you are running
+is drawn at the top of the screen in game, and every player is warned when somebody's build
+differs.
+
+**No friends needed.** The lobby list and Quick Join find other players who have the mod, anywhere
+in the world. See [Finding a game](#finding-a-game).
 
 **On Linux or a Steam Deck?** It is the same mod, running through Proton — tested on a Steam
 Deck — so Windows and Linux players should be able to share a table, though that part is not
@@ -73,7 +79,7 @@ every mode the lobby can reach.
 
 ![A chaos card called at eight players](docs/images/chaos-deck-8-players.jpg)
 
-And this is the fix this release exists for. Before it, at eight players, the revolver could
+And this is the fix v1.0.0 existed for. Before it, at eight players, the revolver could
 only be pointed at three fixed chairs — and if you were sitting in seat four or later you could
 not aim at anybody at all. Now every seat can choose any other with the game's own aiming
 keys (A / D, LB / RB or the D-pad), going round the table past either end, and because the
@@ -83,6 +89,50 @@ mod tells you who you have picked and where they sit:
 ![Aiming at a named player at a table of eight](docs/images/aiming-at-eight.jpg)
 
 *(Every screenshot is from the test harness, where the players are named Player1–Player8.)*
+
+---
+
+## Finding a game
+
+An eight-player game does not take seven friends. Everyone with the mod shares a pool of lobbies
+of their own, on Steam, in the game's own menus. There is no server and nothing to sign up for.
+This is new, and nobody has yet joined anybody through it: see
+[What still is not true](#what-still-is-not-true).
+
+**ENTER THE BAR → LOBBY LIST** shows lobbies hosted with the mod, from anywhere in the world. Each
+row is marked **8 PLAYER MOD** and shows how many are in it, like `5/8`. Press JOIN on any with a
+seat. They stay listed from one player to seven, and for as long as the host waits. A lobby leaves
+the list while a match runs and comes back when it ends, and one whose host has gone drops off
+within five minutes.
+
+**QUICK JOIN**, at the bottom of that list, puts you in the fullest lobby with a seat. If nobody is
+hosting it opens a public lobby for you, and the next person to press it should land in yours, as
+long as that lobby's mode is one they ticked. Two people pressing it at the same moment should end
+up together, with the same condition: for the first 45 seconds a lobby it opened keeps looking, and
+if another lobby turns up one of the two hosts moves to it, with a line on screen to say so. Back
+stops it while it is looking or opening a lobby, and a connection gives up by itself within 20
+seconds. The four mode boxes count: with only DICE ticked it only joins Liar's Dice lobbies. A lobby
+it opens for you starts in the game's current mode, whatever is ticked, and you can change that in
+the lobby as usual.
+
+**HOST GAME** works as it always has. A **Public** lobby is found by everybody with the mod, and a
+**Friends Only** lobby stays unlisted.
+
+**Everyone at a table needs the same version.** A lobby on another version is still listed, marked
+with the version it runs, and JOIN tells you what it needs instead of letting you in. Quick Join
+skips those. The game offers new versions when it starts, so one restart usually settles it.
+
+Players without the mod never see these lobbies, and you do not see theirs. Lobbies hosted with
+versions before matchmaking arrived do not appear either: they are not part of the pool.
+
+**Playing with friends has not changed**, with two exceptions. A lobby refuses Steam invites and
+JOIN WITH ID while its match is running, so a friend joins between matches, not during one. And if
+a friend without the mod gets in, the lobby chat should say the table needs the mod, and the host's
+game sends them back to the menu a few seconds later, because they would desync the table. Start
+stays unlit until that is settled. They need to install it.
+
+**Want the game's normal list back?** Set `ShowUnmoddedLobbies` to `true` (see
+[Configure](#configure)). You then see lobbies without the mod, and not the ones with it.
 
 ---
 
@@ -120,6 +170,19 @@ A table of one is a lobby: it forms, holds and reports nothing wrong, and no mat
 
 ## What still is not true
 
+**Nobody has joined anybody through finding a game yet.** One Steam account cannot join its own
+lobby, and the sixty-five matches above did not go through the lobby list or Quick Join. On real
+Steam with one account we have seen a lobby found by a modded search and not by a plain one, the
+rows, a lobby still listed after 16 minutes, a lobby with a stopped heartbeat dropping off the list,
+the refusals for another mod version and another `MaxPlayers`, Quick Join opening a lobby, two lobbies
+noticing each other and one moving up to the join, Back while looking and opening, and a real match
+closing a lobby that then came back to the list. JOIN at 4/8 and Start being held were only seen with
+a test switch forcing them. Everything that needs a second person has never run: a join connecting,
+a lobby listed with more than one real member, two people ending at one table, a friend without the
+mod being turned away, another version arriving by invite, an invite refused during a match, a
+crashed host's players leaving its lobby, and a connection reaching a running match with no
+character. Tell us what happens.
+
 **Eight people on eight different machines has never happened.** Every table above is eight
 copies of the game talking to each other on one PC. That exercises every message that crosses
 between machines, and it is not the same as eight of you in a Steam lobby. The largest real
@@ -147,9 +210,10 @@ by one person. It began as a for-fun experiment in how far that could be taken, 
 offered in that spirit rather than as a commercial product.
 
 That is a reason to read the limits above. It is not a reason to expect something flaky.
-Everything here was checked by running the game and reading what it did, not by reasoning about
-what it ought to do — and the difference matters, because this release exists because of two
-bugs that reasoning had missed for months:
+Playing a match was checked by running the game and reading what it did, not by reasoning about
+what it ought to do — and the difference matters, because v1.0.0 existed because of two bugs
+that reasoning had missed for months. Finding a game was checked the same way as far as one
+Steam account can go, and **What still is not true** says where that stops.
 
 - In the Chaos deck at eight players, **half the table could not be shot at.** The revolver
   could only be pointed at three fixed chairs, and seats four to seven could not aim at anybody
@@ -168,8 +232,9 @@ Where something is untested, or is known to be wrong and left alone, this projec
 instead of rounding it up. See **What still is not true** above, and `STATUS.md` for the long
 version.
 
-No game files are changed on disk. Nothing phones home. The mod reads and writes only inside
-your Liar's Bar folder.
+No game files are changed on disk. The only thing the mod contacts is GitHub, to see whether a
+newer version is out, and `Updates = Off` stops that. Finding a game goes through Steam and nothing
+else. The mod reads and writes only inside your Liar's Bar folder.
 
 ---
 
@@ -186,7 +251,8 @@ terms.
 | **The turn reaches everyone** | Six separate places wrap the seat number at three. All six are rewritten, including two that only matter when somebody dies or drops mid-round. |
 | **Everyone is dealt** | Nine routines allocate room for exactly four hands. Every one is widened, and the deck grows with the table so nobody is short. |
 | **You can shoot anyone** | In the Chaos deck the revolver could only be pointed at three fixed chairs. Now every seat can choose any other with the aiming keys, and the mod names your target and where they sit on screen — three canned aiming poses cannot identify one of seven people. |
-| **It says what it did** | The version is drawn in the corner, everyone is warned if somebody's build differs, and the log names the exact networked call behind any failure instead of leaving you guessing. |
+| **Strangers can find you** | The lobby list and Quick Join search a pool of modded lobbies worldwide, up to seven players in, with no time limit on waiting. The game's own list dropped a lobby at four players, and its date filters could drop one after fifteen minutes or at midnight UTC. |
+| **It says what it did** | The version is drawn at the top of the screen, everyone is warned if somebody's build differs, and the log names the exact networked call behind any failure instead of leaving you guessing. |
 
 ---
 
@@ -319,21 +385,25 @@ stale setting once silently disabled a fix for a whole session.
 |---|---|---|
 | `MaxPlayers` | `8` | Lobby size. **Must match across all players.** |
 | `AutoReadyJoiners` | `true` | When you host, each player is marked ready once as they join and when everyone comes back from a match, so you only have to press Start. They can un-ready with the game's button. Only the host's setting matters. |
-| `Updates` | `Ask` | What to do when a newer version of this mod is out, checked each time the game starts. `Ask`: a window in the game asks whether to install it - yes downloads it and restarts the game with it - with tick boxes to switch to either of the others. `Automatic`: install it without asking; it loads the next time the game starts. `Off`: never check. Only the plugin is replaced. |
+| `Updates` | `Ask` | What to do when a newer version of this mod is out, checked each time the game starts. `Ask`: a window in the game asks whether to install it - yes downloads it and restarts the game with it - with tick boxes to switch to either of the others. `Automatic`: install it without asking; it loads the next time the game starts. `Off`: never check. Only the plugin is replaced. After it updates itself the main menu shows what changed, once. |
 | `EmoteCooldownSeconds` | `10` | Seconds between your own emotes; the game's own wait is 12. Counted on your machine, as the game counts it, at every table size (1 to 60). |
+| `ShowUnmoddedLobbies` | `false` | The lobby list and Quick Join only look at lobbies hosted with this mod. Turn this on to put the game's normal list and Quick Join back: you then see lobbies without the mod, and not the ones with it. Lobbies you host stay modded either way, and friend invites and JOIN WITH ID work the same either way. |
 | `VerboseDiagnostics` | `true` | Log seat, podium and deck counts. Leave on — it is what makes a bad round diagnosable. |
 | `DeveloperMode` | `false` | Test tools: bots, an F8 panel, and a running account of everything. Leave off for normal play. |
 | `SelfTest*` | `false` | Developer only. Leave off. |
 
 ## Testers wanted
 
-The one thing this mod cannot test on its own is **a full lobby of people on their own PCs**.
-Everything short of that has been done; eight *people* on eight *machines* has not. If you
-play a game with it — any size — a log is genuinely useful, whether it went well or badly.
+Two things this mod cannot test on its own: **a full lobby of people on their own PCs**, and
+**finding a game with a second Steam account**. Eight *people* on eight *machines* has not
+happened, and nobody has yet joined a lobby through the list or Quick Join. If you play a game
+with it — any size — a log is genuinely useful, whether it went well or badly.
 
 Especially wanted:
 
 - **Eight players on eight machines.** Nobody has done it outside a test rig.
+- **Finding a game with strangers.** The lobby list, Quick Join, and two people pressing Quick Join
+  at the same moment. Nothing but real Steam accounts can test this.
 - **A chaos card at a full table.** Every seat can now choose any other, and the choice is
   named on screen while you make it. It has been measured from every chair; it has not been
   played by people who did not know what it was supposed to do.

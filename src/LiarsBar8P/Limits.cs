@@ -23,4 +23,10 @@ internal static class Limits
 
     /// <summary>Highest seat index at the configured maximum.</summary>
     public static int MaxSlot => Max - 1;
+
+    /// <summary>
+    /// What a lobby hosted here actually seats. The caps only ever raise the game's own four,
+    /// so a <see cref="Max"/> below that still makes a lobby of four.
+    /// </summary>
+    public static int LobbySeats => System.Math.Max(Max, VanillaPlayers);
 }
