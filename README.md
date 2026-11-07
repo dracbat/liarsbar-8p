@@ -295,9 +295,10 @@ of the screen mean it loaded.
 
 ### Updating
 
-- **On v1.1.3 or v2.0.0:** nothing to download. When the game starts, the mod offers the update in
-  a window; say yes and it installs it and restarts the game. If you set `Updates` to `Off`, run the
-  installer again instead.
+- **On v1.1.3, v2.0.0 or v3.0.0:** nothing to download. When the game starts, the mod offers the
+  update in a window; say yes and it installs it and restarts the game. If you set `Updates` to
+  `Off`, run the installer again instead. While Fully Loaded is switched off the mod doesn't look
+  for updates, so switch it back on to get them.
 - **On v1.1.2 or older:** those versions can't update themselves. Download
   `Install-LiarsBar8P.bat` again from the [latest release](../../releases/latest) and run it.
   **Coming from v1.0.0**, use the new download rather than your old copy: the 1.0.0 installer also
