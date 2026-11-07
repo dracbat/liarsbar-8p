@@ -23,6 +23,7 @@ internal sealed class ModTicker : MonoBehaviour
     private void Update()
     {
         if (Plugin.Bare) { BareUpdate(); return; }
+        if (Plugin.Off) { OffUpdate(); return; }
 
         try { WhatsNew.Frame(); }
         catch (Exception e) { Plugin.Log.LogError($"[update] changelog frame failed: {e.Message}"); }
@@ -218,6 +219,9 @@ internal sealed class ModTicker : MonoBehaviour
         try { UltrawideArt.FixPanels(); }
         catch (Exception e) { Plugin.Log.LogError($"[wide] panel tick failed: {e.Message}"); }
 
+        try { FullyLoadedSwitch.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[switch] tick failed: {e.Message}"); }
+
         try { VersionTag.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[version] tag tick failed: {e.Message}"); }
 
@@ -254,6 +258,25 @@ internal sealed class ModTicker : MonoBehaviour
         catch (Exception e) { Plugin.Log.LogError($"[matchmaking] self test tick failed: {e.Message}"); }
     }
 
+    /// <summary>FullyLoaded off (<see cref="Plugin.Off"/>): the switch, the mod's words for it, and a test copy's window and driver.</summary>
+    private void OffUpdate()
+    {
+        try { Ultrawide.Frame(); }
+        catch (Exception e) { Plugin.Log.LogError($"[wide] test window frame failed: {e.Message}"); }
+
+        if (Time.time < _next) return;
+        _next = Time.time + 0.25f;
+
+        try { FullyLoadedSwitch.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[switch] tick failed: {e.Message}"); }
+
+        try { Words.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[words] tick failed: {e.Message}"); }
+
+        try { MatchmakingSelfTest.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[matchmaking] self test tick failed: {e.Message}"); }
+    }
+
     /// <summary>
     /// Every frame, after the game's animations have been applied. A few things the game
     /// animates have to be corrected after the animator writes them, or the animator simply
@@ -265,13 +288,13 @@ internal sealed class ModTicker : MonoBehaviour
     // A downloaded update the game was holding open goes in once the game has closed.
     private void OnApplicationQuit()
     {
-        if (Plugin.Bare) return;
+        if (Plugin.Bare || Plugin.Off) return;
         try { AutoUpdate.OnQuit(); } catch { }
     }
 
     private void LateUpdate()
     {
-        if (Plugin.Bare) return;
+        if (Plugin.Bare || Plugin.Off) return;
 
         try { DiceTable.LateTick(); }
         catch (Exception e) { Plugin.Log.LogError($"[dicetable] late tick failed: {e.Message}"); }

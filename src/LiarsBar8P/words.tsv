@@ -205,3 +205,9 @@ The rules were broken at this host's table, so you left it. This host is now on 
 Cards and bullets are not kept hidden this match.	Bu maçta kartlar ve mermiler gizli tutulmuyor.	В этом матче карты и пули не скрываются.	本场比赛不隐藏手牌和子弹.
 This table runs a different version of Fully Loaded	Bu masada Fully Loaded'ın farklı bir sürümü çalışıyor	За этим столом другая версия Fully Loaded	这张牌桌用的是另一个版本的 Fully Loaded
 {0} on another mod version	{0} kişi başka mod sürümünde	С другой версией мода: {0}	{0} 名玩家的模组版本与你不同
+{0}: ON	{0}: AÇIK	{0}: ВКЛ	{0}: 开
+{0}: OFF	{0}: KAPALI	{0}: ВЫКЛ	{0}: 关
+TURN OFF? CLICK AGAIN	KAPATILSIN MI? TEKRAR TIKLA	ВЫКЛЮЧИТЬ? НАЖМИ ЕЩЁ РАЗ	关闭? 再次点击
+TURN ON? CLICK AGAIN	AÇILSIN MI? TEKRAR TIKLA	ВКЛЮЧИТЬ? НАЖМИ ЕЩЁ РАЗ	开启? 再次点击
+RESTARTING...	YENİDEN BAŞLATILIYOR...	ПЕРЕЗАПУСК...	正在重启...
+RESTART THE GAME TO FINISH	BİTİRMEK İÇİN OYUNU YENİDEN BAŞLAT	ПЕРЕЗАПУСТИ ИГРУ, ЧТОБЫ ЗАВЕРШИТЬ	请重启游戏以完成

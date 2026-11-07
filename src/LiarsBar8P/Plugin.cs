@@ -10,7 +10,7 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "liarsbar.eightplayers";
-    public const string Version = "3.0.0";
+    public const string Version = "3.0.1";
 
     /// <summary>
     /// The mod's name as players see it, and the one place it is written. Only words on screen
@@ -36,6 +36,7 @@ public class Plugin : BasePlugin
     public static ConfigEntry<float> EmoteCooldownSeconds;
     public static ConfigEntry<bool> ShowUnmoddedLobbies;
     public static ConfigEntry<bool> AllowBots;
+    public static ConfigEntry<bool> FullyLoaded;
     public static ConfigEntry<string> ChangelogShownFor;
     public static ConfigEntry<bool> Verbose;
     public static ConfigEntry<bool> DiagAutoHost;
@@ -70,14 +71,28 @@ public class Plugin : BasePlugin
 
     private static bool? _bare;
 
+    /// <summary>
+    /// FullyLoaded is off: the mod is the switch on the main menu and nothing else
+    /// (<see cref="FullyLoadedSwitch"/>). Never in a bare test copy, which has its own short load.
+    /// </summary>
+    internal static bool Off { get; private set; }
+
     public override void Load()
     {
         Log = base.Log;
 
+        // First, because off, the mod is the switch on the main menu and nothing else.
+        FullyLoaded = Config.Bind("General", "FullyLoaded", true,
+            "On: everything this mod adds. Off: the game plays exactly like the base game, ranked " +
+            "included, and the only thing left of the mod is the FULLY LOADED switch on the main menu, " +
+            "which turns it back on. The switch restarts the game for you; a change made here loads the " +
+            "next time the game starts. The installer writes this file afresh, so this is on again after reinstalling.");
+        Off = !FullyLoaded.Value && !Bare;
+
         // The bug report's memory of this session, first, so it keeps the start of it too.
         if (!Bare)
         {
-            BugReport.Listen();
+            if (!Off) BugReport.Listen();
             Words.Load();    // the mod's words in the game's language, before anything shows any
         }
 
@@ -178,6 +193,7 @@ public class Plugin : BasePlugin
             Log.LogInfo("  developer mode off - normal play");
 
         if (Bare) { LoadBare(); return; }
+        if (Off) { LoadOff(); return; }
 
         var harmony = new Harmony(Guid);
 
@@ -378,6 +394,32 @@ public class Plugin : BasePlugin
     }
 
     /// <summary>
+    /// The whole load with FullyLoaded off (<see cref="Off"/>): the switch on the main menu, which
+    /// needs no patch, only the ticker. No other patch, no lobby key, no update check. A copy the
+    /// test harness started keeps its window held as well, which no player's copy has.
+    /// </summary>
+    private static void LoadOff()
+    {
+        Log.LogInfo($"  {DisplayName} is off: only the switch on the main menu (FullyLoaded = false in the config)");
+        if (Ultrawide.Held) HoldTestWindow(new Harmony(Guid));
+        SpawnHud();
+        Log.LogInfo("=== Liar's Bar 8P loaded (Fully Loaded off) ===");
+    }
+
+    /// <summary>A test copy's window, held where the harness put it (<see cref="Ultrawide.Held"/>).</summary>
+    private static void HoldTestWindow(Harmony harmony)
+    {
+        Ultrawide.SavesGuarded =
+            Apply(harmony, typeof(Ultrawide.Saved), "wide screens: a wide size is saved as one of the game's own");
+        Ultrawide.WindowGuarded =
+            Apply(harmony, typeof(Ultrawide.HeldWindow), "test copies: a window, never full screen");
+        try { Ultrawide.Frame(); }
+        catch (System.Exception e) { Log.LogWarning($"[wide] test: the window is held from the first frame on: {e.Message}"); }
+        try { HeldFocus.Start(); }
+        catch (System.Exception e) { Log.LogWarning($"[wide] test: the foreground is not watched: {e.Message}"); }
+    }
+
+    /// <summary>
     /// A bare test copy's whole load (<see cref="Bare"/>). The ranked block stays on too: a copy
     /// with the mod in it never reaches ranked, bare or not, and it holds next to nothing.
     /// </summary>
@@ -454,7 +496,7 @@ public class Plugin : BasePlugin
 
             // A bare test copy has the ticker alone, which then runs only the kit's parts.
             Il2CppInterop.Runtime.Injection.ClassInjector.RegisterTypeInIl2Cpp<ModTicker>();
-            if (Bare) { go.AddComponent<ModTicker>(); return; }
+            if (Bare || Off) { go.AddComponent<ModTicker>(); return; }
 
             Il2CppInterop.Runtime.Injection.ClassInjector.RegisterTypeInIl2Cpp<VersionHud>();
             go.AddComponent<VersionHud>();

@@ -38,8 +38,10 @@ until everyone seated at it runs the host's version, and the mod won't let you j
 another version. Players without the mod are turned away by the host, because they would desync
 the table.
 
-**Ranked is off while the mod is installed.** The ranked button says so and opens the lobby list
-instead. To play ranked, [uninstall](#uninstall) first, or on Linux take the launch option out.
+**Ranked is off while Fully Loaded is on.** The ranked button says so and opens the lobby list
+instead. To play ranked, or the base game, click **FULLY LOADED: ON** at the bottom of the main
+menu twice: the game restarts with the mod off, exactly like the base game, and only that button
+left to turn it back on. To remove the mod, [uninstall](#uninstall) it.
 
 ---
 
@@ -375,6 +377,7 @@ the game replaces only the plugin and keeps it.
 
 | Setting | Default | Meaning |
 |---|---|---|
+| `FullyLoaded` | `true` | Everything the mod adds. Off, the game plays exactly like the base game, ranked included, and only the **FULLY LOADED** switch on the main menu is left to turn it back on. The switch restarts the game for you; a change made here loads at the next start. |
 | `MaxPlayers` | `8` | Lobby size. **Must match across all players.** |
 | `AutoReadyJoiners` | `true` | When you host, each player is marked ready as they join and when everyone comes back from a match, so you only have to press Start. They can un-ready with the game's button. Only the host's setting matters. |
 | `Updates` | `Ask` | What to do when a newer version of the mod is out, checked each time the game starts. `Ask`: a window asks whether to install it, and yes restarts the game with it. `Automatic`: install it without asking; it loads the next time the game starts. `Off`: never check. |
@@ -439,7 +442,8 @@ that folder by hand: type `%LOCALAPPDATA%` in the Explorer address bar and delet
 (on Linux the same folder is inside the game's Proton prefix).
 
 On Linux, take the `WINEDLLOVERRIDES` launch option out as well. Left in, it does nothing once the
-loader is gone, and taking it out *without* uninstalling is a quick way to play without the mod.
+loader is gone. To play without the mod for a while, the **FULLY LOADED** switch on the main menu
+is the quicker way, on Windows and Linux alike.
 
 Steam's **Verify integrity of game files** does *not* remove the mod: it checks only the game's own
 files, which the mod never changes, and leaves everything above in place.

@@ -45,6 +45,17 @@ reports itself and is skipped.
 The decompiler's output is the game's own code in readable form and is never committed.
 What was learned from it lives in `docs/PLAYER-LIMITS.md`.
 
+**The only programs the mod starts** are the game itself again, the same exe with the same
+command line, from two places: the updater's restart after an update (`AutoUpdate.Restart`) and
+the main-menu switch's restart after FullyLoaded is turned on or off (`FullyLoadedSwitch.Restart`,
+which does not set the updater's restart mark); and the updater's short `cmd` file move after the
+game quits (`AutoUpdate.OnQuit`). Each restart starts the new copy and quits the old one at once,
+so there is never a second copy. Bots, and everything else, live inside the host's own game.
+
+**FullyLoaded off** (`Plugin.LoadOff`): the config is bound and the ticker runs the switch, its
+words and the test kit's parts, and nothing else goes on: no patch, no lobby key, no update check,
+no ranked block.
+
 ## Architecture
 
 Internal codename for the game is "Velvet". Devs are Turkish — expect Turkish
