@@ -30,3 +30,28 @@ internal static class LoopbackSteamStub
         if (string.IsNullOrEmpty(__result)) __result = "0";
     }
 }
+
+/// <summary>
+/// A copy started with a loopback test role never opens or joins a Steam lobby. Its test tools
+/// belong to the harness, and this keeps them there even after the copy leaves the harness for
+/// the menu: to play online, start the game again without the test option. The harness itself
+/// never uses a Steam lobby, so nothing it does goes through here.
+/// </summary>
+internal static class LoopbackNoSteamLobbies
+{
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(Steamworks.SteamMatchmaking), nameof(Steamworks.SteamMatchmaking.CreateLobby))]
+    private static bool NoCreate(ref Steamworks.SteamAPICall_t __result) => Refuse("open", ref __result);
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(Steamworks.SteamMatchmaking), nameof(Steamworks.SteamMatchmaking.JoinLobby))]
+    private static bool NoJoin(ref Steamworks.SteamAPICall_t __result) => Refuse("join", ref __result);
+
+    private static bool Refuse(string what, ref Steamworks.SteamAPICall_t result)
+    {
+        if (!Loopback.Requested) return true;
+        Plugin.Log.LogWarning($"[loopback] a test copy does not {what} Steam lobbies: start the game again without the test option to play online");
+        result = default;
+        return false;
+    }
+}

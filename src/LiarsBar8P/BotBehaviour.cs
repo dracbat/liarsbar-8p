@@ -5,16 +5,18 @@ using UnityEngine;
 namespace LiarsBar8P;
 
 /// <summary>
-/// What a bot does when the turn reaches it: wait a moment, then make the simplest legal
-/// move, so the round keeps moving.
+/// A test instrument for Liar's Deck and the Chaos deck: during a harness run it plays the real
+/// seats (the host's and the loopback clients'), waiting a moment and then making the simplest
+/// legal move, so the round keeps moving. Bots' seats are never played here: their moves are
+/// <see cref="BotBrain"/>'s, and a seat played from two places would move twice.
 ///
-/// Deliberately not clever. The point of a bot here is to prove that a table of eight can
-/// deal, take turns in the right order and finish a round — not to play well. Anything
-/// resembling strategy would only make a failed round harder to read.
+/// Deliberately not clever. The point is to prove that a table of eight can deal, take turns in
+/// the right order and finish a round, not to play well. Anything resembling strategy would only
+/// make a failed round harder to read.
 ///
 /// The move goes through <c>RequestThrowCards</c>, which is where a person's play lands
 /// too: on the host it calls the server-side throw directly, so it needs no connection and
-/// no ownership, and a bot's turn is settled by exactly the code that settles a person's.
+/// no ownership, and the turn is settled by exactly the code that settles a person's.
 /// </summary>
 internal static class BotBehaviour
 {
@@ -44,15 +46,25 @@ internal static class BotBehaviour
 
     /// <summary>
     /// Whether the round is in a state where nobody should be acting: a liar call being
-    /// resolved, or cards still being dealt. Both are periods the game itself will not take
-    /// input during.
+    /// resolved, cards still being dealt, or the game holding every player's moves, as it does
+    /// while it makes the call itself for the last player with cards. All are periods the game
+    /// itself will not take input during. That last one was missed: once everybody else had
+    /// emptied their hand, the game handed the host's seat the turn to make that call for it,
+    /// this threw a card for the seat in the moment before the game did, and the table stopped.
     /// </summary>
     private static bool RoundIsResolving()
     {
         try
         {
             if (DealTrace.Dealing) return true;
-            return TableHand.LiarCallInFlight();
+            if (TableHand.LiarCallInFlight()) return true;
+            var m = Manager.Instance;
+            switch (TableHand.Playing())
+            {
+                case TableHand.Kind.Deck: return m.DeckGamePlayManager != null && m.DeckGamePlayManager.BlocksBidInput;
+                case TableHand.Kind.ChaosDeck: return m.ChaosDeckGame != null && m.ChaosDeckGame.BlocksBidInput;
+            }
+            return false;
         }
         catch { return false; }
     }
@@ -114,42 +126,35 @@ internal static class BotBehaviour
         // has no way to block a seat being played for from the host, so that is done here.
         if (RoundIsResolving())
         {
-            _advanceFrom = -1;          // whatever was pending belongs to the old round
             _playAt.Clear();
             RecoverStalledLiarCall();   // still watch for one that never finishes
             return;
         }
 
-        AdvanceIfStuck(m);
         RecoverStalledLiarCall();
 
-        // During an unattended test every seat is played, not just the bots'. Without it the
+        // Only during an unattended test, and then every real seat is played. Without it the
         // round reaches the tester's turn and stops there, which tests nothing beyond the
-        // first turn. Only ever during a test - in an ordinary session, bots play and people
-        // play for themselves.
+        // first turn. In an ordinary session people play for themselves.
         //
         // The loopback harness counts as one, and is the more useful case. Those seats are
         // real connected clients with properly spawned player objects, so a liar call played
         // for them resolves through the game's own code: the cards are revealed, somebody
-        // pulls a trigger, and a player can actually be eliminated. None of that is reachable
-        // with bots, whose player objects are never network-spawned - every targeted message
-        // to one is refused as "not spawned", the trigger pull among them. Bots can play a
-        // round; only real connections can finish a match.
+        // pulls a trigger, and a player can actually be eliminated.
         //
         // Driving, not Active: "the option is switched on" stays true for the whole launch, so
         // a host who ran one bot test and then invited friends over Steam had every friend's
         // turn played for them a second after it arrived, with about every third forced move
         // calling them a liar in their own name.
         bool playEveryone = DevAutoTest.Driving || Loopback.Mine == Loopback.Role.Host;
+        if (!playEveryone) return;
 
         foreach (var p in Dev.TablePlayers())
         {
-            if (p == null) continue;
-            if (!BotManager.IsBot(p) && !playEveryone) continue;
-
-            // Only a bot needs its hand built by hand. A real client is dealt over its own
-            // connection, and doing it again here would fight the deal that already worked.
-            if (BotManager.IsBot(p)) HoldCards(p);
+            if (p == null || BotManager.IsBot(p)) continue;
+            // Outside the loopback test harness the automatic test plays the host's own seat and
+            // nobody else's: anyone else at the table plays their own turns.
+            if (!Fair.TestsAllowed && !p.isLocalPlayer) continue;
 
             if (!p.HaveTurn || p.Dead)
             {
@@ -164,7 +169,7 @@ internal static class BotBehaviour
             {
                 due = Time.time + ThinkTime(p.Slot);
                 _playAt[p.Slot] = due;
-                Dev.Log("bot", $"{p.PlayerName} has the turn (seat {p.Slot}) - playing in " +
+                Dev.Log("bot", $"seat {p.Slot} has the turn - playing in " +
                                $"{due - Time.time:F1}s");
                 continue;
             }
@@ -176,16 +181,6 @@ internal static class BotBehaviour
         }
     }
 
-    /// <summary>Bots whose hand has already been built this round.</summary>
-    private static readonly HashSet<int> _handBuilt = new();
-
-    /// <summary>
-    /// The active slot a bot has just played from, and when to move the turn on if the
-    /// game has not managed it by then. -1 means nothing is pending.
-    /// </summary>
-    private static int _advanceFrom = -1;
-    private static float _advanceAt;
-
     /// <summary>The seat that threw last this round, and so the one there is a claim from
     /// to challenge. -1 means nothing has been thrown yet.</summary>
     private static int _lastThrower = -1;
@@ -194,12 +189,23 @@ internal static class BotBehaviour
     /// noticed rather than silently hanging the table. Zero means none outstanding.</summary>
     private static float _calledAt;
 
+    /// <summary>A call still being settled this long after it was made has stalled.</summary>
+    private const float StalledAfter = 60f;
+
     internal static void RoundStarting()
     {
-        _handBuilt.Clear();
+        RoundKeepingHands();
+    }
+
+    /// <summary>
+    /// A Liar's Deck 2 round that keeps everybody's hand. The turn state belongs to the round
+    /// just ended and goes; the hands stay as they are, so no bot is given its cards twice.
+    /// Without this the first seat to play called liar on whoever threw last in the old round.
+    /// </summary>
+    internal static void RoundKeepingHands()
+    {
         _playedOn.Clear();
         _playAt.Clear();
-        _advanceFrom = -1;
         _lastThrower = -1;
         _calledAt = 0f;
         _rarity.Clear();
@@ -208,20 +214,34 @@ internal static class BotBehaviour
     /// <summary>
     /// Recover from a liar call that never resolves.
     ///
-    /// Resolving a call means somebody pulls a trigger, and the game runs that on the
-    /// losing player's own machine. A bot has no machine, so this is exactly the kind of
-    /// step that can stop dead. The round is a lost cause once that happens, so rather than
-    /// leave the table frozen this says so plainly in the log and restarts the round -
-    /// which keeps a long unattended test running, and leaves a record of every time it was
-    /// needed instead of a silent hang to be diagnosed later.
+    /// Resolving a call means somebody pulls a trigger. Before bots had seats on the network,
+    /// a bot could not, so this was exactly the kind of step that stopped dead; a bot's seat
+    /// now pulls its trigger on the host, and this should never be needed. If it is, the round
+    /// is a lost cause, so rather than leave the table frozen this says so plainly in the
+    /// log and restarts the round - which keeps a long unattended test running, and leaves
+    /// a record of every time it was needed instead of a silent hang to be diagnosed later.
+    ///
+    /// Only a call still being settled after a minute counts. It used to fire thirty
+    /// seconds after the harness's call whether or not the call had long been settled, and
+    /// the devil card's volley at a table of eight takes longer than that by itself. And
+    /// only at the Liar's Deck table: the Chaos deck's manager has no restart, and the Liar's
+    /// Deck one it used to reach for there dealt a round to nobody.
     /// </summary>
     private static void RecoverStalledLiarCall()
     {
-        if (_calledAt <= 0f || Time.time - _calledAt < 30f) return;
+        if (_calledAt <= 0f || Time.time - _calledAt < StalledAfter) return;
+        if (!TableHand.LiarCallInFlight()) { _calledAt = 0f; return; }
         _calledAt = 0f;
 
         try
         {
+            if (TableHand.Playing() != TableHand.Kind.Deck)
+            {
+                Dev.Warn("bot", $"a liar call has not resolved after {StalledAfter:0}s at the {TableHand.Playing()} table, " +
+                                "which has no restart - left to the game");
+                return;
+            }
+
             var deck = Dev.Deck;
             if (deck == null) return;
 
@@ -241,115 +261,11 @@ internal static class BotBehaviour
                 return;
             }
 
-            Dev.Warn("bot", "a liar call has not resolved after 30s - the round is stuck, " +
-                            "restarting it. The trigger pull runs on the losing player's own " +
-                            "machine and a bot has none.");
+            Dev.Warn("bot", $"a liar call has not resolved after {StalledAfter:0}s - the round is stuck, " +
+                            "restarting it (RecoverStalledLiarCall)");
             deck.AbortLiarResolveAndResetRound();
         }
         catch (Exception e) { Dev.Warn("bot", $"could not restart the stuck round: {e.Message}"); }
-    }
-
-    /// <summary>
-    /// Move the turn on when a bot's throw has not moved it.
-    ///
-    /// Deliberately late and conditional: if the game passes the turn itself - which it does
-    /// for anyone with a real connection - the active slot has already changed by the time
-    /// this looks, and it does nothing. It only steps in for the case that genuinely has
-    /// nobody to complete it. The wait also lets the throw animation play, so the turn does
-    /// not jump before the card has landed.
-    /// </summary>
-    private static void AdvanceIfStuck(Manager m)
-    {
-        if (_advanceFrom < 0 || Time.time < _advanceAt) return;
-
-        if (m.ActivePlayerSlot != _advanceFrom) { _advanceFrom = -1; return; }
-
-        try
-        {
-            foreach (var q in Dev.TablePlayers())
-                if (q != null && q.HaveTurn) q.NetworkHaveTurn = false;
-
-            m.GiveTurn();
-            Dev.Log("bot", $"turn had not moved on from seat {_advanceFrom} after a bot played " +
-                           $"- moved it to seat {m.ActivePlayerSlot}");
-        }
-        catch (Exception e) { Dev.Warn("bot", $"could not move the turn on: {e.Message}"); }
-
-        _advanceFrom = -1;
-    }
-
-    /// <summary>
-    /// Put the cards and the revolver in a bot's hands.
-    ///
-    /// Everything a player physically receives arrives over their own connection: the card
-    /// objects, the flag saying they are holding cards, the revolver being loaded. A bot
-    /// has no connection, so none of it reaches them — they are dealt a hand that exists
-    /// only as numbers, sit there empty-handed with no gun, and the round waits forever
-    /// for everyone to be holding cards before giving out the first turn.
-    ///
-    /// The host therefore runs the receiving end for them. These are the same methods a
-    /// real client runs when the message arrives, called directly rather than sent, so a
-    /// bot ends up in the state a person would be in.
-    /// </summary>
-    private static void HoldCards(PlayerStats p)
-    {
-        try
-        {
-            var gp = p.GetComponent<DeckGameplay>();
-            if (gp == null || gp.cardTypes == null) return;
-
-            int count = gp.cardTypes.Count;
-            if (count == 0) return;
-
-            int id = p.Slot;
-            if (_handBuilt.Contains(id))
-            {
-                // Already built; just keep the flag true as cards are played.
-                if (!gp.HaveCards) gp.NetworkHaveCards = true;
-                return;
-            }
-            _handBuilt.Add(id);
-
-            // The card values it was dealt, and every one of them face down and active.
-            var types = new Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<int>(count);
-            var active = new Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<int>(count);
-            for (int i = 0; i < count; i++) { types[i] = gp.cardTypes[i]; active[i] = i; }
-
-            gp.ApplyCardState(types, active, true);
-
-            // Applying the state records the hand; showing it is a separate step, and it is
-            // the one that puts the card meshes in the player's hands. Without it a bot has
-            // five cards on paper and empty hands on screen.
-            gp.SetHaveCards(true);
-
-            int objects = gp.Cards != null ? gp.Cards.Count : -1;
-            Dev.Log("bot", $"{p.PlayerName} given {count} card(s) in hand ({objects} card objects) - " +
-                           "done here because a bot has no connection to be dealt over");
-
-            LoadRevolver(p, gp);
-        }
-        catch (Exception e)
-        {
-            Dev.Warn("bot", $"{p.PlayerName} could not be given a hand: {e.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Load a bot's revolver. Same reason as the cards: the game runs this on the player's
-    /// own client, and a bot has none, so its gun stays unloaded while everyone else's is
-    /// ready.
-    /// </summary>
-    private static void LoadRevolver(PlayerStats p, DeckGameplay gp)
-    {
-        try
-        {
-            gp.StartCoroutine(gp.UpdateRevolverUI());
-            Dev.Log("bot", $"{p.PlayerName} loaded its revolver");
-        }
-        catch (Exception e)
-        {
-            Dev.Warn("bot", $"{p.PlayerName} could not load its revolver: {e.Message}");
-        }
     }
 
     /// <summary>
@@ -363,15 +279,21 @@ internal static class BotBehaviour
             var gp = TableHand.For(p);
             if (gp == null)
             {
-                Dev.Warn("bot", $"{p.PlayerName} has no gameplay component - passing the turn instead");
+                Dev.Warn("bot", $"seat {p.Slot} has no gameplay component - passing the turn instead");
                 DevCommands.SkipTurn();
                 return;
             }
 
-            var hand = gp.Cards;
-            if (hand == null || hand.Count == 0)
+            // The cards really in the hand, its card objects. The list of dealt values it used
+            // to throw from, and shorten, is never shortened by the game: Liar's Deck 2 deals
+            // it back out by place when a round keeps the hands, so a shortened list put every
+            // card in the wrong place, and the seat's card objects, never taken from the hand,
+            // stayed full. Seen in batch B2: a Deck 2 table where this harness's seats held
+            // seven cards on every screen, found none here, and passed their turns for ever.
+            var held = gp.InHand();
+            if (held.Count == 0)
             {
-                Dev.Warn("bot", $"{p.PlayerName} has no cards - passing the turn instead");
+                Dev.Warn("bot", $"seat {p.Slot} has no cards - passing the turn instead");
                 DevCommands.SkipTurn();
                 return;
             }
@@ -381,37 +303,28 @@ internal static class BotBehaviour
             // point of the variant it belongs to, and throwing off the front meant a run
             // could go its whole length without one ever reaching the table, so the mechanic
             // that makes the mode a different game was never once exercised.
-            int pick = Special(hand);
-            int type = hand[pick];
+            var types = new System.Collections.Generic.List<int>();
+            foreach (var h in held) types.Add(h.Card.Devil ? -1 : h.Card.cardtype);
+            int pick = Special(types);
+            int type = types[pick];
 
             var thrown = new Il2CppSystem.Collections.Generic.List<int>();
             thrown.Add(type);
 
-            bool emptied = hand.Count <= 1;
-            hand.RemoveAt(pick);
-
-            Dev.Log("bot", $"{p.PlayerName} (seat {p.Slot}) throws a {type}, {hand.Count} left" +
+            bool emptied = held.Count <= 1;
+            Dev.Log("bot", $"seat {p.Slot} throws a {type}, {held.Count - 1} left" +
                            (emptied ? " - hand empty" : ""));
 
+            // The server-side throw ends the turn and schedules the pass, as it does for a
+            // person: these seats are real connections, so nothing here moves the turn on.
+            // Then the card leaves the hand on every machine, through the server's own call.
             gp.Throw(thrown, emptied);
+            gp.Hide(held[pick].Index);
             _lastThrower = p.Slot;
-
-            // Throwing does not end a bot's turn on its own: the game ends it from a
-            // scheduled pass that never completes for a player with no connection. Clearing
-            // the turn flag here is not enough either - that was tried, and it left the
-            // active slot pointing at the bot that had just played, so the watchdog handed
-            // the turn straight back to it, it declined to play twice, and the table sat
-            // there. The turn has to actually be moved on, which is what this schedules.
-            var m = Dev.Mgr;
-            if (m != null)
-            {
-                _advanceFrom = m.ActivePlayerSlot;
-                _advanceAt = Time.time + 2.5f;
-            }
         }
         catch (Exception e)
         {
-            Dev.Warn("bot", $"{p.PlayerName} could not play: {e.Message} - passing the turn instead");
+            Dev.Warn("bot", $"seat {p.Slot} could not play: {e.Message} - passing the turn instead");
             try { DevCommands.SkipTurn(); } catch { }
         }
     }
@@ -461,7 +374,7 @@ internal static class BotBehaviour
     /// Every other move rather than always, so ordinary cards still get played and a round
     /// does not become nothing but special cards.
     /// </summary>
-    private static int Special(Il2CppSystem.Collections.Generic.List<int> hand)
+    private static int Special(System.Collections.Generic.List<int> hand)
     {
         if (hand == null || hand.Count <= 1) return 0;
 
@@ -483,12 +396,13 @@ internal static class BotBehaviour
     /// <summary>
     /// How many of each card value are in play, counted across every hand at the table.
     ///
-    /// Taken once a round, from the server's own view of everybody's cards - which is a thing
-    /// no player can see and this is not pretending to be one. It drives nothing but which
-    /// card a test throws first.
+    /// Taken once a round, and only inside the loopback test harness: outside it nobody's cards
+    /// but the player's own are looked at, and every card counts as rare. It drives nothing but
+    /// which card a test throws first.
     /// </summary>
     private static void CountTheDeck()
     {
+        if (!Fair.TestsAllowed) return;
         try
         {
             foreach (var p in Dev.TablePlayers())
@@ -520,21 +434,41 @@ internal static class BotBehaviour
 
     private static readonly System.Collections.Generic.Dictionary<int, int> _rarity = new();
 
+    /// <summary>The seat whose throw stands on the table, from the manager actually running, or -1.</summary>
+    private static int LastBidder()
+    {
+        try
+        {
+            var m = Manager.Instance;
+            GameObject last = null;
+            switch (TableHand.Playing())
+            {
+                case TableHand.Kind.Deck: last = m.DeckGamePlayManager != null ? m.DeckGamePlayManager.LastBetPlayer : null; break;
+                case TableHand.Kind.ChaosDeck: last = m.ChaosDeckGame != null ? m.ChaosDeckGame.LastBetPlayer : null; break;
+            }
+            var ps = last != null ? last.GetComponent<PlayerStats>() : null;
+            return ps != null ? ps.Slot : -1;
+        }
+        catch { return -1; }
+    }
+
     private static bool WantsLiar(PlayerStats p)
     {
         try
         {
             if (TableHand.LiarCallInFlight()) return false;
 
-            // Who to challenge is tracked here rather than read from the game's own
-            // LastBetPlayer. That field is filled in by the announcing side of a claim,
-            // which never runs for a player with no connection, so it stays empty for a
-            // whole table of bots and every call was declined as "nothing to challenge".
-            // The last throw is something this already knows for certain.
-            if (_lastThrower < 0 || _lastThrower == p.Slot) return false;
+            // Who to challenge is the game's own LastBetPlayer, written by the server-side
+            // throw. Bots' throws reach that throw now that their seats are on the network,
+            // and this harness does not see them: tracking only its own throws, it found its
+            // own seat as the last thrower at a table of bots, and never called. Its own
+            // record is kept for a table whose manager has none.
+            int last = LastBidder();
+            if (last < 0) last = _lastThrower;
+            if (last < 0 || last == p.Slot) return false;
 
             var gp = TableHand.For(p);
-            bool empty = gp == null || gp.Count == 0;
+            bool empty = gp == null || gp.InHand().Count == 0;
 
             // With nothing left to throw, calling is the only move there is.
             //
@@ -563,14 +497,15 @@ internal static class BotBehaviour
             var gp = TableHand.For(p);
             if (gp == null) { Play(p); return; }
 
-            Dev.Log("bot", $"{p.PlayerName} (seat {p.Slot}) calls LIAR on seat {_lastThrower} " +
+            int last = LastBidder();
+            Dev.Log("bot", $"seat {p.Slot} calls LIAR on seat {(last >= 0 ? last : _lastThrower)} " +
                            $"(cards on table {TableHand.CardsOnTable()})");
             gp.CallLiar();
             _calledAt = Time.time;
         }
         catch (Exception e)
         {
-            Dev.Warn("bot", $"{p.PlayerName} could not call liar: {e.Message} - throwing instead");
+            Dev.Warn("bot", $"seat {p.Slot} could not call liar: {e.Message} - throwing instead");
             try { Play(p); } catch { }
         }
     }

@@ -382,7 +382,7 @@ internal static class SeatRing
                 if (slot < 0 || slot >= m.Slots.Count)
                 {
                     Plugin.Log.LogWarning(
-                        $"[seatring] '{p.PlayerName}' holds slot {slot}, outside 0..{m.Slots.Count - 1}");
+                        $"[seatring] a player holds slot {slot}, outside 0..{m.Slots.Count - 1}");
                     continue;
                 }
 
@@ -406,13 +406,13 @@ internal static class SeatRing
                     float landed = Vector3.Distance(root.position, seat.position);
                     if (landed > 0.01f)
                         Plugin.Log.LogWarning(
-                            $"[seatring] '{p.PlayerName}' (seat {slot}) would not move: asked for " +
+                            $"[seatring] seat {slot} would not move: asked for " +
                             $"{seat.position.ToString("F2")}, sits at {root.position.ToString("F2")}; " +
                             $"root '{root.name}' parent " +
                             $"'{(root.parent != null ? root.parent.name : "<none>")}'");
                     else if (_retries > 0)
                         Plugin.Log.LogInfo(
-                            $"[seatring] '{p.PlayerName}' (seat {slot}) moved {from.ToString("F2")} " +
+                            $"[seatring] seat {slot} moved {from.ToString("F2")} " +
                             $"-> {seat.position.ToString("F2")}, root '{root.name}'");
                 }
             }
@@ -650,7 +650,7 @@ internal static class SeatRing
                 }
 
                 bearings.Add(deg);
-                lines.Add($"  seat {p.Slot} '{p.PlayerName}' at {deg,6:F1}deg  r={dist:F2}  " +
+                lines.Add($"  seat {p.Slot} at {deg,6:F1}deg  r={dist:F2}  " +
                           $"off its seat {offset:F2}m  pos={w.ToString("F2")}");
             }
 
@@ -670,8 +670,8 @@ internal static class SeatRing
             // The verdict is per player, against the seat their own slot maps to - not against
             // the gaps between the bodies this machine happens to see.
             //
-            // Counting bodies was wrong in a way that only showed up with bots: a bot's object
-            // is never network-spawned, so a client sees two bodies at an eight player table,
+            // Counting bodies was wrong in a way that first showed up with bots, whose seats
+            // once never reached a client: a client saw two bodies at an eight player table,
             // measures gaps of 45 and 315 degrees against an "ideal" of 180, calls a perfectly
             // correct table UNEVEN, and burns every retry re-laying out a table that was right
             // the first time. Distance from your own seat needs no agreement about population.

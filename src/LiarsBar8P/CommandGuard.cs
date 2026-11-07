@@ -43,8 +43,7 @@ internal static class CommandGuard
         try
         {
             if (p == null) return "player == null";
-            return $"connId={p.ConnectionID} idNo={p.PlayerIdNumber} slot={p.InGameSlot} " +
-                   $"name='{p.PlayerName}' skin={p.PlayerSkin}";
+            return $"connId={p.ConnectionID} idNo={p.PlayerIdNumber} slot={p.InGameSlot} skin={p.PlayerSkin}";
         }
         catch (Exception e) { return $"<player probe failed: {e.Message}>"; }
     }

@@ -1,0 +1,207 @@
+# The mod's words. english <TAB> tr <TAB> ru <TAB> zh-Hans. A blank cell is English. \n is a new line.
+# Machine translated: corrections from native speakers are welcome.
+# Rules: keep every {0}; reorder freely. Never write < or >. Never decline a name: put it after a colon.
+# Keep key letters as they are: (Y / A), (N / B). The mod's name, FULLY LOADED and CLASSIC, QUICK, HARSH stay.
+# Chinese: ASCII punctuation only , . : ! ? ( ) because the game's Chinese font has no full-width ones.
+# Russian counts: three forms split by | for 1 and 21, for 2 to 4, and for the rest.
+#
+# The tag and the main menu
+MAX {0}	MAKS {0}	МАКС {0}	最多 {0}
+{0} {1} LOBBIES OPEN	{0} {1} LOBİSİ AÇIK	{0} ЛОББИ {1} ОТКРЫТО	{0} 个 {1} 大厅开放中
+{0} PLAYERS WAITING	{0} OYUNCU BEKLİYOR	{0} ИГРОК ЖДЁТ|{0} ИГРОКА ЖДУТ|{0} ИГРОКОВ ЖДУТ	{0} 名玩家等待中
+VERSION MISMATCH	SÜRÜM UYUŞMAZLIĞI	РАЗНЫЕ ВЕРСИИ	版本不一致
+OLD or NO MOD	ESKİ ya da MODSUZ	СТАРАЯ ВЕРСИЯ или БЕЗ МОДА	旧版本或未安装模组
+Ranked is off while the mod is installed\nStart the game without it to play ranked	Mod yüklüyken dereceli kapalı\nDereceli oynamak için oyunu modsuz başlat	Рейтинговые игры отключены, пока установлен мод\nЗапусти игру без него, чтобы играть в рейтинговые	安装模组时无法进行排位赛\n请在不加载模组的情况下启动游戏来玩排位赛
+#
+# The update window and the line under the tag
+{0} - UPDATE AVAILABLE	{0} - GÜNCELLEME VAR	{0} - ДОСТУПНО ОБНОВЛЕНИЕ	{0} - 有可用更新
+v{0} is out. You have v{1}.\nEveryone at a table needs the same version.\nInstall it? The game restarts by itself to load it.	v{0} çıktı. Sende v{1} var.\nMasadaki herkesin aynı sürüme ihtiyacı var.\nKurulsun mu? Oyun yüklemek için kendiliğinden yeniden başlar.	Вышла v{0}. У тебя v{1}.\nУ всех за столом должна быть одна версия.\nУстановить? Игра сама перезапустится, чтобы загрузить её.	v{0} 已发布. 你的版本是 v{1}.\n同桌的所有人都需要相同的版本.\n要安装吗? 游戏会自动重启以加载它.
+YES, INSTALL   (Y / A)	EVET, KUR   (Y / A)	ДА, УСТАНОВИТЬ   (Y / A)	是, 安装   (Y / A)
+NOT NOW   (N / B)	ŞİMDİ DEĞİL   (N / B)	НЕ СЕЙЧАС   (N / B)	以后再说   (N / B)
+Install updates automatically from now on	Bundan sonra güncellemeleri otomatik kur	Отныне устанавливать обновления автоматически	以后自动安装更新
+Don't check for updates	Güncellemeleri denetleme	Не проверять обновления	不检查更新
+Updates in the mod's config file turns checks back on, and so does reinstalling the mod.	Modun ayar dosyasındaki Updates denetimleri yeniden açar, modu yeniden kurmak da öyle.	Проверки снова включит Updates в файле настроек мода или переустановка мода.	在模组配置文件中修改 Updates 或重新安装模组都可以重新开启检查.
+{0} - UPDATE INSTALLED	{0} - GÜNCELLEME KURULDU	{0} - ОБНОВЛЕНИЕ УСТАНОВЛЕНО	{0} - 更新已安装
+v{0} is installed. Restarting the game to load it in {1}...	v{0} kuruldu. Oyun {1} saniye içinde yeniden başlıyor...	v{0} установлена. Игра перезапустится через {1} с...	v{0} 已安装. {1} 秒后重启游戏以加载...
+RESTART NOW   (Y / A)	ŞİMDİ BAŞLAT   (Y / A)	ПЕРЕЗАПУСТИТЬ   (Y / A)	立即重启   (Y / A)
+RESTART LATER   (N / B)	SONRA BAŞLAT   (N / B)	ПОЗЖЕ   (N / B)	稍后重启   (N / B)
+Future updates will install by themselves.	Sonraki güncellemeler kendiliğinden kurulacak.	Следующие обновления будут устанавливаться сами.	以后的更新将自动安装.
+The mod will not check for updates again unless it is reinstalled or Updates is changed in its config.	Mod yeniden kurulmadıkça ya da ayarlarındaki Updates değiştirilmedikçe güncellemeleri bir daha denetlemeyecek.	Мод больше не будет проверять обновления, пока его не переустановят или не изменят Updates в его настройках.	除非重新安装模组或修改其配置中的 Updates, 否则模组不会再检查更新.
+Downloading {0} v{1}...	{0} v{1} indiriliyor...	Загрузка {0} v{1}...	正在下载 {0} v{1}...
+Downloading {0} v{1}... {2}%	{0} v{1} indiriliyor... %{2}	Загрузка {0} v{1}... {2}%	正在下载 {0} v{1}... {2}%
+Downloading {0} v{1}... {2} MB	{0} v{1} indiriliyor... {2} MB	Загрузка {0} v{1}... {2} МБ	正在下载 {0} v{1}... {2} MB
+{0} v{1} is installed - restart the game to use it	{0} v{1} kuruldu - kullanmak için oyunu yeniden başlat	{0} v{1} установлен - перезапусти игру, чтобы им пользоваться	{0} v{1} 已安装 - 重启游戏后生效
+{0} v{1} is ready - it installs when you close the game	{0} v{1} hazır - oyunu kapattığında kurulacak	{0} v{1} готов - он установится, когда ты закроешь игру	{0} v{1} 已就绪 - 关闭游戏时安装
+{0} v{1} is installed, but the game could not restart by itself - restart it to use the new version	{0} v{1} kuruldu, ama oyun kendiliğinden yeniden başlayamadı - yeni sürüm için oyunu yeniden başlat	{0} v{1} установлен, но игра не смогла перезапуститься сама - перезапусти её, чтобы играть с новой версией	{0} v{1} 已安装, 但游戏无法自动重启 - 请手动重启以使用新版本
+{0} v{1} could not be installed ({2})	{0} v{1} kurulamadı ({2})	Не удалось установить {0} v{1} ({2})	{0} v{1} 安装失败 ({2})
+{0} v{1} could not be installed ({2}) - it is tried again the next time the game starts	{0} v{1} kurulamadı ({2}) - oyun bir dahaki açılışında yeniden denenecek	Не удалось установить {0} v{1} ({2}) - попытка повторится при следующем запуске игры	{0} v{1} 安装失败 ({2}) - 下次启动游戏时会再试一次
+{0} v{1} could not be installed ({2}) - you will be asked again the next time the game starts	{0} v{1} kurulamadı ({2}) - oyun bir dahaki açılışında yeniden soracak	Не удалось установить {0} v{1} ({2}) - мы спросим снова при следующем запуске игры	{0} v{1} 安装失败 ({2}) - 下次启动游戏时会再次询问
+{0} UPDATE	{0} GÜNCELLEMESİ	ОБНОВЛЕНИЕ {0}	{0} 更新
+WHAT'S NEW	YENİLİKLER	ЧТО НОВОГО	更新内容
+CONTINUE	DEVAM ET	ПРОДОЛЖИТЬ	继续
+#
+# Finding a game: the box over the lobby list, and the host's label
+Looking for a lobby	Lobi aranıyor	Поиск лобби	正在寻找大厅
+No lobbies yet. Opening one	Henüz lobi yok. Bir tane açılıyor	Лобби пока нет. Создаём своё	还没有大厅. 正在创建一个
+Could not open a lobby	Lobi açılamadı	Не удалось создать лобби	无法创建大厅
+Still connecting\nTry again in a moment	Hala bağlanıyor\nBirazdan tekrar dene	Ещё идёт подключение\nПопробуй чуть позже	仍在连接中\n请稍后再试
+Quick Join stopped\nTry again	Hızlı Eşleşme durdu\nTekrar dene	Быстрый матч остановлен\nПопробуй ещё раз	快速加入已停止\n请重试
+Found players. Moving you there	Oyuncular bulundu. Oraya geçiyorsun	Игроки найдены. Переносим тебя к ним	找到玩家了. 正在把你带过去
+Joining a {0} table	{0} masasına katılınıyor	Вход за стол {0}	正在加入 {0} 牌桌
+Checking who has the mod	Kimde mod olduğu denetleniyor	Проверяем, у кого есть мод	正在检查谁装了模组
+A player is still arriving	Bir oyuncu hala geliyor	Игрок ещё подключается	还有玩家正在进入
+{0} needs the mod	Mod gerekiyor: {0}	Нужен мод: {0}	{0} 需要安装模组
+The house rules just changed	Masa kuralları az önce değişti	Правила стола только что изменились	房规刚刚改变
+Could not join that lobby\nIt may be full or in a match	O lobiye katılınamadı\nDolu ya da maçta olabilir	Не удалось войти в это лобби\nОно может быть заполнено или в игре	无法加入该大厅\n它可能已满或正在比赛中
+This lobby does not say\nwhich mod version it runs	Bu lobi hangi mod sürümünü\nkullandığını söylemiyor	Это лобби не сообщает,\nкакая у него версия мода	该大厅没有说明\n它使用的模组版本
+This lobby runs mod v{0}\nYou have v{1}	Bu lobide mod v{0} var\nSende v{1} var	В этом лобби мод v{0}\nУ тебя v{1}	该大厅使用模组 v{0}\n你的是 v{1}
+This lobby seats {0}\nYours are set to {1}	Bu lobide {0} koltuk var\nSeninki {1} olarak ayarlı	В этом лобби мест: {0}\nУ тебя задано: {1}	该大厅有 {0} 个座位\n你设置的是 {1}
+Type or paste a lobby ID first	Önce bir lobi kimliği yaz ya da yapıştır	Сначала введи или вставь ID лобби	请先输入或粘贴大厅 ID
+That is not a lobby ID\nIt is the number after LOBBY ID in a lobby	Bu bir lobi kimliği değil\nLobide LOBBY ID yanındaki sayıdır	Это не ID лобби\nЭто число после LOBBY ID в лобби	这不是大厅 ID\n它是大厅中 LOBBY ID 后面的数字
+(Copied)	(Kopyalandı)	(Скопировано)	(已复制)
+#
+# The lobby: house rules, the wardrobe, blocking, bots
+HOUSE RULES	MASA KURALLARI	ПРАВИЛА СТОЛА	房规
+The game's own rules	Oyunun kendi kuralları	Обычные правила игры	游戏原版规则
+No house rules for this table	Bu masa için kural yok	Для этого стола правил нет	此桌没有房规
+CLASSIC until everyone has this version of the mod	Herkeste modun bu sürümü olana kadar CLASSIC	CLASSIC, пока у всех не будет этой версии мода	在所有人都装上此版本模组之前为 CLASSIC
+15 s turns	15 sn tur	ход 15 с	每回合 15 秒
+4-chamber revolver	4 hazneli tabanca	4-зарядный револьвер	4 发弹巢左轮
+3-chamber revolver	3 hazneli tabanca	3-зарядный револьвер	3 发弹巢左轮
+3 cards each	kişi başı 3 kart	по 3 карты	每人 3 张牌
+2 chaos cards in 12	12 kartta 2 kaos kartı	2 карты хаоса из 12	12 张中有 2 张混沌牌
+3 dice each	kişi başı 3 zar	по 3 кости	每人 3 个骰子
+one drink and you are out	tek yudumda elenirsin	один глоток, и ты выбыл	喝一口就出局
+every hand starts on 1 bullet	her el 1 mermiyle başlar	каждая раздача с 1 пули	每手牌从 1 发子弹开始
+no Coward's Fold	korkak çekilmesi yok	без трусливого паса	不能懦夫弃牌
+every round starts on 2 points	her tur 2 puanla başlar	каждый раунд с 2 очков	每轮从 2 分开始
+the dead spin spares 1 in 7	ölü çevirme 7'de 1 bağışlar	мёртвый спин щадит 1 из 7	死亡旋转有 1/7 的几率放过你
+WARDROBE	GARDIROP	ГАРДЕРОБ	衣柜
+Click the cross again to block {0}	Engellemek için çarpıya tekrar tıkla: {0}	Нажми на крестик ещё раз, чтобы заблокировать: {0}	再次点击叉号以屏蔽 {0}
+Blocked {0}. You won't see their lobbies, and they can't join yours	Engellendi: {0}. Lobilerini görmeyeceksin, o da seninkine katılamayacak	Заблокирован: {0}. Ты не увидишь его лобби, а он не сможет войти в твоё	已屏蔽 {0}. 你不会看到他的大厅, 他也无法加入你的大厅
+Unblocked {0}	Engel kaldırıldı: {0}	Разблокирован: {0}	已解除屏蔽 {0}
+BLOCKED ({0})	ENGELLENENLER ({0})	Заблокированы ({0})	已屏蔽 ({0})
+UNBLOCK	ENGELİ KALDIR	РАЗБЛОКИРОВАТЬ	解除屏蔽
+Unknown player	Bilinmeyen oyuncu	Неизвестный игрок	未知玩家
+ADD BOT	BOT EKLE	НОВЫЙ БОТ	添加机器人
+REMOVE BOT	BOT ÇIKAR	УБРАТЬ БОТА	移除机器人
+Bots can't play this table yet	Botlar bu masada henüz oynayamıyor	Боты пока не умеют играть за этим столом	机器人暂时还不能玩这一桌
+The table is full	Masa dolu	Стол заполнен	这一桌已满
+Bots can't play this table yet, so they left	Botlar bu masada henüz oynayamıyor, bu yüzden ayrıldılar	Боты пока не умеют играть за этим столом, поэтому они ушли	机器人暂时还不能玩这一桌, 所以它们离开了
+Save Bug Report	Hata Raporu Kaydet	Сохранить отчёт об ошибке	保存错误报告
+Bug report saved: 	Hata raporu kaydedildi: 	Отчёт сохранён: 	错误报告已保存:
+Could not save the bug report	Hata raporu kaydedilemedi	Не удалось сохранить отчёт	无法保存错误报告
+#
+# At the table: the turn line and the Tab board. The mode names stay as the game writes them.
+Seat {0}'s turn	Sıra: koltuk {0}	Ход: место {0}	轮到座位 {0}
+seat {0}	koltuk {0}	место {0}	座位 {0}
+Your turn	Senin Sıran	Твой ход	轮到你了
+{0}'s turn	Sıra: {0}	Ход: {0}	轮到 {0}
+Players	Oyuncular	Игроки	玩家
+SEAT {0}	KOLTUK {0}	МЕСТО {0}	座位 {0}
+OUT	ELENDİ	ВЫБЫЛ	出局
+LEFT	AYRILDI	ВЫШЕЛ	离开
+FOLD	ÇEKİLDİ	ПАС	弃牌
+ALL IN	ALL-IN	ВА-БАНК	全押
+AIMING	NİŞAN ALIYOR	ЦЕЛИТСЯ	瞄准中
+CARDS	KART	КАРТЫ	手牌
+SHOTS	ATIŞ	ВЫСТРЕЛЫ	开枪
+CHAMBER	HAZNE	ПАТРОН	弹膛
+LIVES	CAN	ЖИЗНИ	生命
+BID	TEKLİF	СТАВКА	叫数
+BULLETS	MERMİ	ПУЛИ	子弹
+PLAY	HAMLE	ХОД	动作
+#
+# The aim line, while choosing whom to shoot. Whole lines: in the counted ones {0} is how many seats away and {1} the name.
+Aiming at nobody	Nişan: kimse yok	Цели нет	没有瞄准任何人
+Aim locked on nobody	Nişan kilitlendi: kimse yok	Прицел зафиксирован, цели нет	已锁定: 无人
+Aiming at {0}	Nişan: {0}	Цель: {0}	瞄准: {0}
+Locked on {0}	Nişan kilitlendi: {0}	Цель зафиксирована: {0}	已锁定: {0}
+Aiming at {0} - straight across	Nişan: {0} - tam karşında	Цель: {0} - прямо напротив тебя	瞄准: {0} - 在你正对面
+Locked on {0} - straight across	Nişan kilitlendi: {0} - tam karşında	Цель зафиксирована: {0} - прямо напротив тебя	已锁定: {0} - 在你正对面
+Aiming at {0} - next to you, on your right	Nişan: {0} - hemen sağında	Цель: {0} - рядом с тобой, справа	瞄准: {0} - 就在你右边
+Locked on {0} - next to you, on your right	Nişan kilitlendi: {0} - hemen sağında	Цель зафиксирована: {0} - рядом с тобой, справа	已锁定: {0} - 就在你右边
+Aiming at {0} - next to you, on your left	Nişan: {0} - hemen solunda	Цель: {0} - рядом с тобой, слева	瞄准: {0} - 就在你左边
+Locked on {0} - next to you, on your left	Nişan kilitlendi: {0} - hemen solunda	Цель зафиксирована: {0} - рядом с тобой, слева	已锁定: {0} - 就在你左边
+Aiming at {1} - {0} seats to your right	Nişan: {1} - {0} koltuk sağında	Цель: {1} - на {0} место правее тебя|Цель: {1} - на {0} места правее тебя|Цель: {1} - на {0} мест правее тебя	瞄准: {1} - 你右边第 {0} 个座位
+Locked on {1} - {0} seats to your right	Nişan kilitlendi: {1} - {0} koltuk sağında	Цель зафиксирована: {1} - на {0} место правее тебя|Цель зафиксирована: {1} - на {0} места правее тебя|Цель зафиксирована: {1} - на {0} мест правее тебя	已锁定: {1} - 你右边第 {0} 个座位
+Aiming at {1} - {0} seats to your left	Nişan: {1} - {0} koltuk solunda	Цель: {1} - на {0} место левее тебя|Цель: {1} - на {0} места левее тебя|Цель: {1} - на {0} мест левее тебя	瞄准: {1} - 你左边第 {0} 个座位
+Locked on {1} - {0} seats to your left	Nişan kilitlendi: {1} - {0} koltuk solunda	Цель зафиксирована: {1} - на {0} место левее тебя|Цель зафиксирована: {1} - на {0} места левее тебя|Цель зафиксирована: {1} - на {0} мест левее тебя	已锁定: {1} - 你左边第 {0} 个座位
+A / D, LB / RB or the D-pad to change target	Hedefi değiştirmek için A / D, LB / RB ya da yön tuşları	Сменить цель: A / D, LB / RB или крестовина	切换目标: A / D, LB / RB 或方向键
+A / D to change target	Hedefi değiştirmek için A / D	Сменить цель: A / D	切换目标: A / D
+#
+# Awards at the end of a match. A count is keyed on its English for more than one.
+AWARDS	ÖDÜLLER	НАГРАДЫ	奖项
+BEST LIAR	EN İYİ YALANCI	ЛУЧШИЙ ЛЖЕЦ	最佳骗子
+{0} lies never caught	{0} yalan hiç yakalanmadı	{0} обман не раскрыт|{0} обмана не раскрыты|{0} обманов не раскрыто	{0} 次说谎从未被抓
+WORST BLUFFER	EN KÖTÜ BLÖFÇÜ	ХУДШИЙ БЛЕФУН	最差吹牛者
+caught lying {0} times	{0} kez yalanda yakalandı	пойман на лжи {0} раз|пойман на лжи {0} раза|пойман на лжи {0} раз	说谎被抓 {0} 次
+LIE DETECTOR	YALAN DEDEKTÖRÜ	ДЕТЕКТОР ЛЖИ	测谎仪
+{0} liars caught	{0} yalancı yakaladı	{0} лжец пойман|{0} лжеца поймано|{0} лжецов поймано	抓到 {0} 个骗子
+CRIED WOLF	YALANCI ÇOBAN	ЛОЖНАЯ ТРЕВОГА	狼来了
+{0} wrong calls	{0} yanlış suçlama	{0} ошибочный вызов|{0} ошибочных вызова|{0} ошибочных вызовов	{0} 次错误质疑
+NERVES OF STEEL	ÇELİK SİNİRLER	СТАЛЬНЫЕ НЕРВЫ	钢铁神经
+{0} shots survived	{0} atıştan sağ çıktı	выжил после {0} выстрела|выжил после {0} выстрелов|выжил после {0} выстрелов	躲过 {0} 枪
+LUCKIEST	EN ŞANSLI	САМЫЙ ВЕЗУЧИЙ	最幸运
+lived through a 1 in {0}	1/{0} şansla hayatta kaldı	выжил при шансе 1 к {0}	在 1/{0} 的几率下活了下来
+HONEST TO A FAULT	FAZLA DÜRÜST	ЧЕСТНЕЙШИЙ	老实过头
+{0} throws, not one lie	{0} atış, tek yalan yok	{0} ход, ни одной лжи|{0} хода, ни одной лжи|{0} ходов, ни одной лжи	出牌 {0} 次, 从不说谎
+DEVIL'S FAVOURITE	ŞEYTANIN GÖZDESİ	ЛЮБИМЕЦ ДЬЯВОЛА	恶魔宠儿
+spared by the devil {0} times	şeytan {0} kez bağışladı	дьявол пощадил {0} раз|дьявол пощадил {0} раза|дьявол пощадил {0} раз	被恶魔饶过 {0} 次
+SOLD OUT	RUHUNU SATTI	ПРОДАЛ ДУШУ	出卖灵魂
+{0} devil cards played	{0} şeytan kartı oynadı	{0} карта дьявола сыграна|{0} карты дьявола сыграно|{0} карт дьявола сыграно	打出 {0} 张恶魔牌
+SHARPSHOOTER	KESKİN NİŞANCI	СНАЙПЕР	神枪手
+{0} kills	{0} öldürme	{0} убийство|{0} убийства|{0} убийств	击杀 {0} 次
+AGENT OF CHAOS	KAOS AJANI	АГЕНТ ХАОСА	混沌使者
+{0} chaos cards	{0} kaos kartı	{0} карта хаоса|{0} карты хаоса|{0} карт хаоса	{0} 张混沌牌
+SPOT ON	TAM İSABET	В ТОЧКУ	一语中的
+{0} perfect calls	{0} kusursuz tahmin	{0} точный вызов|{0} точных вызова|{0} точных вызовов	{0} 次精准判断
+HIGH ROLLER	BÜYÜK OYNAYAN	КРУПНЫЙ ИГРОК	豪赌客
+bid {0} dice	{0} zar teklif etti	ставка на {0} кость|ставка на {0} кости|ставка на {0} костей	叫了 {0} 个骰子
+CARD SHARK	KART USTASI	КАРТЁЖНИК	牌桌高手
+{0} hands won	{0} el kazandı	{0} раздача выиграна|{0} раздачи выиграно|{0} раздач выиграно	赢了 {0} 手牌
+ALL-IN MANIAC	ALL-IN MANYAĞI	МАНЬЯК ВА-БАНКА	全押狂人
+all in {0} times	{0} kez all-in	ва-банк {0} раз|ва-банк {0} раза|ва-банк {0} раз	全押 {0} 次
+lived with {0} of 8 loaded	8'de {0} doluyken hayatta kaldı	выжил с {0} из 8 заряженных	8 发装了 {0} 发仍然活着
+BEST HAND	EN İYİ EL	ЛУЧШАЯ РУКА	最佳牌型
+COWARD	KORKAK	ТРУС	胆小鬼
+folded {0} times	{0} kez çekildi	пас {0} раз|пас {0} раза|пас {0} раз	弃牌 {0} 次
+SWAPPER	DEĞİŞTİRİCİ	МЕНЯЛА	换牌手
+{0} cards swapped	{0} kart değiştirdi	{0} карта заменена|{0} карты заменено|{0} карт заменено	换了 {0} 张牌
+DEAD SPIN SURVIVOR	ÖLÜ ÇEVİRME GAZİSİ	ПЕРЕЖИЛ МЁРТВЫЙ СПИН	死亡旋转幸存者
+{0} dead spins lived	{0} ölü çevirmeden sağ çıktı	пережит {0} мёртвый спин|пережито {0} мёртвых спина|пережито {0} мёртвых спинов	活过 {0} 次死亡旋转
+SLOT JUNKIE	SLOT BAĞIMLISI	ИГРОМАН	老虎机迷
+{0} spins	{0} çevirme	{0} спин|{0} спина|{0} спинов	旋转 {0} 次
+EXECUTIONER	CELLAT	ПАЛАЧ	行刑者
+{0} executions	{0} infaz	{0} казнь|{0} казни|{0} казней	处决 {0} 次
+HIGH CARD	YÜKSEK KART	СТАРШАЯ КАРТА	高牌
+ONE PAIR	TEK ÇİFT	ПАРА	一对
+TWO PAIR	İKİ ÇİFT	ДВЕ ПАРЫ	两对
+THREE OF A KIND	ÜÇLÜ	СЕТ	三条
+STRAIGHT	KENT	СТРИТ	顺子
+FLUSH	FLOŞ	ФЛЕШ	同花
+FULL HOUSE	FUL	ФУЛЛ-ХАУС	葫芦
+FOUR OF A KIND	KARE	КАРЕ	四条
+STRAIGHT FLUSH	SIRALI FLOŞ	СТРИТ-ФЛЕШ	同花顺
+ROYAL FLUSH	ROYAL FLOŞ	РОЯЛ-ФЛЕШ	皇家同花顺
+# The released Liar's Poker on the Poker tab's plate, in the wording of the game's own loading tips,
+# not machine made: they say ЛЖЕЦ-ПОКЕР and 骗子扑克, and Turkish keeps the English name there, as for Liar's Deck and Dice.
+LIAR'S POKER	LIAR'S POKER	ЛЖЕЦ-ПОКЕР	骗子扑克
+TWO-CARD POKER	İKİ KARTLI POKER	ПОКЕР НА ДВЕ КАРТЫ	双牌扑克
+This table always plays CLASSIC	Bu masada her zaman CLASSIC oynanır	За этим столом всегда CLASSIC	此桌始终为 CLASSIC
+Two cards each, from a deck of 21: two Aces, two Kings, two Queens, two Fives, four Fours, four Threes, four Twos and a Joker.	Herkese 21 kartlık desteden iki kart: iki As, iki Papaz, iki Kız, iki Beşli, dört Dörtlü, dört Üçlü, dört İkili ve bir Joker.	Каждому две карты из колоды в 21 карту: два туза, два короля, две дамы, две пятёрки, четыре четвёрки, четыре тройки, четыре двойки и джокер.	每人两张牌, 牌堆共 21 张: 两张 A, 两张 K, 两张 Q, 两张 5, 四张 4, 四张 3, 四张 2 和一张小丑牌.
+Ace 12, King 7, Queen 6, the rest their number. Your hand is its two cards added up. A pair counts its value squared, so two Aces make 144, and the Joker pairs with any card.	As 12, Papaz 7, Kız 6, diğerleri üzerindeki sayı kadar. Elin, iki kartının toplamıdır. Çift, değerinin karesi sayılır: iki As 144 eder ve Joker her kartla çift olur.	Туз 12, король 7, дама 6, остальные по своему числу. Рука стоит сумму двух её карт. Пара стоит квадрат своего значения: два туза дают 144, а джокер составляет пару с любой картой.	A 12, K 7, Q 6, 其余按牌面数字. 手牌分数为两张牌之和. 对子按点数的平方计算, 两张 A 为 144, 小丑牌可与任意牌组成对子.
+Your turn: E swaps a card for one from the deck, the old one face up. F passes, once a round. From the second lap, C challenges: show one card and stake your hand.	Sıran gelince: E bir kartını desteden biriyle değiştirir, eskisi açık kalır. F pas geçer, her elde bir kez. İkinci turdan itibaren C meydan okur: bir kart gösterir, elini ortaya koyarsın.	Твой ход: E меняет карту на карту из колоды, старая ложится лицом вверх. F - пас, раз за раунд. Со второго круга C - вызов: покажи одну карту и поставь свою руку.	轮到你时: E 用牌堆中的一张牌换掉一张手牌, 旧牌正面朝上. F 过牌, 每轮一次. 从第二圈起, C 发起挑战: 亮出一张牌, 以整手牌作赌注.
+The player before you answers. X calls it a lie: both hands show, the higher wins, the challenger on a tie. C challenges too. Once two have challenged, S shows all their hands: the highest wins.	Senden önceki oyuncu cevap verir. X yalan der: iki el açılır, yüksek olan kazanır, eşitlikte meydan okuyan. C de meydan okur. İki kişi meydan okuyunca S tüm elleri açar: en yüksek kazanır.	Отвечает игрок перед тобой. X - назвать ложью: обе руки открываются, побеждает старшая, при равенстве - бросивший вызов. C - тоже вызов. Когда вызов бросили двое, S открывает все их руки: побеждает старшая.	由你前一位玩家回应. X 称其撒谎: 双方亮牌, 大者胜, 平局算挑战者胜. C 也发起挑战. 两人挑战后, S 亮出所有挑战者的手牌: 最大者胜.
+The winner aims the shotgun with A and D, and it fires when time runs out: three of its six shells are live. Two left, C faces off. Hold Space to see your cards, Tab for every hand's worth.	Kazanan pompalıyı A ve D ile yöneltir, süre dolunca ateş eder: altı fişeğinden üçü doludur. İki kişi kalınca C ile düello. Kartlarını görmek için Boşluk'u basılı tut, el değerleri için Tab.	Победитель наводит дробовик клавишами A и D, выстрел - когда время выйдет: из шести патронов три боевых. Двое остались - C, дуэль. Держи Пробел, чтобы видеть карты, Tab - ценность рук.	胜者用 A 和 D 瞄准霰弹枪, 时间到即开枪: 六发子弹中有三发实弹. 只剩两人时 C 对决. 按住空格键看牌, Tab 查看各手牌分数.
+# Fair play: a player leaving a table whose rules were broken, and the host's note for a match without hidden hands
+A player at this table lived through {0} pulls of a six-chamber revolver.	Bu masadaki bir oyuncu altı hazneli bir tabancanın tetiğini {0} kez çekip hayatta kaldı.	Игрок за этим столом остался жив после нажатий на спуск шестизарядного револьвера: {0}.	这张牌桌上有一名玩家扣了 {0} 次六发左轮的扳机, 却还活着.
+A player who was out came back into this match.	Elenmiş bir oyuncu bu maça geri döndü.	Выбывший игрок вернулся в этот матч.	一名已出局的玩家又回到了这场比赛.
+A player who was out was named the winner of this match.	Elenmiş bir oyuncu bu maçın kazananı ilan edildi.	Выбывший игрок был объявлен победителем этого матча.	一名已出局的玩家被宣布为这场比赛的赢家.
+This host's table showed {0} dice for one player. A cup holds 5.	Bu oda sahibinin masası bir oyuncu için {0} zar gösterdi. Bir zar kabı 5 zar alır.	Стол этого хоста показал у одного игрока костей: {0}. В стакане их помещается 5.	这位房主的牌桌为一名玩家显示了 {0} 颗骰子. 一个骰盅只装 5 颗.
+This host's table loaded {0} bullets into an eight-bullet revolver.	Bu oda sahibinin masası sekiz mermilik bir tabancaya {0} mermi koydu.	Стол этого хоста зарядил в восьмизарядный револьвер пуль: {0}.	这位房主的牌桌往八发左轮里装了 {0} 颗子弹.
+This host sent awards for a match they took over partway through.	Bu oda sahibi, yarıda devraldığı bir maç için ödül dağıttı.	Этот хост выдал награды за матч, который он подхватил посреди игры.	这位房主为一场中途接手的比赛发放了奖励.
+The rules were broken at this host's table, so you left it. This host is now on your BLOCKED list.	Bu oda sahibinin masasında kurallar çiğnendi, bu yüzden masadan ayrıldın. Bu oda sahibi artık ENGELLENENLER listende.	За столом этого хоста нарушались правила, поэтому мод вывел тебя из-за стола. Этот хост теперь в твоём списке Заблокированы.	这位房主的牌桌上有人违反了规则, 所以你已离开. 该房主现已在你的已屏蔽列表中.
+Cards and bullets are not kept hidden this match.	Bu maçta kartlar ve mermiler gizli tutulmuyor.	В этом матче карты и пули не скрываются.	本场比赛不隐藏手牌和子弹.
+This table runs a different version of Fully Loaded	Bu masada Fully Loaded'ın farklı bir sürümü çalışıyor	За этим столом другая версия Fully Loaded	这张牌桌用的是另一个版本的 Fully Loaded
+{0} on another mod version	{0} kişi başka mod sürümünde	С другой версией мода: {0}	{0} 名玩家的模组版本与你不同

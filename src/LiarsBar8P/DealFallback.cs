@@ -68,7 +68,7 @@ internal static class DealFallback
 
                 bool mine = IsLocal(p);
 
-                report.Add($"  seat {p.Slot} '{p.PlayerName}'{(mine ? " (this machine)" : "")}: " +
+                report.Add($"  seat {p.Slot}{(mine ? " (this machine)" : "")}: " +
                            $"{want} cards dealt, {showing} of {Count(gp.Cards)} card objects " +
                            $"switched on, holding={gp.HaveCards}");
 
@@ -110,9 +110,9 @@ internal static class DealFallback
                 try
                 {
                     p.GetComponent<DeckGameplay>().SetHaveCards(true);
-                    Plugin.Log.LogInfo($"[dealcards] '{p.PlayerName}' already had their cards - marked as holding them");
+                    Plugin.Log.LogInfo($"[dealcards] seat {p.Slot} already had their cards - marked as holding them");
                 }
-                catch (Exception e) { Plugin.Log.LogWarning($"[dealcards] could not mark '{p.PlayerName}': {e.Message}"); }
+                catch (Exception e) { Plugin.Log.LogWarning($"[dealcards] could not mark seat {p.Slot}: {e.Message}"); }
             }
 
             if (waiting.Count == 0)
@@ -215,11 +215,11 @@ internal static class DealFallback
             gp.SetCardsRpc(types);
 
             int objects = gp.Cards != null ? gp.Cards.Count : -1;
-            Plugin.Log.LogInfo($"[dealcards] '{p.PlayerName}' handed {count} cards ({objects} card objects)");
+            Plugin.Log.LogInfo($"[dealcards] seat {p.Slot} handed {count} cards ({objects} card objects)");
         }
         catch (Exception e)
         {
-            Plugin.Log.LogError($"[dealcards] could not hand '{p.PlayerName}' their cards: {e.Message}");
+            Plugin.Log.LogError($"[dealcards] could not hand seat {p.Slot} their cards: {e.Message}");
         }
     }
 }

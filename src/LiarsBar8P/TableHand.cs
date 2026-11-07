@@ -62,6 +62,39 @@ internal sealed class TableHand
         get { var c = Cards; return c != null ? c.Count : 0; }
     }
 
+    /// <summary>
+    /// The cards really still in the hand: its card objects that are switched on, each with its
+    /// place in the hand. The list of values above is the deal and is never shortened by a throw,
+    /// and Liar's Deck 2 sends it back out by those places when a round keeps the hands.
+    /// </summary>
+    internal System.Collections.Generic.List<(int Index, Card Card)> InHand()
+    {
+        var held = new System.Collections.Generic.List<(int Index, Card Card)>();
+        try
+        {
+            var cards = _deck != null ? _deck.Cards : _chaos.Cards;
+            if (cards == null) return held;
+            for (int i = 0; i < cards.Count; i++)
+            {
+                var go = cards[i];
+                if (go == null || !go.activeSelf) continue;
+                var card = go.GetComponent<Card>();
+                if (card != null) held.Add((i, card));
+            }
+        }
+        catch { }
+        return held;
+    }
+
+    /// <summary>A card taken out of the hand on every machine, the way the server does it when a throw leaves the hand.</summary>
+    internal void Hide(int index)
+    {
+        var at = new Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<int>(1);
+        at[0] = index;
+        if (_deck != null) _deck.ServerHideCards(at);
+        else _chaos.ServerChaosHideCards(at);
+    }
+
     internal bool Holding
     {
         get { try { return _deck != null ? _deck.HaveCards : _chaos.HaveCards; } catch { return false; } }
@@ -108,32 +141,30 @@ internal sealed class TableHand
     ///
     /// Exactly one gameplay component is bolted onto a player, and it is the one for the mode
     /// being played. That is the discriminator, and this is the only place that decides it.
+    ///
+    /// The seats are the server's roster where there is one, and otherwise the seats in the scene:
+    /// the roster is the server's own and empty on a client for the whole match, so reading only
+    /// that answered None on every machine but the host's.
     /// </summary>
     internal static Kind Playing()
     {
         try
         {
             var m = Manager.Instance;
-            if (m == null || m.Players == null) { _kindFor = null; return Kind.None; }
+            if (m == null) { _kindFor = null; return Kind.None; }
 
             if (ReferenceEquals(_kindFor, m) && _kind != Kind.None) return _kind;
 
-            foreach (var p in m.Players)
+            // A client searches the scene, at most five times a second until a seat carries a mode.
+            bool roster = m.Players != null && m.Players.Count > 0;
+            float now = UnityEngine.Time.unscaledTime;
+            if (!roster && ReferenceEquals(_lookedFor, m) && now < _nextLook) return Kind.None;
+            _lookedFor = m;
+            _nextLook = now + 0.2f;
+
+            foreach (var p in Seats(m))
             {
-                if (p == null) continue;
-                Kind found = Kind.None;
-
-                if (p.GetComponent<DeckGameplay>() != null) found = Kind.Deck;
-                else if (p.GetComponent<ChaosDeckGameplay>() != null) found = Kind.ChaosDeck;
-                else if (p.GetComponent<ChaosGamePlay>() != null) found = Kind.Chaos;
-                else if (p.GetComponent<PokerGamePlay>() != null) found = Kind.Poker;
-                else if (p.GetComponent<TexasGamePlay>() != null) found = Kind.Texas;
-                else if (p.GetComponent<DiceGamePlay>() != null) found = Kind.Dice;
-                else if (p.GetComponent<SpinGamePlay>() != null) found = Kind.Spin;
-                else if (p.GetComponent<RouletteGamePlay>() != null) found = Kind.Roulette;
-                else if (p.GetComponent<BlorfGamePlay>() != null) found = Kind.Blorf;
-                else if (p.GetComponent<BlorfGamePlayMatchMaking>() != null) found = Kind.BlorfMatchMaking;
-
+                Kind found = KindOf(p);
                 if (found == Kind.None) continue;
 
                 _kindFor = m;
@@ -145,8 +176,48 @@ internal sealed class TableHand
         return Kind.None;
     }
 
+    private static Kind KindOf(PlayerStats p)
+    {
+        if (p == null) return Kind.None;
+        if (p.GetComponent<DeckGameplay>() != null) return Kind.Deck;
+        if (p.GetComponent<ChaosDeckGameplay>() != null) return Kind.ChaosDeck;
+        if (p.GetComponent<ChaosGamePlay>() != null) return Kind.Chaos;
+        if (p.GetComponent<PokerGamePlay>() != null) return Kind.Poker;
+        if (p.GetComponent<TexasGamePlay>() != null) return Kind.Texas;
+        if (p.GetComponent<DiceGamePlay>() != null) return Kind.Dice;
+        if (p.GetComponent<SpinGamePlay>() != null) return Kind.Spin;
+        if (p.GetComponent<RouletteGamePlay>() != null) return Kind.Roulette;
+        if (p.GetComponent<BlorfGamePlay>() != null) return Kind.Blorf;
+        if (p.GetComponent<BlorfGamePlayMatchMaking>() != null) return Kind.BlorfMatchMaking;
+        return Kind.None;
+    }
+
+    /// <summary>
+    /// The seats at this table as this machine has them: the server's roster, or on a client,
+    /// which has none, the seats in the scene.
+    /// </summary>
+    internal static System.Collections.Generic.List<PlayerStats> Seats(Manager m)
+    {
+        var found = new System.Collections.Generic.List<PlayerStats>();
+        if (m == null) return found;
+
+        if (m.Players != null && m.Players.Count > 0)
+        {
+            foreach (var p in m.Players) if (p != null) found.Add(p);
+            return found;
+        }
+
+        var all = UnityEngine.Object.FindObjectsOfType<PlayerStats>();
+        if (all != null)
+            for (int i = 0; i < all.Count; i++)
+                if (all[i] != null) found.Add(all[i]);
+        return found;
+    }
+
     private static Manager _kindFor;
     private static Kind _kind = Kind.None;
+    private static Manager _lookedFor;
+    private static float _nextLook;
 
     /// <summary>Whether a liar call is being resolved, asked of the manager actually running.</summary>
     internal static bool LiarCallInFlight()

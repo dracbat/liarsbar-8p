@@ -47,7 +47,7 @@ internal static class MechanicsTrace
             if (c == null) return "somebody";
             var stats = c.GetComponent<PlayerStats>();
             if (stats == null) return c.gameObject != null ? c.gameObject.name : "somebody";
-            return $"'{stats.PlayerName}' (seat {stats.Slot})";
+            return $"seat {stats.Slot}";
         }
         catch { return "somebody"; }
     }
@@ -106,8 +106,11 @@ internal static class MechanicsTrace
     {
         try
         {
+            // The card types only inside the loopback test harness; anywhere else, how many.
             string cards = "nothing";
-            if (thrownTypes != null && thrownTypes.Length > 0)
+            if (thrownTypes != null && thrownTypes.Length > 0 && !Fair.TestsAllowed)
+                cards = $"{thrownTypes.Length} card(s)";
+            else if (thrownTypes != null && thrownTypes.Length > 0)
             {
                 var sb = new System.Text.StringBuilder();
                 for (int i = 0; i < thrownTypes.Length; i++)
@@ -155,12 +158,7 @@ internal static class MechanicsTrace
         try
         {
             _shots++;
-            string who = "nobody";
-            if (player != null)
-            {
-                string n = player.PlayerName;
-                who = string.IsNullOrEmpty(n) ? $"seat {player.Slot}" : $"'{n}' (seat {player.Slot})";
-            }
+            string who = player != null ? $"seat {player.Slot}" : "nobody";
 
             Plugin.Log.LogWarning(
                 $"[mechanic] the shot from {Who(__instance)} landed on {who}" +
@@ -184,8 +182,9 @@ internal static class MechanicsTrace
     /// </summary>
     [HarmonyPostfix]
     [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.UserCode_PlaceBet__Int32__Int32))]
-    private static void DiceBid(DiceGamePlay __instance, int count, int dice)
+    private static void DiceBid(DiceGamePlay __instance, int count, int dice, bool __runOriginal)
     {
+        if (!__runOriginal) return;
         try
         {
             _bids++;
@@ -198,8 +197,9 @@ internal static class MechanicsTrace
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.UserCode_CallLier))]
-    private static void DiceLiar(DiceGamePlay __instance)
+    private static void DiceLiar(DiceGamePlay __instance, bool __runOriginal)
     {
+        if (!__runOriginal) return;
         try
         {
             _diceLiar++;
@@ -210,8 +210,9 @@ internal static class MechanicsTrace
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.UserCode_CallSpotOn))]
-    private static void DiceSpotOn(DiceGamePlay __instance)
+    private static void DiceSpotOn(DiceGamePlay __instance, bool __runOriginal)
     {
+        if (!__runOriginal) return;
         try
         {
             _diceSpotOn++;
@@ -232,8 +233,9 @@ internal static class MechanicsTrace
     /// </summary>
     [HarmonyPostfix]
     [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.UserCode_CMDRised__Boolean))]
-    private static void TexasRaised(TexasGamePlay __instance, bool AllInN)
+    private static void TexasRaised(TexasGamePlay __instance, bool AllInN, bool __runOriginal)
     {
+        if (!__runOriginal) return;
         try
         {
             _raises++;
@@ -262,8 +264,9 @@ internal static class MechanicsTrace
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(SpinGamePlay), nameof(SpinGamePlay.UserCode_RiseCmd__Int32))]
-    private static void SpinClaim(SpinGamePlay __instance, int count)
+    private static void SpinClaim(SpinGamePlay __instance, int count, bool __runOriginal)
     {
+        if (!__runOriginal) return;
         try
         {
             _claims++;
@@ -276,8 +279,9 @@ internal static class MechanicsTrace
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(SpinGamePlay), nameof(SpinGamePlay.UserCode_CallLiar))]
-    private static void SpinLiar(SpinGamePlay __instance)
+    private static void SpinLiar(SpinGamePlay __instance, bool __runOriginal)
     {
+        if (!__runOriginal) return;
         try
         {
             _spinLiar++;

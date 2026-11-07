@@ -32,7 +32,7 @@ internal static class SeatAssign
             {
                 var p = nm.GamePlayers[i];
                 if (p == null) continue;
-                sb.Append($"  [{i}] '{p.PlayerName}' idNo={p.PlayerIdNumber} seat={p.InGameSlot}");
+                sb.Append($"  [{i}] connection {p.ConnectionID} idNo={p.PlayerIdNumber} seat={p.InGameSlot}");
                 seen.Add(p.InGameSlot);
             }
             Plugin.Log.LogInfo($"[seatassign] {when}:{sb}");
@@ -80,7 +80,7 @@ internal static class SeatAssign
             while (taken.Contains(seat) && seat < Limits.Max) seat++;
 
             Plugin.Log.LogWarning(
-                $"[seatassign] '{__instance.PlayerName}' got no seat from CmdSetPlayer " +
+                $"[seatassign] connection {__instance.ConnectionID} got no seat from CmdSetPlayer " +
                 $"(no free lobby panel) - assigning seat {seat}");
             // The plain field is server-only state; the generated setter is what reaches clients.
             __instance.NetworkInGameSlot = seat;

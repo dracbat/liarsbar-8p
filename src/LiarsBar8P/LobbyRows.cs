@@ -35,9 +35,13 @@ internal static class LobbyRows
     internal const int VersionLength = 16;
 
     private const string TagName = "LB8P_Tag";
+    private const string RulesName = "LB8P_Rules";
 
     /// <summary>Wide enough for the label, and clear of JOIN: the row has 640 free to the right of the count.</summary>
     private const float TagWidth = 210f;
+
+    /// <summary>The house rules pill, after the label: QUICK, HARSH or RULES ?, and nothing for a CLASSIC lobby.</summary>
+    private const float RulesWidth = 130f;
     private const float TagGap = 16f;
     private const float TextMargin = 6f;
     private const int TagFontSize = 24;
@@ -60,6 +64,7 @@ internal static class LobbyRows
         MatchmakingSelfTest.Report(lobbyids);
 
         if (!Matchmaking.Active) return true;
+        LobbyCount.Saw(lobbyids);
         if (__instance.isCreateMoment) return false;
 
         __instance.isCreateMoment = true;
@@ -90,6 +95,7 @@ internal static class LobbyRows
         try
         {
             if (SteamMatchmaking.GetLobbyData(id, Matchmaking.StateKey) != Matchmaking.InTheLobby) return;
+            if (BlockList.HostBlocked(id)) return;
             if (!list.PassModeLocal(SteamMatchmaking.GetLobbyData(id, "Mode"))) return;
 
             go = UnityEngine.Object.Instantiate(list.lobbyDataPrefab);
@@ -129,6 +135,8 @@ internal static class LobbyRows
 
             string name = Matchmaking.Clean(__instance.LobbyName, NameLength);
             __instance.LobbyName = name.Length > 0 ? name : "unnamed lobby";
+            if (MatchmakingSelfTest.RowNames != null && LobbyListManager.instance != null)
+                __instance.LobbyName = string.Format(MatchmakingSelfTest.RowNames, LobbyListManager.instance.listOfLobbies.Count + 1);
 
             if (__instance.MaxPlayerCount <= 0) __instance.MaxPlayerCount = Limits.LobbySeats;
 
@@ -157,48 +165,53 @@ internal static class LobbyRows
             bool matches = Matchmaking.WhyNot(__instance.lobbyID) == null;
 
             // Which version is the useful thing to say about a lobby this copy cannot join; the
-            // reason in full comes up if the player tries.
+            // reason in full comes up if the player tries. The seat count is in the pill beside
+            // this one, so the label is just the mod's name.
             string label = matches || version == Plugin.Version
-                ? $"{__instance.MaxPlayerCount} PLAYER MOD"
+                ? Plugin.TagName
                 : string.IsNullOrEmpty(version) ? "MOD v?"
                 : $"MOD v{Matchmaking.Clean(version, VersionLength)}";
 
-            Tag(__instance, label, matches);
+            Tag(__instance, TagName, 0f, TagWidth, label, matches);
+
+            // Drawn only for a lobby with house rules, so an ordinary lobby's row is as it was.
+            string rules = HouseRules.RowName(SteamMatchmaking.GetLobbyData(__instance.lobbyID, HouseRules.Key));
+            if (rules != null) Tag(__instance, RulesName, TagGap + TagWidth, RulesWidth, rules, true);
         }
         catch (Exception e) { Plugin.Log.LogWarning($"[matchmaking] row label failed: {e.Message}"); }
     }
 
     /// <summary>
-    /// A copy of the row's count pill with other words in it. It has no button and no
-    /// localisation of its own, so the copy brings no behaviour with it. Rows are destroyed on
-    /// every refresh, so nothing piles up.
+    /// A copy of the row's count pill with other words in it, <paramref name="after"/> further
+    /// along than the first copy goes. It has no button and no localisation of its own, so the
+    /// copy brings no behaviour with it. Rows are destroyed on every refresh, so nothing piles up.
     /// </summary>
-    private static void Tag(LobbyDataEntry row, string label, bool matches)
+    private static void Tag(LobbyDataEntry row, string tagName, float after, float width, string label, bool matches)
     {
         var count = row.playerCountext;
         var inner = count != null ? count.transform.parent : null;
         var pill = inner != null ? inner.parent : null;
         if (pill == null || pill.parent == null) return;
 
-        var existing = pill.parent.Find(TagName);
+        var existing = pill.parent.Find(tagName);
         var copy = existing != null ? existing.gameObject
                                     : UnityEngine.Object.Instantiate(pill.gameObject, pill.parent, false);
 
         if (existing == null)
         {
-            copy.name = TagName;
+            copy.name = tagName;
 
             // The pill is anchored by its right edge, so the width goes on to the left of that
             // and the position is where the new right edge wants to be.
             var box = copy.GetComponent<RectTransform>();
-            box.anchoredPosition = new Vector2(box.anchoredPosition.x + TagGap + TagWidth, box.anchoredPosition.y);
-            box.sizeDelta = new Vector2(TagWidth, box.sizeDelta.y);
+            box.anchoredPosition = new Vector2(box.anchoredPosition.x + after + TagGap + width, box.anchoredPosition.y);
+            box.sizeDelta = new Vector2(width, box.sizeDelta.y);
 
             var ring = copy.GetComponentInChildren<UnityEngine.UI.Image>(true);
             if (ring != null) KeepRoundEnds(ring, box.sizeDelta.y);
 
             // Under the row's hover highlight, which lives in the last child, not on top of it.
-            copy.transform.SetSiblingIndex(pill.GetSiblingIndex() + 1);
+            copy.transform.SetSiblingIndex(pill.GetSiblingIndex() + 1 + (after > 0f ? 1 : 0));
         }
 
         var text = copy.GetComponentInChildren<UnityEngine.UI.Text>(true);
@@ -206,7 +219,7 @@ internal static class LobbyRows
 
         // Only the pill's background stretches with it; the words have a box of their own,
         // pivoted on its left edge in the middle of the pill.
-        float wide = TagWidth - TextMargin;
+        float wide = width - TextMargin;
         var words = text.rectTransform;
         words.sizeDelta = new Vector2(wide, words.sizeDelta.y);
         words.anchoredPosition = new Vector2(-wide / 2f, words.anchoredPosition.y);

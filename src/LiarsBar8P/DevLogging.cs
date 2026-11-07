@@ -64,7 +64,7 @@ internal static class DevLogging
     private static void Seated(PlayerObjectController player, int slot, int skin)
     {
         if (!Dev.Enabled) return;
-        try { Dev.Log("seat", $"seated '{player?.PlayerName}' on seat {slot} (skin {skin})"); }
+        try { Dev.Log("seat", $"seated connection {player?.ConnectionID} on seat {slot} (skin {skin})"); }
         catch (Exception e) { Dev.Warn("seat", e.Message); }
     }
 
@@ -73,7 +73,7 @@ internal static class DevLogging
     private static void SeatChanged(PlayerStats __instance, int value)
     {
         if (!Dev.Enabled) return;
-        try { Dev.Log("seat", $"'{__instance.PlayerName}' seat -> {value}"); }
+        try { Dev.Log("seat", $"a player's seat -> {value}"); }
         catch { }
     }
 
@@ -108,7 +108,7 @@ internal static class DevLogging
                 if (p == null) continue;
                 var gp = p.GetComponent<DeckGameplay>();
                 int n = gp?.cardTypes?.Count ?? -1;
-                sb.Append($" {p.PlayerName}={n}");
+                sb.Append($" seat{p.Slot}={n}");
                 if (n > 0) dealt++; else empty++;
             }
             Dev.Log("deal", sb.ToString());
@@ -186,7 +186,7 @@ internal static class DevLogging
                 if (!_lastDead.TryGetValue(key, out bool wasDead) || wasDead != dead)
                 {
                     _lastDead[key] = dead;
-                    if (dead) Dev.Log("seen", $"{p.PlayerName} is out (seat {p.Slot})");
+                    if (dead) Dev.Log("seen", $"seat {p.Slot} is out");
                 }
             }
         }
@@ -251,7 +251,7 @@ internal static class DevLogging
 
             int alive = 0;
             foreach (var p in Dev.TablePlayers()) if (p != null && !p.Dead) alive++;
-            Dev.Log("dead", $"{__instance.PlayerName} is out (seat {seat}); {alive} still in");
+            Dev.Log("dead", $"seat {seat} is out; {alive} still in");
         }
         catch { }
     }
@@ -261,7 +261,7 @@ internal static class DevLogging
     private static void HealthChanged(PlayerStats __instance, int value)
     {
         if (!Dev.Enabled) return;
-        try { Dev.Log("dead", $"{__instance.PlayerName} health -> {value}"); }
+        try { Dev.Log("dead", $"seat {__instance.Slot} health -> {value}"); }
         catch { }
     }
 

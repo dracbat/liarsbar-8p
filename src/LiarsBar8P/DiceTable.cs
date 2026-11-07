@@ -479,9 +479,8 @@ internal static class DiceLabels
                     $"{Inward * 100f:F0}cm towards the middle, clear of the neighbour's hand and bottles");
             }
 
-            // Bodies arrive over a few seconds, and on a client the bots never arrive at all, so
-            // keep looking for a while; once everybody is here, now and then, in case a body is
-            // replaced.
+            // Bodies arrive over a few seconds, so keep looking for a while; once everybody is
+            // here, now and then, in case a body is replaced.
             _next = now + (seen >= seats ? 5f : 2f);
         }
         catch (Exception e)
@@ -619,6 +618,9 @@ internal static class SpectatorCams
         {
             var cam = parent.GetChild(i);
             if (cam == null) continue;
+
+            // A seat's camera copied in by SeatCams is already where that seat's camera is.
+            if (cam.name.StartsWith(SeatCams.Prefix, StringComparison.Ordinal)) continue;
 
             int id = cam.GetInstanceID();
             if (!_home.TryGetValue(id, out var home))

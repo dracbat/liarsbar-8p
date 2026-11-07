@@ -333,7 +333,7 @@ internal static class LobbyPodiums
                 if (s != null && !s.Dolu) return true;      // the game can seat them
 
             Plugin.Log.LogWarning(
-                $"[podium] no podium left for '{__instance.PlayerName}' - {lobby.SpawnSlots.Count} podiums, " +
+                $"[podium] no podium left for connection {__instance.ConnectionID} - {lobby.SpawnSlots.Count} podiums, " +
                 $"maximum {Limits.Max}; placing them at the last one");
 
             if (__instance.isOwned) __instance.NetworkReady = true;
@@ -1452,7 +1452,7 @@ internal static class LobbyPodiums
                 }
 
                 sb.AppendLine(
-                    $"  '{p.PlayerName}' podium={p.SlotName} " +
+                    $"  connection {p.ConnectionID} podium={p.SlotName} " +
                     $"screen=({v.x:F2},{v.y:F2}) depth={v.z:F1} " +
                     (onScreen ? "on screen" : "OFF SCREEN") +
                     (adrift > 0.5f ? $"  !! standing {adrift:F2} from their podium" : "") +

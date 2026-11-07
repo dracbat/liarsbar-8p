@@ -26,6 +26,9 @@ internal static class VersionCheck
     internal const string Key = "lb8p_ver";
     private static float _nextReport;
 
+    /// <summary>For a member who publishes no version. The only words here a player sees; the log keeps the English.</summary>
+    private const string NoModWords = "OLD or NO MOD";
+
     [HarmonyPostfix]
     [HarmonyPatch(typeof(SteamLobby), nameof(SteamLobby.OnLobbyEntered))]
     private static void Publish(LobbyEnter_t callback)
@@ -86,13 +89,15 @@ internal static class VersionCheck
 
             int mismatched = 0;
             var report = new StringBuilder();
+            var versions = new StringBuilder();
 
             for (int i = 0; i < members; i++)
             {
                 var member = SteamMatchmaking.GetLobbyMemberByIndex(lobby, i);
                 string name = SteamFriends.GetFriendPersonaName(member);
                 string ver = SteamMatchmaking.GetLobbyMemberData(lobby, member, Key);
-                if (string.IsNullOrEmpty(ver)) ver = "OLD or NO MOD";
+                bool none = string.IsNullOrEmpty(ver);
+                if (none) ver = NoModWords;
                 if (ver != Plugin.Version)
                 {
                     mismatched++;
@@ -105,19 +110,28 @@ internal static class VersionCheck
                     // enough to wreck the readout or the frame rate of everyone else in the
                     // room. Nothing else in this mod takes a string from another player and
                     // draws it, so this is the one place that has to be careful.
+                    //
+                    // The names are for the screen only. The log gets the versions: it is what
+                    // people paste into an issue.
                     if (mismatched <= MaxNamesShown)
-                        report.Append($"  {Safe(name, 24)}={Safe(ver, 16)}");
+                    {
+                        report.Append($"  {Safe(name, 24)}={(none ? Words.T(NoModWords) : Safe(ver, 16))}");
+                        versions.Append($"  {Safe(ver, 16)}");
+                    }
                     else if (mismatched == MaxNamesShown + 1)
+                    {
                         report.Append("  ...");
+                        versions.Append("  ...");
+                    }
                 }
             }
 
             if (mismatched > 0)
             {
                 Plugin.Log.LogWarning(
-                    $"[version] {mismatched} player(s) NOT on {Plugin.Version}:{report} " +
+                    $"[version] {mismatched} player(s) NOT on {Plugin.Version}:{versions} " +
                     "- they must reinstall or the session will misbehave");
-                VersionHud.Mismatch = $"VERSION MISMATCH -{report}";
+                VersionHud.Mismatch = Words.T("VERSION MISMATCH") + " -" + report;
             }
             else
             {

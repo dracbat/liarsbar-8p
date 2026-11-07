@@ -58,6 +58,7 @@ internal static class QuickMatch
     internal const string StillConnecting = "Still connecting\nTry again in a moment";
     private const string WentWrong = "Quick Join stopped\nTry again";
     private const string FoundPlayers = "Found players. Moving you there";
+    private const string JoiningRules = "Joining a {0} table";
 
     /// <summary>How many times the pool is looked at before deciding nobody is there.</summary>
     private const int Looks = 2;
@@ -126,6 +127,9 @@ internal static class QuickMatch
 
     /// <summary>A join is under way, and this class is watching how it ends.</summary>
     internal static bool Joining => _step == Step.Joining;
+
+    /// <summary>Quick Join is doing anything at all: looking, joining or opening a lobby.</summary>
+    internal static bool Busy => _step != Step.Idle;
 
     // ------------------------------------------------------------------ the button
 
@@ -483,16 +487,18 @@ internal static class QuickMatch
     internal static void ListArrived() => _listIn = true;
 
     /// <summary>
-    /// Fullest first, because that is what gets a table to eight, then the lower id, the same
-    /// way two lone hosts settle it. Only lobbies the mode boxes would show: the search itself
-    /// no longer looks at them, so the list's own test decides.
+    /// Fullest first, because that is what gets a table to eight, then a CLASSIC lobby before
+    /// one with house rules, then the lower id, the same way two lone hosts settle it. Only
+    /// lobbies the mode boxes would show: the search itself no longer looks at them, so the
+    /// list's own test decides. Hidden lobbies, a blocked player's among them, never get here.
     /// </summary>
-    private static void Decide(SteamLobby sl, LobbyListManager list, float now)
+    internal static int Best(SteamLobby sl, LobbyListManager list, out CSteamID best, out string bestRules)
     {
         var ids = sl.lobbiesIDs;
         int found = ids != null ? ids.Count : 0;
 
-        CSteamID best = default;
+        best = default;
+        bestRules = null;
         int bestMembers = -1;
         for (int i = 0; i < found; i++)
         {
@@ -500,19 +506,34 @@ internal static class QuickMatch
             if (_tried.Contains(id.m_SteamID) || !Matchmaking.Seatable(id)) continue;
             if (!list.PassModeLocal(SteamMatchmaking.GetLobbyData(id, Matchmaking.ModeKey))) continue;
 
+            // House rules only ever lose a tie: fullest first is what gets a table to eight.
             int members = SteamMatchmaking.GetNumLobbyMembers(id);
-            if (members > bestMembers || (members == bestMembers && id.m_SteamID < best.m_SteamID))
+            string rules = HouseRules.RowName(SteamMatchmaking.GetLobbyData(id, HouseRules.Key));
+            bool classic = rules == null, bestClassic = bestRules == null;
+            if (members > bestMembers ||
+                (members == bestMembers && (classic && !bestClassic || classic == bestClassic && id.m_SteamID < best.m_SteamID)))
             {
                 best = id;
                 bestMembers = members;
+                bestRules = rules;
             }
         }
+        return bestMembers;
+    }
+
+    private static void Decide(SteamLobby sl, LobbyListManager list, float now)
+    {
+        var ids = sl.lobbiesIDs;
+        int found = ids != null ? ids.Count : 0;
+        int bestMembers = Best(sl, list, out var best, out string bestRules);
 
         Plugin.Log.LogInfo($"[matchmaking] quick join: {found} lobbies found, " +
-                           (bestMembers >= 0 ? $"best has {bestMembers} in it" : "none with a seat"));
+                           (bestMembers >= 0 ? $"best has {bestMembers} in it{(bestRules != null ? $", house rules {bestRules}" : "")}"
+                                             : "none with a seat"));
 
         if (bestMembers >= 0 && _tried.Count < MostJoins)
         {
+            if (bestRules != null) Matchmaking.Say(Words.F(JoiningRules, bestRules));
             _tried.Add(best.m_SteamID);
             _joining = best.m_SteamID;
             _entered = false;
@@ -758,7 +779,7 @@ internal static class QuickMatch
 
     // --------------------------------------------- two lone hosts finding each other
 
-    private static void StopLooking()
+    internal static void StopLooking()
     {
         _ownLobby = 0;
         _lookInFlight = false;
@@ -847,6 +868,7 @@ internal static class QuickMatch
                 int seats = SteamMatchmaking.GetLobbyMemberLimit(id);
                 if (seats > 0 && seats != Limits.LobbySeats) continue;
                 if (!ModeTicked(SteamMatchmaking.GetLobbyData(id, Matchmaking.ModeKey))) continue;
+                if (BlockList.HostBlocked(id)) continue;
 
                 if (SteamMatchmaking.GetNumLobbyMembers(id) > 1 || id.m_SteamID < mine)
                 {

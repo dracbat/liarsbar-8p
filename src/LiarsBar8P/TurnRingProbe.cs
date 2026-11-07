@@ -22,8 +22,8 @@ namespace LiarsBar8P;
 /// which is the whole bug, visible in one line.
 ///
 /// It is a test instrument and says so: nothing happens unless <c>LIARSBAR8P_TURNPROBE</c>
-/// is set, which the harness sets and a player never does. It runs once per match, on the
-/// server, and stops.
+/// is set and the copy runs in the loopback test harness with developer mode on. It runs once
+/// per match, on the server, and stops.
 /// </summary>
 internal static class TurnRingProbe
 {
@@ -47,8 +47,9 @@ internal static class TurnRingProbe
         {
             if (_wanted == null)
             {
+                // It moves the turn, so it works only inside the loopback test harness.
                 string raw = Environment.GetEnvironmentVariable("LIARSBAR8P_TURNPROBE");
-                _wanted = !string.IsNullOrEmpty(raw) && raw != "0";
+                _wanted = Fair.TestsAllowed && !string.IsNullOrEmpty(raw) && raw != "0";
             }
             return _wanted.Value;
         }

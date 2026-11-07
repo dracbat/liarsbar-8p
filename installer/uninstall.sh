@@ -299,6 +299,11 @@ while IFS= read -r -d '' f; do
     else bad "could not remove ${f##*/}"; fi
 done < <(find "$GAME/BepInEx/plugins" -mindepth 1 \( -type f -o -type l \) -iname '*liarsbar8p*' -print0 2> /dev/null
          find "$GAME/BepInEx/config" -maxdepth 1 \( -type f -o -type l \) -iname '*liarsbar.eightplayers.cfg' -print0 2> /dev/null)
+# The bug reports the mod saved, which are its own too.
+if [ -d "$GAME/BepInEx/bug-reports" ]; then
+    if rm -rf -- "${GAME:?}/BepInEx/bug-reports"; then good "removed bug-reports"; removed=$((removed + 1))
+    else bad "could not remove bug-reports"; fi
+fi
 
 # BepInEx itself is shared, so it only goes if nothing else is using it. With this mod's
 # own files gone, anything still in plugins/ or patchers/ is somebody else's - a DLL, one

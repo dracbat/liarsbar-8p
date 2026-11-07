@@ -133,14 +133,20 @@ internal static class Dev
         }
     }
 
-    /// <summary>Short, stable description of a lobby player for a log line.</summary>
+    /// <summary>
+    /// Short, stable description of a lobby player for a log line.
+    ///
+    /// The number is written "#3", never "id=3": the per-copy log masks whatever follows the
+    /// words "player id", because that is how the game prints a player's sign-in, and a developer
+    /// line written that way lost its number to the mask.
+    /// </summary>
     internal static string Describe(PlayerObjectController p)
     {
         if (p == null) return "<null>";
         try
         {
-            string bot = BotManager.IsBot(p) ? " BOT" : "";
-            return $"'{p.PlayerName}'{bot} id={p.PlayerIdNumber} conn={p.ConnectionID} " +
+            string who = BotManager.IsBot(p) ? "BOT" : "player";
+            return $"{who} #{p.PlayerIdNumber} conn={p.ConnectionID} " +
                    $"seat={p.InGameSlot} podium={(string.IsNullOrEmpty(p.SlotName) ? "-" : p.SlotName)} " +
                    $"ready={p.Ready}";
         }
@@ -153,7 +159,7 @@ internal static class Dev
         if (p == null) return "<null>";
         try
         {
-            return $"'{p.PlayerName}' seat={p.Slot} hp={p.Health} " +
+            return $"seat={p.Slot} hp={p.Health} " +
                    $"{(p.Dead ? "DEAD" : "alive")}{(p.HaveTurn ? " <-TURN" : "")}";
         }
         catch (Exception e) { return $"<unreadable: {e.Message}>"; }

@@ -199,7 +199,7 @@ internal static class DiceRevealGuard
                 catch { }
 
                 Plugin.Log.LogWarning(
-                    $"[dicefix]   seat {p.Slot} '{p.PlayerName}' dead={p.Dead} finished={p.Fnished} dice={dice}");
+                    $"[dicefix]   seat {p.Slot} dead={p.Dead} finished={p.Fnished} dice={dice}");
             }
         }
         catch (Exception e) { Plugin.Log.LogWarning($"[dicefix] could not describe the table: {e.Message}"); }

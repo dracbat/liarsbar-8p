@@ -39,7 +39,9 @@ namespace LiarsBar8P;
 /// <b>The cooldown</b> between emotes is the game's own counter - 12 seconds, counted on the
 /// player's own machine; the server passes emotes on without checking - run faster, so that it
 /// fills in <c>EmoteCooldownSeconds</c> (10 unless set) at every table size, because that is a
-/// change the mod's owner asked for rather than something the table size needs.
+/// change the mod's owner asked for rather than something the table size needs. Only at a table
+/// where everybody has the mod (<see cref="Table.Modded"/>): it changes what other players
+/// receive, so anywhere else they get emotes at the game's own pace.
 ///
 /// <b>How it travels.</b> The game sends the direction as a plain number to the server, which
 /// hands it to everybody without looking at it. At five or more, the number sent is the target
@@ -281,11 +283,16 @@ internal static class EmoteTargets
     ///
     /// This is every player object's every frame, so it stops at the first check on all of them
     /// but the one whose emotes are cooling down.
+    ///
+    /// The first check is the table: a quicker emote is something the other players receive, so
+    /// it only happens where they all run the mod, at four seats as well as eight.
     /// </summary>
     [HarmonyPrefix]
     [HarmonyPatch(typeof(CharController), nameof(CharController.Update))]
     private static void Cooldown(CharController __instance)
     {
+        if (!Table.Modded) return;
+
         var setting = Plugin.EmoteCooldownSeconds;
         if (setting == null) return;
         float want = setting.Value;

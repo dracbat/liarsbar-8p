@@ -26,6 +26,12 @@ internal sealed class TurnHud : MonoBehaviour
     private static string _line;
     private static bool _isYou;
 
+    // The words, in one place for the word table. A name is never declined: other languages put it after a colon.
+    private const string SeatTurn = "Seat {0}'s turn";
+    private const string SeatWord = "seat {0}";
+    private const string YourTurn = "Your turn";
+    private const string NameTurn = "{0}'s turn";
+
     private GUIStyle _style;
     private GUIStyle _yours;
     private Texture2D _backdrop;
@@ -37,6 +43,12 @@ internal sealed class TurnHud : MonoBehaviour
     private static readonly Vector2 Corner = new(0f, 1f);
     private const float Inset = 6f;
     private const float Down = 224f;
+
+    /// <summary>
+    /// Two-Card Poker keeps a table of every hand's worth down the left edge, all match long, and
+    /// this line sat across its top rows. There it starts just past the table instead.
+    /// </summary>
+    private const float BesideTheValues = 96f;
 
     /// <summary>
     /// Work out the line to show. Called four times a second from the ticker, because this
@@ -60,11 +72,8 @@ internal sealed class TurnHud : MonoBehaviour
         {
             if (!string.IsNullOrEmpty(_pretend)) _line = _pretend;
 
-            if (_row == null)
-            {
-                _row = ModCanvas.NewLine("turn", Corner, 40f, 26f, ModCanvas.Cream, rule: true);
-                _row.Box.anchoredPosition = new Vector2(Inset, -Down);
-            }
+            if (_row == null) _row = ModCanvas.NewLine("turn", Corner, 40f, 26f, ModCanvas.Cream, rule: true);
+            _row.Box.anchoredPosition = new Vector2(TwoCardPoker.Playing ? BesideTheValues : Inset, -Down);
 
             _plain = !ModCanvas.Fits(_line);
             _row.Text.color = _isYou ? ModCanvas.Gold : ModCanvas.Cream;
@@ -77,8 +86,9 @@ internal sealed class TurnHud : MonoBehaviour
     {
         try
         {
+            // Nobody has a turn on the win screen, and the awards are written where this sits.
             var m = Manager.Instance;
-            if (m == null || !m.GameStarted) { _line = null; return; }
+            if (m == null || !m.GameStarted || m.GameEnd) { _line = null; return; }
 
             // Liar's Texas says whose turn it is itself, by name, in the top right - and
             // keeps a ranking ladder down the left edge, which this line was drawn straight
@@ -114,19 +124,18 @@ internal sealed class TurnHud : MonoBehaviour
 
             if (up == null)
             {
-                // A seat this machine has no player object for - a bot, whose object is never
-                // network-spawned and so cannot be seen from a client. Name the seat rather
-                // than show nothing.
+                // A seat this machine has no player object for, such as one whose body has not
+                // arrived yet. Name the seat rather than show nothing.
                 _isYou = false;
-                _line = slot >= 0 ? $"Seat {slot + 1}'s turn" : null;
+                _line = slot >= 0 ? Words.F(SeatTurn, slot + 1) : null;
                 return;
             }
 
             string name = up.PlayerName;
-            if (string.IsNullOrEmpty(name)) name = $"seat {up.Slot + 1}";
+            if (string.IsNullOrEmpty(name)) name = Words.F(SeatWord, up.Slot + 1);
 
             _isYou = IsLocal(up);
-            _line = _isYou ? "Your turn" : $"{name}'s turn";
+            _line = _isYou ? Words.T(YourTurn) : Words.F(NameTurn, name);
         }
         catch
         {
@@ -210,10 +219,11 @@ internal sealed class TurnHud : MonoBehaviour
             // fraction of the height rather than a pixel count, because that block is laid
             // out by a canvas that scales with the window.
             float y = Screen.height * 0.21f;
+            float x = TwoCardPoker.Playing ? BesideTheValues * Screen.height / 1080f : 6f;
             Vector2 size = style.CalcSize(new GUIContent(_line));
 
-            GUI.DrawTexture(new Rect(6f, y - 3f, size.x + 14f, size.y + 8f), _backdrop);
-            GUI.Label(new Rect(13f, y, size.x + 10f, size.y + 4f), _line, style);
+            GUI.DrawTexture(new Rect(x, y - 3f, size.x + 14f, size.y + 8f), _backdrop);
+            GUI.Label(new Rect(x + 7f, y, size.x + 10f, size.y + 4f), _line, style);
         }
         catch { /* never let a HUD draw break the game */ }
     }

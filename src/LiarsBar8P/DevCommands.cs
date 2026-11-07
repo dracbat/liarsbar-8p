@@ -84,9 +84,9 @@ internal static class DevCommands
                 if (s == null) { sb.AppendLine($"  [{i}] <null>"); continue; }
                 string who = "-";
                 foreach (var p in Dev.LobbyPlayers())
-                    if (p != null && p.SlotName == s.gameObject.name) { who = p.PlayerName; break; }
+                    if (p != null && p.SlotName == s.gameObject.name) { who = $"connection {p.ConnectionID}"; break; }
                 sb.AppendLine($"  [{i}] {s.gameObject.name} taken={s.Dolu} ready={s.Ready} " +
-                              $"name='{s.PlayerName}' :: {who}");
+                              $"named={!string.IsNullOrEmpty(s.PlayerName)} :: {who}");
             }
         }
         catch (Exception e) { sb.AppendLine($"  failed: {e.Message}"); }
@@ -140,8 +140,10 @@ internal static class DevCommands
                 var gp = p.GetComponent<DeckGameplay>();
                 if (gp == null) continue;
                 // Two different things, and the gap between them is the bug that made a
-                // table look dealt while nobody physically held a card.
-                sb.AppendLine($"  {p.PlayerName}: {Count(gp.cardTypes)} card values {Types(gp.cardTypes)}, " +
+                // table look dealt while nobody physically held a card. Counts only, except
+                // inside the loopback test harness.
+                string values = Fair.TestsAllowed ? $" {Types(gp.cardTypes)}" : "";
+                sb.AppendLine($"  seat {p.Slot}: {Count(gp.cardTypes)} card values{values}, " +
                               $"{Count(gp.Cards)} card objects, haveCards={gp.HaveCards}");
             }
         }

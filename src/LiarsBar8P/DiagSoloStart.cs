@@ -12,7 +12,8 @@ namespace LiarsBar8P;
 /// </summary>
 internal static class DiagSoloStart
 {
-    private static bool Active => Plugin.DiagSoloStart != null && Plugin.DiagSoloStart.Value;
+    // It starts a match, so only inside the loopback test harness with developer mode on.
+    private static bool Active => Fair.TestsAllowed && Plugin.DiagSoloStart != null && Plugin.DiagSoloStart.Value;
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.EditorSoloDeckTest))]

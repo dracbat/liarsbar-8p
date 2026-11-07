@@ -6,46 +6,24 @@ using UnityEngine;
 namespace LiarsBar8P;
 
 /// <summary>
-/// Liar's Texas card swaps at a table of five or more: a swap that never ends, a real face on
-/// somebody else's card, and a deck one card short at eight.
-///
-/// The report was "after changing cards you can see the cards of the person next to you
-/// instead of question marks; if you don't change cards it shows question marks". Every
-/// machine hides the cards of seats it does not own the same way: <c>TexasCard.FixedUpdate</c>
-/// puts the question-mark material (<c>BlurMaterial</c>) on them every physics tick - except
-/// while that seat's <c>isSwitching</c> flag is up. Then it stops, and paints the card held up
-/// during the swap with the face of the card being swapped out instead. That flag is only ever
-/// lowered by the end of the swap animation or by the swapper's own "swap is over" message,
-/// and nothing lowers it at the next deal. So a swap that never finishes leaves that seat's
-/// cards unhidden for the rest of the match, on every machine. The host is where it shows: the
-/// host paints every seat's real cards when it deals and when it swaps, and relies on the
-/// hiding to cover them again. Above four players the seats beside the host are far enough
-/// round that they are probably off its screen; if their animation is not played off screen,
-/// the host's own end of the swap never runs and only the swapper's message can end it.
+/// Liar's Poker card swaps at a table of five or more: every swap ends, every other seat's cards
+/// show the question mark, and the deck has a card for everyone at eight.
 ///
 /// Three server-side guards make sure a swap always ends:
 ///   - a swap the game refuses (the option chosen is not one it offers - the betting round
 ///     moved on with the menu open, or the seat was dealt fewer options) is ended on the spot;
-///     the game returns without a word and would otherwise leave the flag up for good;
-///   - every deal lowers a flag left over from the last hand;
-///   - a flag still up eight seconds after the swap went through, or after the seat's turn
-///     ended, is lowered.
+///   - every deal clears a swap left over from the last hand;
+///   - a swap still marked as in progress eight seconds after it went through, or after the
+///     seat's turn ended, is ended.
 ///
 /// And every machine, once a frame and after everything else has painted, puts the question
-/// mark back on every card of every seat it does not own. That closes the host's own flashes
-/// (the new card painted on the swapper's card by the animation, the real faces painted at
-/// each deal before the next physics tick hides them) and any swap that is stuck however it got
-/// stuck. That includes the card a player holds up while swapping. The game paints it with the
-/// card being given up - <c>CardValueForSwitch</c>, which it sends to every machine for nothing
-/// else - and at four players nobody is close enough to read it. At eight they are: players
-/// reported seeing "the actual card" on their neighbour's swap where every other card of theirs
-/// shows the blank template. Above four it gets the template like the rest
-/// (<see cref="ShowSwappedOutCard"/>); at four the game's own reveal is untouched.
+/// mark back on every card of every seat it does not own, the card held up during a swap
+/// included (<see cref="ShowSwappedOutCard"/>). At four players the game's own reveal is
+/// untouched.
 ///
-/// The table cards in front of each seat are handled on the host only, because only the host
-/// ever paints real cards on them before the showdown - at the deal and at the swap. For seats
-/// the host does not own they are put back to whatever they showed before, which is exactly
-/// what a joining player's machine shows. The showdown repaints them everywhere, host included.
+/// The table cards in front of each seat are looked after on the host: until the showdown, each
+/// seat the host does not own shows them as a joining player's machine does. The showdown turns
+/// them over everywhere.
 ///
 /// Then the deck. Each seat is dealt two cards and four cards to switch to, and the table gets
 /// five, all from one 52-card deck: 8 x 6 + 5 = 53. Every seat's options come out before the
@@ -59,26 +37,29 @@ namespace LiarsBar8P;
 /// landing on a blank fourth.
 ///
 /// Everything here does nothing at a table of four or fewer, which plays exactly as shipped.
+/// The one exception is a copy watching through seat cameras (<see cref="SeatCams"/>, which are
+/// only added above four): it goes on hiding the cards, and the host its table cards, if the
+/// table shrinks to four, since a seat camera is close enough to read the game's own reveal.
 /// </summary>
 internal static class TexasSwap
 {
     /// <summary>
-    /// Whether the card held up mid-swap may show the card going back, above four players. Off:
-    /// at a table that close, the neighbours can read it. See the class summary.
+    /// Developer-only: hide at any table size, so a test with fewer than five copies of the game
+    /// (and no bots, which stall a Texas fold) can still watch the hiding work. Only inside the
+    /// loopback test harness (<see cref="Fair.TestsAllowed"/>), with <c>LIARSBAR8P_TEXAS_ANYSIZE=1</c>.
+    /// </summary>
+    private static bool TestAtAnySize => Fair.TestsAllowed && Environment.GetEnvironmentVariable("LIARSBAR8P_TEXAS_ANYSIZE") == "1";
+
+    /// <summary>
+    /// Whether the card held up mid-swap may show its face above four players. Off for everybody.
     /// </summary>
     /// <remarks>
-    /// Off for everybody. A test run can turn it back on for one copy of the game with
-    /// <c>LIARSBAR8P_TEXAS_REVEAL=1</c>, so the same match shows the leak on one screen and the
-    /// fix on the one beside it.
+    /// A test copy inside the loopback test harness can turn it on with
+    /// <c>LIARSBAR8P_TEXAS_REVEAL=1</c>, to compare the game's own drawing with the mod's beside it.
     /// </remarks>
-    /// <summary>
-    /// Developer-only: hide at any table size, so a test with fewer than five copies of the game
-    /// (and no bots, which stall a Texas fold) can still watch the hiding work. Needs both the
-    /// harness's developer mode and <c>LIARSBAR8P_TEXAS_ANYSIZE=1</c>.
-    /// </summary>
-    private static bool TestAtAnySize => Dev.Enabled && Environment.GetEnvironmentVariable("LIARSBAR8P_TEXAS_ANYSIZE") == "1";
+    private static bool ShowSwappedOutCard => Fair.TestsAllowed && RevealSwitch;
 
-    private static readonly bool ShowSwappedOutCard = Environment.GetEnvironmentVariable("LIARSBAR8P_TEXAS_REVEAL") == "1";
+    private static readonly bool RevealSwitch = Environment.GetEnvironmentVariable("LIARSBAR8P_TEXAS_REVEAL") == "1";
 
     // The deal's own numbers, read from watiforGiveCard: two cards each ("RandomCards(card1,
     // card2)"), four to switch to ("cmp r14d,4"), five for the table ("cmp r15d,5").
@@ -181,6 +162,19 @@ internal static class TexasSwap
 
     /// <summary>More than four seats at it.</summary>
     private static bool _bigger;
+
+    /// <summary>
+    /// A Texas table whose cards this machine hides from every seat: more than four at it. The
+    /// seat cameras are only added at one (<see cref="SeatCams"/>).
+    /// </summary>
+    internal static bool HidesCards => Live && _bigger;
+
+    /// <summary>
+    /// Whether this machine hides the cards of seats it does not own: above four seats, and on a
+    /// copy that has seat cameras, even if the table has shrunk to four since they were added. Only
+    /// what this machine draws; the server's guards still go by <see cref="_bigger"/>.
+    /// </summary>
+    internal static bool Hiding => _bigger || SeatCams.Added > 0;
 
     /// <summary>Server only: when each seat was first seen marked mid-swap after it should have ended.</summary>
     private static readonly Dictionary<IntPtr, float> _stuckSince = new();
@@ -512,10 +506,8 @@ internal static class TexasSwap
     // ================================================================= host: the table cards
 
     /// <summary>
-    /// The host paints the real cards on the table cards in front of every seat when it deals
-    /// and when a seat swaps. Every other machine never learns those cards until the showdown,
-    /// when they are painted everywhere at once. So on the host, for seats it does not own, the
-    /// table cards are put back to what they were - which is what everybody else is looking at.
+    /// On the host, for seats it does not own, the table cards in front of each seat are kept as
+    /// every other machine shows them, through the deal and every swap, until the showdown.
     /// </summary>
     [HarmonyPrefix]
     [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.UserCode_SetCardsCmd))]
@@ -537,7 +529,7 @@ internal static class TexasSwap
     private static Material[] TableFacesToKeep(TexasGamePlay tg)
     {
         if (tg == null || !Mirror.NetworkServer.active || tg.isOwned) return null;
-        if (!Bigger(Manager.Instance)) return null;
+        if (!Bigger(Manager.Instance) && SeatCams.Added == 0) return null;
 
         var masa = tg.CardsMasa;
         if (masa == null || masa.Count == 0) return null;
@@ -643,9 +635,9 @@ internal static class TexasSwap
     /// found is searched again when a seat has gone, the seat count has changed, while it is
     /// still settling, or every ten seconds as a backstop.
     ///
-    /// Each seat's cards are read only where something uses them - above four seats, where they
-    /// are hidden, or in developer mode, where they are checked. Whose each seat is, which the
-    /// hiding needs every frame, is asked here rather than there.
+    /// Each seat's cards are read only where something uses them - above four seats or on a copy
+    /// with seat cameras, where they are hidden, or in developer mode, where they are checked.
+    /// Whose each seat is, which the hiding needs every frame, is asked here rather than there.
     /// </summary>
     private static void Refresh()
     {
@@ -657,8 +649,7 @@ internal static class TexasSwap
         float now = Time.time;
 
         // One Manager plays one mode for as long as it lives, and the mode is read off the
-        // seats. Asked of the server's roster, so on a joining machine it says nothing and the
-        // search below decides.
+        // seats. Before anybody is seated it says nothing, and the search below decides.
         var kind = TableHand.Playing();
         if (kind != TableHand.Kind.None && kind != TableHand.Kind.Texas)
         {
@@ -700,7 +691,7 @@ internal static class TexasSwap
         // The seats in the scene are a seated count of their own, needing no SyncVar.
         _bigger = Math.Max(count, _seats.Count) > Limits.VanillaPlayers || TestAtAnySize;
 
-        bool cards = _bigger || Dev.Enabled;
+        bool cards = Hiding || Fair.TestsAllowed;
         for (int i = 0; i < _seats.Count; i++)
         {
             var s = _seats[i];
@@ -878,7 +869,7 @@ internal static class TexasSwap
     /// </summary>
     internal static void Enforce()
     {
-        if (!_bigger) return;
+        if (!Hiding) return;
         var blur = _blur;
         if (!Alive(blur)) return;
         IntPtr blurAt = blur.Pointer;
@@ -943,7 +934,7 @@ internal static class TexasSwap
     }
 
     /// <summary>
-    /// Developer mode only, on every machine: report any card of a seat this machine does not
+    /// Only inside the loopback test harness, on every copy there: report any card of a seat this machine does not
     /// own that has a card face on it while it is switched on, outside the showdown.
     ///
     /// Judged the way the verification of this bug said it has to be. Materials are compared by
@@ -958,7 +949,7 @@ internal static class TexasSwap
     /// </summary>
     internal static void Watchful()
     {
-        if (!Dev.Enabled || !Live) return;
+        if (!Fair.TestsAllowed || !Live) return;
 
         float now = Time.time;
         bool any = false;
@@ -997,7 +988,7 @@ internal static class TexasSwap
     /// <summary>Tagged on its own so one grep finds every line of the check.</summary>
     private static void Leak(string message, bool warn = false)
     {
-        if (!Dev.Enabled) return;
+        if (!Fair.TestsAllowed) return;
         if (warn) Plugin.Log.LogWarning("[texasleak] " + message);
         else Plugin.Log.LogInfo("[texasleak] " + message);
     }
@@ -1186,7 +1177,7 @@ internal sealed class TexasCardGuard : MonoBehaviour
         try { TexasSwap.Enforce(); }
         catch (Exception e) { TexasSwap.Failed("hiding other seats' cards", e); }
 
-        if (!Dev.Enabled) return;
+        if (!Fair.TestsAllowed) return;
         try { TexasSwap.Watchful(); }
         catch (Exception e) { TexasSwap.Failed("the developer card check", e); }
     }

@@ -31,8 +31,8 @@ namespace LiarsBar8P;
 /// looking at where the aim landed before pressing again, until the aim is on the person
 /// chosen. Then nothing: the countdown fires the shot, as it does for a player.
 ///
-/// Each machine presses the keys of the seats it would press them for in a real game - its own
-/// player, and on the host the bots, which have no other machine. A loopback client therefore
+/// Each machine presses the keys of the seat it would press them for in a real game - its own
+/// player. Bots' seats are left to <see cref="BotBrain"/>. A loopback client therefore
 /// walks its own aim and sends it to the host the way a player's game does, and the host sees
 /// only the result. When the shot is resolved the server writes down what it is about to fire
 /// at, next to what the keys chose wherever it knows, and whether the chamber was live - an
@@ -169,7 +169,11 @@ internal static class AimDrive
         if (m.Players == null) return found;
         foreach (var p in m.Players)
         {
-            if (p == null || p.Dead) continue;
+            // A bot's seat aims by its own brain, never from here.
+            if (p == null || p.Dead || BotManager.IsBot(p)) continue;
+            // Outside the loopback test harness the automatic test aims for the host's own seat
+            // and nobody else's: anyone else at the table aims for themselves.
+            if (!Fair.TestsAllowed && !p.isLocalPlayer) continue;
             var cc = Play(p);
             if (cc != null) found.Add((p, cc));
         }
@@ -238,20 +242,16 @@ internal static class AimDrive
         // would be made on the first frame of the seat's next choice.
         if (!deck.TakingAim) { _walks.Remove(me); AimKeys.Cancel(deck); return; }
 
-        // Only the seats this machine would press keys for in a real game.
+        // Only the seat this machine would press keys for in a real game: its own.
         if (!deck.isOwned)
         {
-            bool bot = host && deck.connectionToClient == null;
-            if (!bot)
+            if (!_clientSeatsReported)
             {
-                if (!_clientSeatsReported)
-                {
-                    _clientSeatsReported = true;
-                    Plugin.Log.LogWarning("[aim] seats played by a loopback client are aimed by that client's " +
-                                          "own copy of the game, through its own keys - not from here");
-                }
-                return;
+                _clientSeatsReported = true;
+                Plugin.Log.LogWarning("[aim] seats played by a loopback client are aimed by that client's " +
+                                      "own copy of the game, through its own keys - not from here");
             }
+            return;
         }
 
         if (!_walks.TryGetValue(me, out var w) || w.Phase != _phase)
@@ -539,16 +539,16 @@ internal static class AimDrive
             foreach (int s in live)
                 if (s != p.Slot && !seen.Contains(s)) missed.Add(s);
 
-            string who = string.IsNullOrEmpty(p.PlayerName) ? $"seat {p.Slot + 1}" : p.PlayerName;
+            string who = Name(p, p.Slot);
 
             bool seatBad = missed.Count != 0;
             if (!seatBad)
                 Plugin.Log.LogWarning(
-                    $"[aimring] on {where}, {who} (seat {p.Slot}) can aim at all {live.Count - 1} of the " +
+                    $"[aimring] on {where}, {who} can aim at all {live.Count - 1} of the " +
                     $"others - seats {string.Join(", ", reached)}");
             else
                 Plugin.Log.LogError(
-                    $"[aimring] on {where}, {who} (seat {p.Slot}) can aim at only {reached.Count} of " +
+                    $"[aimring] on {where}, {who} can aim at only {reached.Count} of " +
                     $"{live.Count - 1} - never {string.Join(", ", missed)} - reaches {string.Join(", ", reached)}");
 
             // A seat fails if either question fails for it. Counted once per seat, because the
@@ -614,12 +614,12 @@ internal static class AimDrive
         if (missed.Count == 0)
         {
             Plugin.Log.LogWarning(
-                $"[aimring] on {where}, {who} (seat {me}) can reach all {live.Count - 1} with the keys{shipped}");
+                $"[aimring] on {where}, {who} can reach all {live.Count - 1} with the keys{shipped}");
             return true;
         }
 
         Plugin.Log.LogError(
-            $"[aimring] on {where}, {who} (seat {me}) can reach only {seen.Count} of {live.Count - 1} with the " +
+            $"[aimring] on {where}, {who} can reach only {seen.Count} of {live.Count - 1} with the " +
             $"keys - never {string.Join(", ", missed)}{shipped}");
         return false;
     }
@@ -716,7 +716,7 @@ internal static class AimDrive
         _acted[p.Slot] = _phase;
 
         try { Choose(m, p, cc, n); }
-        catch (Exception e) { Dev.Warn("aim", $"{p.PlayerName} could not take the shot: {e.Message}"); }
+        catch (Exception e) { Dev.Warn("aim", $"{Name(p, p.Slot)} could not take the shot: {e.Message}"); }
     }
 
     /// <summary>
@@ -752,6 +752,14 @@ internal static class AimDrive
             Plugin.Log.LogWarning(
                 $"[aim] {Name(p, me)} was aiming at {meant}, who went out before the shot - " +
                 $"not fired (aim {landed}, {n} seats)");
+        else if (n <= Limits.VanillaPlayers && cc.TryCast<PokerGamePlay>() != null)
+            // Two-Card Poker at a size the mod leaves alone: its aim keys, pressed from the host
+            // for a seat played on another machine, do not always move that seat's aim, and the
+            // shot goes where the game's own first aim put it. Not the ring, which is the game's
+            // own here, so not an error.
+            Plugin.Log.LogWarning(
+                $"[aim] {Name(p, me)} could not be steered onto {meant}; the game's own aim stayed on {got} " +
+                $"(aim {landed}, {n} seats)");
         else
             Plugin.Log.LogError(
                 $"[aim] {Name(p, me)} meant to shoot {meant} but the aim resolved to {got} " +
@@ -770,6 +778,7 @@ internal static class AimDrive
     private static int WalkByMethod(CharController cc, int me, int want, int n)
     {
         int last = AimRing.CurrentAim(cc);
+        bool turned = false;
 
         for (int i = 0; i < n * 2 + 2; i++)
         {
@@ -781,11 +790,19 @@ internal static class AimDrive
             int here = AimRing.CurrentAim(cc);
             int atOffset = at != null ? (at.Slot - me + n) % n : n / 2;
             int wantOffset = (want - me + n) % n;
+            bool left = wantOffset > atOffset;
 
-            Press(cc, wantOffset > atOffset ? "LeftAim" : "RightAim");
+            Press(cc, left != turned ? "LeftAim" : "RightAim");
 
             int now = AimRing.CurrentAim(cc);
-            if (now == here) break;                 // the range ran out; nothing more to try
+            if (now == here)
+            {
+                // The range ran out that way. Not every table numbers its aim the same way round
+                // the ring, so the other way once, before giving up.
+                if (turned) break;
+                turned = true;
+                continue;
+            }
             last = now;
         }
 
@@ -807,23 +824,19 @@ internal static class AimDrive
     }
 
     /// <summary>
-    /// Name and seat, counted the way every other diagnostic in the mod counts them.
+    /// A player as the log names them: by seat, counted the way every other diagnostic in the mod
+    /// counts them.
     ///
     /// This printed seats from one while the ring probe and the seat check printed them from
     /// zero, so a single chaos card produced three lines about one player calling them seat 3,
     /// seat 4 and seat 4 again. Nothing was wrong with the game and the log said otherwise -
     /// which is worse than saying nothing. Player-facing text still counts from one, because
     /// people do; logs count from zero, because the code does.
+    ///
+    /// It once printed the player's name in front of the seat. Not any more: a log is what people
+    /// paste into a public issue, and a name is whatever its owner typed.
     /// </summary>
-    private static string Name(PlayerStats p, int slot)
-    {
-        try
-        {
-            string n = p != null ? p.PlayerName : null;
-            return string.IsNullOrEmpty(n) ? $"seat {slot}" : $"{n} (seat {slot})";
-        }
-        catch { return $"seat {slot}"; }
-    }
+    private static string Name(PlayerStats p, int slot) => $"seat {slot}";
 
     private static readonly Dictionary<string, MethodInfo> _keys = new();
 
@@ -864,18 +877,15 @@ internal static class AimDrive
     }
 
     /// <summary>
-    /// Pull the trigger, for the two modes that have a way to. Liar's Poker's <c>TryFire</c> is
-    /// a message the server sends to a client, so the command body is called instead.
+    /// Pull the trigger, for the Chaos mode, which has a way to. Two-Card Poker has no key that
+    /// fires: its shot is left to the game's own countdown.
     /// </summary>
     private static void Fire(CharController cc)
     {
         try
         {
             var chaos = cc.TryCast<ChaosGamePlay>();
-            if (chaos != null) { chaos.TryFire(); return; }
-
-            var poker = cc.TryCast<PokerGamePlay>();
-            if (poker != null) poker.UserCode_HitTargetCmd();
+            if (chaos != null) chaos.TryFire();
         }
         catch (Exception e) { Dev.Warn("aim", $"could not fire: {e.Message}"); }
     }

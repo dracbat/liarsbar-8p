@@ -182,7 +182,7 @@ internal static class DeckSizePatch
                     $"[decksize] {t.Method}: deck {(t.Current == 0 ? t.VanillaDeck : t.Current)} -> {wanted} " +
                     $"({perPlayer} cards each for {players} players)");
                 t.Current = wanted;
-                if (t.Method == "DealBasicOrDevil") CardTypeFix.SetDeckSize(wanted);
+                CardTypeFix.SetDeckSize(t.Method, wanted);
                 ScaleTheMix(t, wanted, players);
             }
             else

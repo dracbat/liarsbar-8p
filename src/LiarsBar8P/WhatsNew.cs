@@ -38,6 +38,11 @@ internal static class WhatsNew
 {
     private const string Resource = "CHANGELOG.md";
 
+    // Every word a player sees from this class. The changelog itself stays in English.
+    private const string UpdateWords = "{0} UPDATE";
+    private const string NewWords = "WHAT'S NEW";
+    private const string ContinueWords = "CONTINUE";
+
     /// <summary>A player many versions behind wants the newest of it, not a book.</summary>
     private const int MostVersions = 5;
 
@@ -67,6 +72,11 @@ internal static class WhatsNew
     private static ScrollRect _scroll;
     private static RectTransform _viewport, _content, _thumb;
 
+    // The window's own words, written again if the language is changed while it is up, and the
+    // language they were last written in.
+    private static TextMeshProUGUI _title, _continue;
+    private static int _wordsIn;
+
     internal static bool Showing => _open;
 
     /// <summary>
@@ -91,7 +101,7 @@ internal static class WhatsNew
     {
         try
         {
-            if (Loopback.Active || Plugin.ChangelogShownFor == null) return;
+            if (Loopback.Requested || Plugin.ChangelogShownFor == null) return;
 
             // A test run must not use up the player's one look at it.
             bool restarted = !string.IsNullOrEmpty(restartedFrom);
@@ -176,6 +186,15 @@ internal static class WhatsNew
             string words = line.TrimStart();
             if (words.Length == 0) { End(); depth = 0; continue; }
 
+            // A part of the version's notes, under a heading of its own.
+            if (words.StartsWith("### ", StringComparison.Ordinal))
+            {
+                End();
+                depth = 0;
+                text.Append($"\n<color={Gold}>{Inline(words.Substring(4))}</color>\n");
+                continue;
+            }
+
             if (words.StartsWith("- ", StringComparison.Ordinal))
             {
                 End();
@@ -203,7 +222,8 @@ internal static class WhatsNew
     /// <summary>From <see cref="ModTicker"/>. Nothing to do once it has been seen, which is nearly always.</summary>
     internal static void Tick()
     {
-        if (_notes == null || _open) return;
+        if (_open) { Rewrite(); return; }
+        if (_notes == null) return;
 
         if (!AtMenu())
         {
@@ -260,7 +280,7 @@ internal static class WhatsNew
         top.sizeDelta = new Vector2(0f, 110f);
         top.anchoredPosition = new Vector2(0f, -14f);
         title.alignment = TextAlignmentOptions.Center;
-        title.text = $"<size=50%><color={Gold}>LIAR'S BAR 8 PLAYER MOD UPDATE</color></size>\nWHAT'S NEW";
+        _title = title;
 
         var area = Box("scroll", panel);
         Stretch(area, PanelSide, TopBand, PanelSide, BottomBand);
@@ -306,7 +326,9 @@ internal static class WhatsNew
         label.alignment = TextAlignmentOptions.Center;
         label.color = Color.white;
         label.raycastTarget = true;
-        label.text = "CONTINUE";
+        _continue = label;
+        _wordsIn = LiarsBar8P.Words.Generation;
+        Say();
 
         var button = label.gameObject.AddComponent<Button>();
         button.targetGraphic = label;
@@ -330,7 +352,28 @@ internal static class WhatsNew
             events.SetSelectedGameObject(label.gameObject);
         }
 
-        Plugin.Log.LogInfo("[update] changelog up");
+        Plugin.Log.LogInfo($"[update] changelog up: {_notes.Length} characters given, {body.textInfo.characterCount} laid out");
+    }
+
+    private static void Say()
+    {
+        _title.text = $"<size=50%><color={Gold}>{LiarsBar8P.Words.F(UpdateWords, Plugin.TitleName)}</color></size>\n" +
+                      LiarsBar8P.Words.T(NewWords);
+        _continue.text = LiarsBar8P.Words.T(ContinueWords);
+    }
+
+    /// <summary>
+    /// The title and CONTINUE again, in the game's face for the language, when the language is
+    /// changed in the settings while the window is up. The changelog under them is English anyway.
+    /// </summary>
+    private static void Rewrite()
+    {
+        if (_wordsIn == LiarsBar8P.Words.Generation || _title == null || _continue == null) return;
+        _wordsIn = LiarsBar8P.Words.Generation;
+
+        var face = ModCanvas.FaceFor(LiarsBar8P.Words.Now);
+        if (face != null) { _title.font = face; _continue.font = face; }
+        Say();
     }
 
     private static RectTransform Box(string name, Transform parent)

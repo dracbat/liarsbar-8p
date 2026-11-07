@@ -76,7 +76,7 @@ internal static class RoundCensus
 
                 if (hand == null)
                 {
-                    lines.Add($"  seat {p.Slot} {state} '{p.PlayerName}'");
+                    lines.Add($"  seat {p.Slot} {state}");
                     continue;
                 }
 
@@ -88,18 +88,10 @@ internal static class RoundCensus
                     if (hand.Dealt > 0 && hand.Showing == 0) empty++;
                 }
 
-                // The card values, but only for a developer.
-                //
-                // They are the thing most likely to come out wrong at eight, because a bigger
-                // table is dealt from a rewritten deck with rescaled face thresholds - a count
-                // of five says nothing about whether those five are five jokers. They are also
-                // every player's hand, written in plain text to a file on the host's machine,
-                // in a game whose entire subject is not knowing what anybody else is holding.
-                // A host who alt-tabbed to their own log would be able to read the table. The
-                // counts are what makes a bad round diagnosable and they give nothing away, so
-                // those stay on for everybody and the values go behind developer mode.
-                string cards = Dev.Enabled ? $" [{hand.Values}]" : "";
-                lines.Add($"  seat {p.Slot} {state} '{p.PlayerName}': {hand.Dealt} dealt{cards}, " +
+                // Counts for everybody, which is what makes a bad round diagnosable. The card
+                // values only inside the loopback test harness, where every seat is a test copy.
+                string cards = Fair.TestsAllowed ? $" [{hand.Values}]" : "";
+                lines.Add($"  seat {p.Slot} {state}: {hand.Dealt} dealt{cards}, " +
                           $"{hand.Showing} of {hand.Objects} card objects out, holding={hand.Holding}");
             }
 
@@ -109,7 +101,11 @@ internal static class RoundCensus
             // Warning on the first sample that looks wrong produced an alarming line in every
             // healthy round, immediately contradicted by the next one - so a complaint has to
             // survive a few seconds of the same picture before it is worth making.
-            bool unhappy = empty > 0 || (anyCards && dealt > 0 && holding < dealt);
+            // Not at Two-Card Poker, whose flag means something else: it deals a seat at a time,
+            // slowly enough that a seat can hold its two cards for five seconds before the flag
+            // goes up, and every hand goes down again at the showdown. A deal that missed a seat
+            // still shows, as cards against a seat with nothing out.
+            bool unhappy = empty > 0 || (anyCards && dealt > 0 && holding < dealt && !TwoCardPoker.Playing);
             if (!unhappy) { _unhappySince = 0f; _complained = false; }
             else if (_unhappySince == 0f) _unhappySince = Time.time;
 

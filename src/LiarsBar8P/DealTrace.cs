@@ -72,6 +72,27 @@ internal static class DealTrace
         Plugin.Log.LogInfo("[dealtrace] GiveCardsVisualRoutine was created");
     }
 
+    /// <summary>
+    /// A Liar's Deck 2 round that keeps everybody's hand deals nothing, so none of the three
+    /// above runs. The game still holds the first turn back while it shows the new round card,
+    /// six seconds, fifteen on a first round, with every hand full and nobody on the turn: what
+    /// the watchdog takes for a stall, four seconds in. It handed out a turn a second or two before
+    /// the game did, and after a death on the revolver it moved the seat the round starts from.
+    /// The wait ends where a deal does, at the first turn. Patched on the round reset itself: the
+    /// game builds the waiting routine inside it, so there is no separate call to see.
+    /// </summary>
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.ResetRoundDeck2))]
+    private static void KeptHandsRound(bool first)
+    {
+        if (IgnoreKeptHands && Dev.Enabled) return;
+        _dealStartedAt = UnityEngine.Time.time;
+        Plugin.Log.LogInfo($"[dealtrace] round keeps the hands (first={first}) - showing the round card, turn watchdog stands aside");
+    }
+
+    /// <summary>Developer test switch: leave a round that keeps the hands unwatched, as before.</summary>
+    internal static bool IgnoreKeptHands { get; set; }
+
     [HarmonyPostfix]
     [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.GiveTurnAfterAllCardsDealt))]
     private static void FirstTurnReached()
@@ -87,9 +108,9 @@ internal static class DealTrace
         try
         {
             var stats = __instance.GetComponent<PlayerStats>();
-            string who = stats != null ? stats.PlayerName : "?";
+            string who = stats != null ? $"seat {stats.Slot}" : "an unseated hand";
             int objects = __instance.Cards != null ? __instance.Cards.Count : -1;
-            Plugin.Log.LogInfo($"[dealtrace] '{who}' hand shown={value} ({objects} card objects)");
+            Plugin.Log.LogInfo($"[dealtrace] {who} hand shown={value} ({objects} card objects)");
         }
         catch { }
     }

@@ -231,8 +231,10 @@ New-Item -ItemType Directory -Path $tmp | Out-Null
 try {
     $zf = [IO.Compression.ZipFile]::OpenRead($Zip)
     try {
-        $entry = $zf.Entries | Where-Object { $_.FullName -like '*BepInEx/plugins/LiarsBar8P.dll' -or $_.FullName -like '*BepInEx\plugins\LiarsBar8P.dll' } | Select-Object -First 1
-        if (-not $entry) { Bad "the zip contains no BepInEx/plugins/LiarsBar8P.dll"; exit 1 }
+        # Exactly the entry the updaters in 1.1.3 and later look for: forward slashes, no top
+        # folder. A zip that only looks right installs nothing for everyone updating in game.
+        $entry = $zf.Entries | Where-Object { $_.FullName -ceq 'BepInEx/plugins/LiarsBar8P.dll' } | Select-Object -First 1
+        if (-not $entry) { Bad "the zip has no entry named exactly BepInEx/plugins/LiarsBar8P.dll, which the in-game updater needs"; exit 1 }
         $out = Join-Path $tmp 'LiarsBar8P.dll'
         [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $out, $true)
     } finally { $zf.Dispose() }
@@ -243,7 +245,17 @@ try {
         Info "Run without -SkipBuild, or rebuild and re-run package.ps1."
         exit 1
     }
-    Good "zip ships plugin $fv, matching $Tag"
+    # The in-game updater checks the assembly's own name and version, not the file version,
+    # and only takes a plugin and a zip of a sensible size.
+    $an = [Reflection.AssemblyName]::GetAssemblyName($out)
+    $av = "$($an.Version.Major).$($an.Version.Minor).$($an.Version.Build)"
+    if ($an.Name -cne 'LiarsBar8P' -or $av -ne $want) {
+        Bad "the zip's plugin is assembly $($an.Name) $av, but the in-game updater needs LiarsBar8P $want"; exit 1
+    }
+    $dllLen = (Get-Item $out).Length
+    if ($dllLen -lt 20000 -or $dllLen -gt 50000000) { Bad "the plugin is $dllLen bytes; the in-game updater only takes 20,000 to 50,000,000"; exit 1 }
+    if ((Get-Item $Zip).Length -gt 200MB) { Bad "the zip is over 200 MB; the in-game updater refuses that"; exit 1 }
+    Good "zip ships plugin $fv (assembly $av), matching $Tag and the in-game updater's checks"
 } finally {
     Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }
@@ -318,7 +330,7 @@ if (-not $Notes) {
 }
 
 if (-not $Notes) {
-    $Notes = "Raises Liar's Bar from 4 players to 8.`n`n" + $InstallFooter
+    $Notes = "Liar's Bar: Fully Loaded, the overhaul that began as the 8 Player Mod.`n`n" + $InstallFooter
 }
 
 $exists = (Invoke-Gh release view $Tag --repo $Repo).Code -eq 0
@@ -331,7 +343,7 @@ if ($exists) {
     $notesFile = Join-Path $env:TEMP "lb8p-notes-$([guid]::NewGuid().ToString('N').Substring(0,6)).md"
     # ...and write it back without a BOM, which would otherwise open the release body.
     [IO.File]::WriteAllText($notesFile, $Notes, (New-Object Text.UTF8Encoding $false))
-    $r = Invoke-Gh release create $Tag $Zip $Bat $Sh --repo $Repo --title "Liar's Bar 8 Player Mod $Tag" --notes-file $notesFile
+    $r = Invoke-Gh release create $Tag $Zip $Bat $Sh --repo $Repo --title "Liar's Bar: Fully Loaded $Tag" --notes-file $notesFile
     if ($r.Code -ne 0) { Bad "release creation failed"; Info $r.Out; exit 1 }
     Good "release created"
 }

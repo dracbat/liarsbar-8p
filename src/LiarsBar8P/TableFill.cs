@@ -248,7 +248,7 @@ internal static class TableFill
             if (m.Slots != null && seat >= m.Slots.Count)
             {
                 Plugin.Log.LogWarning(
-                    $"[tablefill] '{p.PlayerName}' has nowhere to sit - {m.Slots.Count} seats for " +
+                    $"[tablefill] connection {p.ConnectionID} has nowhere to sit - {m.Slots.Count} seats for " +
                     $"{nm.GamePlayers.Count} players");
                 break;
             }
@@ -261,11 +261,11 @@ internal static class TableFill
                 if (p.PlayerSteamID != 0) seatedIds.Add(p.PlayerSteamID);
                 missing++;
                 Plugin.Log.LogWarning(
-                    $"[tablefill] StartGame missed '{p.PlayerName}' - seated them on seat {seat}");
+                    $"[tablefill] StartGame missed connection {p.ConnectionID} - seated them on seat {seat}");
             }
             catch (Exception e)
             {
-                Plugin.Log.LogError($"[tablefill] could not seat '{p.PlayerName}': {e.Message}");
+                Plugin.Log.LogError($"[tablefill] could not seat connection {p.ConnectionID}: {e.Message}");
             }
         }
 
@@ -322,7 +322,7 @@ internal static class TableFill
             if (sameFace)
             {
                 Plugin.Log.LogWarning(
-                    $"[tablefill] a second character for '{ps.PlayerName}' is at the table - " +
+                    $"[tablefill] a second character for the player on seat {ps.Slot} is at the table - " +
                     "left out of the roster so they are only counted once");
                 continue;
             }
@@ -332,7 +332,7 @@ internal static class TableFill
 
             m.Players.Add(ps);
             Plugin.Log.LogWarning(
-                $"[tablefill] '{ps.PlayerName}' was at the table but not in the roster - added " +
+                $"[tablefill] seat {ps.Slot} was at the table but not in the roster - added " +
                 $"({m.Players.Count} seated)");
         }
     }
@@ -374,7 +374,7 @@ internal static class TableFill
             if (sameFace)
             {
                 Plugin.Log.LogWarning(
-                    $"[tablefill] '{ps.PlayerName}' is in the roster twice on seat {ps.Slot} - " +
+                    $"[tablefill] the player on seat {ps.Slot} is in the roster twice - " +
                     "the second entry is dropped rather than given a seat of its own");
                 twins.Add(ps);
                 continue;
@@ -385,8 +385,7 @@ internal static class TableFill
             if (m.Slots != null && seat >= m.Slots.Count) continue;
 
             Plugin.Log.LogWarning(
-                $"[tablefill] '{ps.PlayerName}' shared seat {ps.Slot} with " +
-                $"'{taken[ps.Slot].PlayerName}' - moved to seat {seat}");
+                $"[tablefill] two players shared seat {ps.Slot} - the second moved to seat {seat}");
             ps.NetworkSlot = seat;
             taken[seat] = ps;
         }

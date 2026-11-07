@@ -14,7 +14,8 @@ internal static class DiagAutoHost
     private static int _frames;
     private static bool _fired;
 
-    internal static bool Active => Plugin.DiagAutoHost != null && Plugin.DiagAutoHost.Value;
+    // A private lobby and nothing more, so developer mode is enough.
+    internal static bool Active => Dev.Enabled && Plugin.DiagAutoHost != null && Plugin.DiagAutoHost.Value;
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(SteamLobby), nameof(SteamLobby.Update))]
@@ -45,13 +46,15 @@ internal static class DiagAutoHost
 
     /// <summary>
     /// While the self test is running, force the lobby private so an automated
-    /// diagnostic run cannot put a joinable lobby in front of other players.
+    /// diagnostic run cannot put a joinable lobby in front of other players. A bare test
+    /// copy's lobby is always private, however it was asked for: it carries none of the
+    /// mod's lobby parts, so a public one would sit in the game's own list without a tag.
     /// </summary>
     [HarmonyPrefix]
     [HarmonyPatch(typeof(SteamMatchmaking), nameof(SteamMatchmaking.CreateLobby))]
     private static void ForcePrivateDuringSelfTest(ref ELobbyType eLobbyType)
     {
-        if (!Active) return;
+        if (!Active && !MatchmakingSelfTest.HostingPrivate && !Plugin.Bare) return;
         if (eLobbyType != ELobbyType.k_ELobbyTypePrivate)
         {
             Plugin.Log.LogInfo($"[selftest] forcing lobby type {eLobbyType} -> Private");

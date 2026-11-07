@@ -60,6 +60,17 @@ internal static class AutoUpdate
     private const string ZipName = "LiarsBar-8P.zip";
     private const string PluginEntry = "BepInEx/plugins/LiarsBar8P.dll";
 
+    // The line under the tag, in one place for the word table: {0} the mod's name, {1} the version.
+    private const string DownloadingWords = "Downloading {0} v{1}...";
+    private const string DownloadingPercent = "Downloading {0} v{1}... {2}%";
+    private const string DownloadingMegabytes = "Downloading {0} v{1}... {2} MB";
+    private const string InstalledWords = "{0} v{1} is installed - restart the game to use it";
+    private const string ReadyWords = "{0} v{1} is ready - it installs when you close the game";
+    private const string NoRestartWords = "{0} v{1} is installed, but the game could not restart by itself - restart it to use the new version";
+    private const string FailedWords = "{0} v{1} could not be installed ({2})";
+    private const string FailedTryAgain = "{0} v{1} could not be installed ({2}) - it is tried again the next time the game starts";
+    private const string FailedAskAgain = "{0} v{1} could not be installed ({2}) - you will be asked again the next time the game starts";
+
     /// <summary>The release zip carries the whole loader as well; anything far past that is not it.</summary>
     private const long MostZipBytes = 200L * 1024 * 1024;
 
@@ -211,7 +222,7 @@ internal static class AutoUpdate
     internal static void RestartFailed()
     {
         _stage = Stage.None;
-        Note = $"Liar's Bar 8P v{Offered} is installed, but the game could not restart by itself - restart it to use the new version";
+        Note = Words.F(NoRestartWords, Plugin.DisplayName, Offered);
     }
 
     /// <summary>"Not now": put the window away. Nothing is remembered, so it asks again next time.</summary>
@@ -265,7 +276,7 @@ internal static class AutoUpdate
                 using var ms = new MemoryStream();
                 var buffer = new byte[81920];
                 int read, shown = -1;
-                Note = $"Downloading Liar's Bar 8P v{newest}...";
+                Note = Words.F(DownloadingWords, Plugin.DisplayName, newest);
                 while ((read = await body.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false)) > 0)
                 {
                     ms.Write(buffer, 0, read);
@@ -277,8 +288,7 @@ internal static class AutoUpdate
                     {
                         shown = now;
                         if (total > 0) Progress = (float)ms.Length / total;
-                        Note = total > 0 ? $"Downloading Liar's Bar 8P v{newest}... {now}%"
-                                         : $"Downloading Liar's Bar 8P v{newest}... {now} MB";
+                        Note = Words.F(total > 0 ? DownloadingPercent : DownloadingMegabytes, Plugin.DisplayName, newest, now);
                     }
                 }
                 zip = ms.ToArray();
@@ -316,7 +326,7 @@ internal static class AutoUpdate
                 File.Move(here, here + ".old");   // allowed while loaded; overwriting is not
                 File.Move(fresh, here);
                 InPlace = true;
-                Note = $"Liar's Bar 8P v{newest} is installed - restart the game to use it";
+                Note = Words.F(InstalledWords, Plugin.DisplayName, newest);
                 Plugin.Log.LogInfo($"[update] v{newest} installed - it loads the next time the game starts");
             }
             catch (Exception e)
@@ -324,7 +334,7 @@ internal static class AutoUpdate
                 if (!File.Exists(here) && File.Exists(here + ".old")) File.Move(here + ".old", here);
                 InPlace = false;
                 _pending = fresh;
-                Note = $"Liar's Bar 8P v{newest} is ready - it installs when you close the game";
+                Note = Words.F(ReadyWords, Plugin.DisplayName, newest);
                 Plugin.Log.LogInfo($"[update] v{newest} downloaded; the running copy could not be moved aside ({e.Message}) - it goes in when the game closes");
             }
             return true;
@@ -342,9 +352,9 @@ internal static class AutoUpdate
 
             string shortWhy = why.Length > 90 ? why.Substring(0, 90) + "..." : why;
             var mode = Plugin.Updates != null ? Plugin.Updates.Value : UpdateMode.Ask;
-            Note = $"Liar's Bar 8P v{newest} could not be installed ({shortWhy})" +
-                   (mode == UpdateMode.Automatic ? " - it is tried again the next time the game starts"
-                    : mode == UpdateMode.Ask ? " - you will be asked again the next time the game starts" : "");
+            // Whole sentences, so each language can order its own. The reason itself stays English.
+            Note = Words.F(mode == UpdateMode.Automatic ? FailedTryAgain : mode == UpdateMode.Ask ? FailedAskAgain : FailedWords,
+                           Plugin.DisplayName, newest, shortWhy);
             return false;
         }
     }
@@ -394,7 +404,11 @@ internal static class AutoUpdate
             start.Environment["LIARSBAR8P_RESTARTED"] = Plugin.Version;
 
             System.Diagnostics.Process.Start(start);
-            Plugin.Log.LogInfo($"[update] restarting the game to load the update (arguments: {args}; " +
+
+            // How many words were passed on, not what they were: launch options are whatever the
+            // player typed into Steam, and this log is what people paste into an issue.
+            int words = args.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Length;
+            Plugin.Log.LogInfo($"[update] restarting the game to load the update ({words} launch word(s) passed on; " +
                                $"left out of its environment: {(keys.Count > 0 ? string.Join(", ", keys) : "nothing")})");
             UnityEngine.Application.Quit();
             return true;

@@ -39,9 +39,22 @@ internal sealed class AimHud : MonoBehaviour
     /// <summary>How long the local player component is trusted before being looked up again.</summary>
     private const float LookupSeconds = 2f;
 
+    // Every word a player sees from this class. Whole lines rather than pieces, so that each
+    // language can put the name and the place where it wants them. [0] while choosing, [1] once
+    // the aim has locked. In the counted lines {0} is how many seats away and {1} the name; a
+    // count is never one, because one seat away is "next to you".
+
     /// <summary>The keys, by mode. The Chaos deck reads the pad as well; Liar's Poker only A and D.</summary>
     private const string DeckKeys = "A / D, LB / RB or the D-pad to change target";
     private const string PokerKeys = "A / D to change target";
+    private const string SeatName = "seat {0}";
+    private static readonly string[] Nobody = { "Aiming at nobody", "Aim locked on nobody" };
+    private static readonly string[] At = { "Aiming at {0}", "Locked on {0}" };
+    private static readonly string[] Across = { "Aiming at {0} - straight across", "Locked on {0} - straight across" };
+    private static readonly string[] NextRight = { "Aiming at {0} - next to you, on your right", "Locked on {0} - next to you, on your right" };
+    private static readonly string[] NextLeft = { "Aiming at {0} - next to you, on your left", "Locked on {0} - next to you, on your left" };
+    private static readonly string[] Right = { "Aiming at {1} - {0} seats to your right", "Locked on {1} - {0} seats to your right" };
+    private static readonly string[] Left = { "Aiming at {1} - {0} seats to your left", "Locked on {1} - {0} seats to your left" };
 
     private static string _line;
     private static string _hint;
@@ -103,6 +116,9 @@ internal sealed class AimHud : MonoBehaviour
     internal static void Pretend(string line) => _pretend = line;
     private static string _pretend;
 
+    /// <summary>For the self test: a real aim's line is up, not a pretended one.</summary>
+    internal static bool Showing => string.IsNullOrEmpty(_pretend) && !string.IsNullOrEmpty(_line);
+
     private static void Publish()
     {
         if (!ModCanvas.Ready) return;
@@ -112,7 +128,7 @@ internal sealed class AimHud : MonoBehaviour
             if (!string.IsNullOrEmpty(_pretend))
             {
                 _line = _pretend;
-                _hint = DeckKeys;
+                _hint = Words.T(DeckKeys);
             }
 
             if (_aimRow == null)
@@ -136,6 +152,7 @@ internal sealed class AimHud : MonoBehaviour
     // spend that twenty times a second for an answer that changes on a keypress.
     private static int _lastAim = int.MinValue;
     private static bool _lastLocked;
+    private static int _lastWords = -1;
     private static PlayerStats _target;
 
     private static void Forget()
@@ -165,42 +182,44 @@ internal sealed class AimHud : MonoBehaviour
             catch { gone = true; }
         }
 
-        if (aim == _lastAim && locked == _lastLocked && !gone && _line != null) return;
+        // A change of language in the settings while choosing says it again in the new one.
+        if (aim == _lastAim && locked == _lastLocked && !gone && _line != null && _lastWords == Words.Generation) return;
         _lastAim = aim;
         _lastLocked = locked;
+        _lastWords = Words.Generation;
 
         _target = AimRing.AimingAt(_me);
-        _hint = locked ? null : (_poker != null ? PokerKeys : DeckKeys);
+        _hint = locked ? null : Words.T(_poker != null ? PokerKeys : DeckKeys);
 
         if (_target == null)
         {
-            _line = locked ? "Aim locked on nobody" : "Aiming at nobody";
+            _line = Words.T(Nobody[locked ? 1 : 0]);
             return;
         }
 
         string name = _target.PlayerName;
-        if (string.IsNullOrEmpty(name)) name = $"seat {_target.Slot + 1}";
+        if (string.IsNullOrEmpty(name)) name = Words.F(SeatName, _target.Slot + 1);
 
-        string where = Where((_target.Slot - mySlot + n) % n, n);
-        string what = locked ? "Locked on" : "Aiming at";
-        _line = where != null ? $"{what} {name} - {where}" : $"{what} {name}";
+        _line = Sentence(name, (_target.Slot - mySlot + n) % n, n, locked);
     }
 
     /// <summary>
-    /// Where a seat sits, counted from yours: round to the right for the nearer half of the
-    /// table, round to the left for the other, straight across when there is a seat exactly
-    /// opposite.
+    /// The whole line for a target this many seats round from yours, in the game's language:
+    /// round to the right for the nearer half of the table, round to the left for the other,
+    /// straight across when there is a seat exactly opposite.
     /// </summary>
-    internal static string Where(int offset, int n)
+    internal static string Sentence(string name, int offset, int n, bool locked)
     {
-        if (n < 2 || offset <= 0 || offset >= n) return null;
-        if (offset * 2 == n) return "straight across";
+        int l = locked ? 1 : 0;
+        if (n < 2 || offset <= 0 || offset >= n) return Words.F(At[l], name);
+        if (offset * 2 == n) return Words.F(Across[l], name);
 
-        if (offset * 2 < n)
-            return offset == 1 ? "next to you, on your right" : $"{offset} seats to your right";
+        bool right = offset * 2 < n;
+        int seats = right ? offset : n - offset;
+        if (seats == 1) return Words.F(right ? NextRight[l] : NextLeft[l], name);
 
-        int left = n - offset;
-        return left == 1 ? "next to you, on your left" : $"{left} seats to your left";
+        string counted = right ? Right[l] : Left[l];
+        return Words.N(counted, counted, seats, name);
     }
 
     private static bool Choosing()

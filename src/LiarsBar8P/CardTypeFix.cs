@@ -22,41 +22,47 @@ namespace LiarsBar8P;
 /// </summary>
 internal static class CardTypeFix
 {
-    private static int _deckSize;          // 0 until a round sets it
-    private static bool _logged;
+    // One size per deal, each 0 until a round sets it. Liar's Deck 2 deals seven a head where
+    // Basic deals five, so the two decks are never the same size and must not share one figure:
+    // reading Basic's forty as Deck 2's size would give a fifty-six card deck twenty-two Jokers.
+    private static int _basicSize;
+    private static int _deck2Size;
+    private static bool _loggedBasic, _loggedDeck2;
 
-    /// <summary>Told by DeckSizePatch what the deal will actually produce.</summary>
-    internal static void SetDeckSize(int size)
+    /// <summary>Told by DeckSizePatch what each deal will actually produce.</summary>
+    internal static void SetDeckSize(string deal, int size)
     {
-        if (size > 0 && size != _deckSize)
+        if (size <= 0) return;
+
+        if (deal == "DealDeck2")
         {
-            _deckSize = size;
-            _logged = false;
+            if (size != _deck2Size) { _deck2Size = size; _loggedDeck2 = false; }
         }
+        else if (size != _basicSize) { _basicSize = size; _loggedBasic = false; }
     }
 
     /// <summary>
     /// Scale a vanilla threshold to the current deck. Returns the original when the deck
     /// is untouched, so an ordinary four player round behaves exactly as before.
     /// </summary>
-    private static int Scale(int threshold, int vanillaDeck)
+    private static int Scale(int threshold, int vanillaDeck, int deckSize)
     {
-        if (_deckSize <= 0 || _deckSize == vanillaDeck) return threshold;
-        return (int)Math.Round(threshold * (double)_deckSize / vanillaDeck, MidpointRounding.AwayFromZero);
+        if (deckSize <= 0 || deckSize == vanillaDeck) return threshold;
+        return (int)Math.Round(threshold * (double)deckSize / vanillaDeck, MidpointRounding.AwayFromZero);
     }
 
-    private static int TypeFor(int n, int vanillaDeck, int t1, int t2, int t3, string which)
+    private static int TypeFor(int n, int deckSize, int vanillaDeck, int t1, int t2, int t3, string which, ref bool logged)
     {
-        int a = Scale(t1, vanillaDeck);
-        int b = Scale(t2, vanillaDeck);
-        int c = Scale(t3, vanillaDeck);
+        int a = Scale(t1, vanillaDeck, deckSize);
+        int b = Scale(t2, vanillaDeck, deckSize);
+        int c = Scale(t3, vanillaDeck, deckSize);
 
-        if (!_logged)
+        if (!logged)
         {
-            _logged = true;
+            logged = true;
             Plugin.Log.LogInfo(
-                $"[cardtype] {which} scaled for a {_deckSize} card deck: " +
-                $"Ace 1-{a}, King {a + 1}-{b}, Queen {b + 1}-{c}, Joker {c + 1}-{_deckSize}");
+                $"[cardtype] {which} scaled for a {deckSize} card deck: " +
+                $"Ace 1-{a}, King {a + 1}-{b}, Queen {b + 1}-{c}, Joker {c + 1}-{deckSize}");
         }
 
         if (n <= a) return 1;
@@ -66,13 +72,15 @@ internal static class CardTypeFix
     }
 
     // Both originals are pure functions of n, so replacing them outright is safe and keeps
-    // the proportions right. Returning false skips the original.
+    // the proportions right. Returning false skips the original. Neither has a caller in the
+    // current build - the compiler copied both into the deals, which DeckSizePatch rewrites in
+    // place - so these only matter if an update calls them again.
     [HarmonyPrefix]
     [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.ToCardTypeBasic))]
     private static bool Basic(int n, ref int __result)
     {
-        if (_deckSize <= 0 || _deckSize == 20) return true;   // untouched deck: let the game do it
-        __result = TypeFor(n, 20, 6, 12, 18, "ToCardTypeBasic");
+        if (_basicSize <= 0 || _basicSize == 20) return true;   // untouched deck: let the game do it
+        __result = TypeFor(n, _basicSize, 20, 6, 12, 18, "ToCardTypeBasic", ref _loggedBasic);
         return false;
     }
 
@@ -80,8 +88,8 @@ internal static class CardTypeFix
     [HarmonyPatch(typeof(DeckGamePlayManager), nameof(DeckGamePlayManager.ToCardTypeDeck2))]
     private static bool Deck2(int n, ref int __result)
     {
-        if (_deckSize <= 0 || _deckSize == 28) return true;
-        __result = TypeFor(n, 28, 8, 16, 24, "ToCardTypeDeck2");
+        if (_deck2Size <= 0 || _deck2Size == 28) return true;
+        __result = TypeFor(n, _deck2Size, 28, 8, 16, 24, "ToCardTypeDeck2", ref _loggedDeck2);
         return false;
     }
 }

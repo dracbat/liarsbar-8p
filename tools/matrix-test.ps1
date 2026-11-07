@@ -21,7 +21,7 @@
     Close everything with:  taskkill /IM "Liar's Bar.exe" /F
 #>
 param(
-    [string[]] $Tables = @('deck0', 'deck1', 'deck2', 'dice0', 'dice1', 'texas', 'spin', 'poker', 'chaos'),
+    [string[]] $Tables = @('deck0', 'deck1', 'deck2', 'deck3', 'dice0', 'dice1', 'texas', 'spin', 'poker', 'chaos'),
     [int[]]    $Sizes = @(5, 6, 7, 8),
     [int]      $PlaySeconds = 120,
     [int]      $LaunchTimeout = 180,
@@ -39,15 +39,19 @@ $Catalogue = @{
     deck0 = @{ Mode = 'LiarsDeck';  Deck = '0'; Dice = '' }
     deck1 = @{ Mode = 'LiarsDeck';  Deck = '1'; Dice = '' }
     deck2 = @{ Mode = 'LiarsDeck';  Deck = '2'; Dice = '' }
-    # There is no deck3. The lobby reports four deck variants and the arrow cycles three of
-    # them: ChangeGameModeDeckRight increments, then resets to zero the moment the value
-    # reaches 3. A cell asking for it silently played Basic a second time and was filed as a
-    # fourth variant, which is a row of results about a table that does not exist.
+    # Liar's Deck 2. The game's own arrow wraps before it, so before the mod put it back on the
+    # arrows a cell asking for 3 silently played Basic a second time. Now the host's arrow steps
+    # onto it from Chaos, which only happens at a table where everybody runs the mod - and the
+    # harness always is one. The census settles which table actually played.
+    deck3 = @{ Mode = 'LiarsDeck';  Deck = '3'; Dice = '' }
     dice0 = @{ Mode = 'LiarsDice';  Deck = '';  Dice = '0' }
     dice1 = @{ Mode = 'LiarsDice';  Deck = '';  Dice = '1' }
     texas = @{ Mode = 'LiarsTexas'; Deck = '';  Dice = '' }
     spin  = @{ Mode = 'LiarsSpin';  Deck = '';  Dice = '' }
-    poker = @{ Mode = 'LiarsPoker'; Deck = '';  Dice = '' }
+    # Two-Card Poker, the game's mode 3. Never asked for as LiarsPoker: the lobby's mode button would
+    # save 3 as the game's last mode. The Poker tab's own arrow chooses it, and the host swaps 5
+    # for 3 as the match starts.
+    poker = @{ Mode = 'LiarsTexas'; Deck = '';  Dice = ''; TwoCard = '1' }
     chaos = @{ Mode = 'LiarsChaos'; Deck = '';  Dice = '' }
 }
 
@@ -58,7 +62,7 @@ $Catalogue = @{
 # the players what they are actually holding, and checking it against what was asked for, is
 # the only way to know a cell tested the mode it is filed under.
 $Expected = @{
-    deck0 = 'Basic variant'; deck1 = 'Devil variant'; deck2 = 'Chaos Deck'
+    deck0 = 'Basic variant'; deck1 = 'Devil variant'; deck2 = 'Chaos Deck'; deck3 = 'Deck2 variant'
     dice0 = 'Dice';  dice1 = 'Dice';  texas = 'Texas'
     spin  = 'Spin';  poker = 'Poker'; chaos = 'Chaos Deck'
 }
@@ -116,6 +120,7 @@ function Start-Copy {
     $env:LIARSBAR8P_MODE     = $Table.Mode
     $env:LIARSBAR8P_DECKMODE = $Table.Deck
     $env:LIARSBAR8P_DICEMODE = $Table.Dice
+    $env:LIARSBAR8P_TWOCARD  = $Table.TwoCard
     $env:LIARSBAR8P_MAP      = $Map
     $env:LIARSBAR8P_EXPECT   = if ($Expect -gt 0) { "$Expect" } else { '' }
 

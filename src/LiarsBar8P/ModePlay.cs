@@ -21,6 +21,7 @@ namespace LiarsBar8P;
 ///
 /// This is a test instrument. It only runs with developer mode on, only on the server, and
 /// only while the harness is driving every seat; in an ordinary game it does nothing at all.
+/// It never plays a bot's seat, which is <see cref="BotBrain"/>'s.
 /// </summary>
 internal static class ModePlay
 {
@@ -41,9 +42,15 @@ internal static class ModePlay
         _moves = 0;
     }
 
+    /// <summary>
+    /// The test driver's "seatplay off": the harness's seats are left to their clocks, as in a bare
+    /// copy, which has none of this, so the two hold the same table when their memory is compared.
+    /// </summary>
+    internal static bool OffForTest { get; set; }
+
     internal static void Tick()
     {
-        if (!Dev.Enabled || !Dev.IsServer) return;
+        if (!Dev.Enabled || !Dev.IsServer || OffForTest) return;
 
         // Only when the harness is standing in for everybody. A real player's turn is theirs.
         if (!(DevAutoTest.Driving || Loopback.Mine == Loopback.Role.Host)) return;
@@ -67,6 +74,10 @@ internal static class ModePlay
 
         foreach (var p in m.Players)
         {
+            // A bot's seat is BotBrain's: played from here as well, it would move twice.
+            if (p != null && BotManager.IsBot(p)) continue;
+            // Outside the loopback test harness, the host's own seat and nobody else's.
+            if (p != null && !Fair.TestsAllowed && !p.isLocalPlayer) continue;
             if (p == null || p.Dead || !p.HaveTurn) { if (p != null) _actAt.Remove(p.Slot); continue; }
             if (_actedOn.TryGetValue(p.Slot, out int on) && on == _turnNo) continue;
 
@@ -83,7 +94,7 @@ internal static class ModePlay
             _moves++;
 
             try { player.Act(p, _moves); }
-            catch (Exception e) { Dev.Warn("play", $"{p.PlayerName} could not act in {kind}: {e.Message}"); }
+            catch (Exception e) { Dev.Warn("play", $"seat {p.Slot} could not act in {kind}: {e.Message}"); }
         }
     }
 
@@ -94,6 +105,7 @@ internal static class ModePlay
             case TableHand.Kind.Dice:  return _dice;
             case TableHand.Kind.Texas: return _texas;
             case TableHand.Kind.Spin:  return _spin;
+            case TableHand.Kind.Poker: return _twoCard;
             default: return null;
         }
     }
@@ -101,6 +113,7 @@ internal static class ModePlay
     private static readonly DicePlayer _dice = new();
     private static readonly TexasPlayer _texas = new();
     private static readonly SpinPlayer _spin = new();
+    private static readonly TwoCardPlayer _twoCard = new();
 
     // --------------------------------------------------------------------------- the modes
 
@@ -136,6 +149,7 @@ internal static class ModePlay
         {
             try
             {
+                if (!Fair.TestsAllowed) return 1;
                 string raw = Environment.GetEnvironmentVariable("LIARSBAR8P_DICE_OPEN");
                 if (!string.IsNullOrEmpty(raw) && int.TryParse(raw, out int n) && n >= 1 && n <= 40)
                 {
@@ -183,7 +197,7 @@ internal static class ModePlay
             if (!anyBid || count <= 0)
             {
                 int openFace = 2 + (p.Slot % 4);
-                Dev.Log("play", $"{p.PlayerName} (seat {p.Slot}) opens the bidding: {OpenCount} x {openFace}");
+                Dev.Log("play", $"seat {p.Slot} opens the bidding: {OpenCount} x {openFace}");
                 Bid(p, gp, OpenCount, openFace);
                 return;
             }
@@ -199,13 +213,13 @@ internal static class ModePlay
 
                 if (spotOn)
                 {
-                    Dev.Log("play", $"{p.PlayerName} (seat {p.Slot}) calls SPOT ON on {count} x {face}");
+                    Dev.Log("play", $"seat {p.Slot} calls SPOT ON on {count} x {face}");
                     gp.UserCode_PlaySpotOnCMD();
                     gp.UserCode_CallSpotOn();
                 }
                 else
                 {
-                    Dev.Log("play", $"{p.PlayerName} (seat {p.Slot}) calls LIAR on {count} x {face}" +
+                    Dev.Log("play", $"seat {p.Slot} calls LIAR on {count} x {face}" +
                                     (absurd ? " - the bid is past the dice on the table" : ""));
                     gp.UserCode_PlayLiarCMD();
                     gp.UserCode_CallLier();
@@ -220,7 +234,7 @@ internal static class ModePlay
             int nextCount = count, nextFace = face + 1;
             if (nextFace > 6) { nextFace = 2; nextCount = count + 1; }
 
-            Dev.Log("play", $"{p.PlayerName} (seat {p.Slot}) raises to {nextCount} x {nextFace}");
+            Dev.Log("play", $"seat {p.Slot} raises to {nextCount} x {nextFace}");
             Bid(p, gp, nextCount, nextFace);
         }
 
@@ -326,39 +340,65 @@ internal static class ModePlay
             catch { return; }
 
             // Folding has to happen or the betting never ends, but a table that folds often
-            // never reaches the later rounds where the switch and the all-in live. One seat in
-            // five, and never the first two moves of a round.
-            bool fold = moveNo > 2 && (moveNo % 5) == 0;
+            // never reaches the later rounds where the switch and the all-in live. A fold fires
+            // the seat's own stake, and folds made on a grown stake killed every time, so a fold
+            // that is survived was never seen and the table thinned out before any showdown.
+            // So the third move of a hand folds on the one bullet every seat is dealt, which the
+            // revolver punishes one time in eight, and after that one seat in five folds, on a
+            // stake of one at most.
+            int stake = 0;
+            try { stake = gp.Bullets; } catch { }
+            bool fold = (moveNo == 3 || (moveNo > 2 && (moveNo % 5) == 0)) && stake <= 1;
 
             if (fold)
             {
-                Dev.Log("play", $"{p.PlayerName} (seat {p.Slot}) folds");
+                // Folding spins the revolver: one live chamber of eight for each bullet staked, the
+                // way the server works it out, and from seven up the all-in odds. The server's own
+                // method for it is still asked, and logged beside the roll, but no longer decides:
+                // read through the interop layer its answer came back fatal on every fold, seven
+                // of seven, three of them on a stake of one, which kills one time in eight.
+                bool dies = stake >= 7 || UnityEngine.Random.Range(1, 9) <= stake;
+                string asked = "?";
+                try { asked = gp.ComputeRevolverOutcomeServer().Item1 ? "dead" : "alive"; }
+                catch (Exception e) { Dev.Warn("play", $"could not ask the game's revolver: {e.Message}"); }
 
-                // Folding spins the revolver, and whether that kills is the server's decision
-                // to make and announce - not something to be worked out here and asserted.
-                bool dies = false;
-                // The server answers with two facts - whether the chamber was loaded and whether
-                // the game intervened to save them. Only the first decides what to send next.
-                try { dies = gp.ComputeRevolverOutcomeServer().Item1; }
-                catch (Exception e) { Dev.Warn("play", $"could not spin the revolver: {e.Message}"); }
+                Dev.Log("play", $"seat {p.Slot} folds on a stake of {stake} and {(dies ? "dies" : "lives")} (the game's method said {asked})");
 
+                // Then the death if the fold killed, and the fold either way, through the game's
+                // own commands. Leaving one of them out hid what the host makes of a fold from a
+                // seat that has just died.
                 try
                 {
                     if (dies) gp.UserCode_CommandBeDead();
-                    else gp.UserCode_CMDFolded();
+                    gp.UserCode_CMDFolded();
                 }
                 catch (Exception e) { Dev.Warn("play", $"the fold did not go through: {e.Message}"); }
                 return;
             }
 
-            // All in is refused in the first betting round, so it is only ever offered later.
+            // All in is refused in the first betting round, so it is only ever offered later, and
+            // not between the last two in a hand: it stakes all eight chambers, so it ended the
+            // match on the spot instead of letting the hand go to a showdown.
             bool allIn = false;
-            try { allIn = t.TexasRound > 0 && (moveNo % 11) == 0; } catch { }
+            try { allIn = t.TexasRound > 0 && (moveNo % 11) == 0 && InHand() > 2; } catch { }
 
-            Dev.Log("play", $"{p.PlayerName} (seat {p.Slot}) {(allIn ? "goes ALL IN" : "calls")}");
+            Dev.Log("play", $"seat {p.Slot} {(allIn ? "goes ALL IN" : "calls")}");
 
             gp.UserCode_AddBullet__Boolean(allIn);
             gp.UserCode_CMDRised__Boolean(allIn);
+        }
+
+        /// <summary>Seats still in this hand: alive and not folded.</summary>
+        private static int InHand()
+        {
+            int n = 0;
+            foreach (var p in Manager.Instance.Players)
+            {
+                if (p == null || p.Dead) continue;
+                var gp = p.GetComponent<TexasGamePlay>();
+                if (gp != null && !gp.Folded) n++;
+            }
+            return n;
         }
 
         /// <summary>
@@ -419,7 +459,7 @@ internal static class ModePlay
                 _openedAt = Time.time;
                 _chosenAt = 0f;
 
-                Dev.Log("play", $"{p.PlayerName} (seat {p.Slot}) opens the switch on card {idx} ({old}), " +
+                Dev.Log("play", $"seat {p.Slot} opens the switch on card {idx} ({old}), " +
                                 $"{options.Count} to choose from - choosing in {SwapHold:0} s");
                 return true;
             }
@@ -492,7 +532,7 @@ internal static class ModePlay
                 if (!viaMenu) gp.UserCode_SwitchCmd__Int32__Int32(_swapIdx, opt);
                 _chosenAt = now;
 
-                Dev.Log("play", $"{p.PlayerName} (seat {_swapSlot}) swaps card {_swapIdx} ({_swapOld}) for option " +
+                Dev.Log("play", $"seat {_swapSlot} swaps card {_swapIdx} ({_swapOld}) for option " +
                                 $"{opt} of {choices} ({incoming}) - {(gp.Switched ? "accepted" : "NOT accepted")}");
                 return;
             }
@@ -565,7 +605,7 @@ internal static class ModePlay
             {
                 if (!gp.hasSpinThisRound && !gp.CanBidWithoutSpin)
                 {
-                    Dev.Log("play", $"{p.PlayerName} (seat {p.Slot}) spins the machine");
+                    Dev.Log("play", $"seat {p.Slot} spins the machine");
                     gp.UserCode_Cmd_RequestSecretSpin();
                     return;                                  // the bid comes next time round
                 }
@@ -580,7 +620,7 @@ internal static class ModePlay
             // always be raised, so nothing else would ever end a round.
             if (anyBid && last > 0 && (moveNo % 4) == 0)
             {
-                Dev.Log("play", $"{p.PlayerName} (seat {p.Slot}) calls LIAR on a claim of {last}");
+                Dev.Log("play", $"seat {p.Slot} calls LIAR on a claim of {last}");
                 try
                 {
                     gp.UserCode_PlayLiarCMD();
@@ -600,7 +640,7 @@ internal static class ModePlay
             int count = last + 1;
             if (ceiling > 0 && count > ceiling) count = 0;
 
-            Dev.Log("play", $"{p.PlayerName} (seat {p.Slot}) claims {count}" +
+            Dev.Log("play", $"seat {p.Slot} claims {count}" +
                             (ceiling > 0 ? $" (the highest allowed is {ceiling})" : ""));
 
             try
@@ -609,6 +649,211 @@ internal static class ModePlay
                 gp.UserCode_CmdGiveTurnSpin();
             }
             catch (Exception e) { Dev.Warn("play", $"the claim did not go through: {e.Message}"); }
+        }
+    }
+
+    /// <summary>
+    /// Two-Card Poker (<see cref="TwoCardPoker"/>): swap or pass on the first lap, then challenge,
+    /// and answer a challenge with a liar call, a challenge of your own or an overall call. With
+    /// two left, the face-off.
+    ///
+    /// Each move is what the game's own key does - showing a card to the table, saying it is a
+    /// challenger, and the command the key sends - made here on the host through the server side
+    /// of each call.
+    ///
+    /// The table's flags for a challenger, a liar caller and a face-off are normally cleared by
+    /// each seat's own play. A seat with nobody at the keyboard never clears them, so the host's
+    /// copies are cleared here at each new deal instead.
+    ///
+    /// The shot is left to the game: the aim is walked by <see cref="AimDrive"/> and the game's own
+    /// countdown fires it. Nobody moves between the shot and the next deal: the shooter's turn flag
+    /// is still up then, and a move made on it once had a seat call liar on itself and shoot a
+    /// second time.
+    /// </summary>
+    private sealed class TwoCardPlayer : IModePlayer
+    {
+        private int _round = -1;
+        private readonly HashSet<int> _swapped = new();
+        private readonly HashSet<int> _facing = new();
+
+        private static PokerGamePlayManager Table
+        {
+            get { try { return Manager.Instance != null ? Manager.Instance.PokerGame : null; } catch { return null; } }
+        }
+
+        public bool Resolving()
+        {
+            var t = Table;
+            if (t == null) return true;
+            try
+            {
+                NewDeal();
+                if (t.AimStarted || TwoCardPoker.Settled) return true;
+                foreach (var p in Manager.Instance.Players)
+                {
+                    var gp = p != null ? p.GetComponent<PokerGamePlay>() : null;
+                    if (gp != null && gp.TakingAim) return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>A new deal: the host's copies of the seats' flags are cleared.</summary>
+        private void NewDeal()
+        {
+            if (TwoCardPoker.Round == _round) return;
+            _round = TwoCardPoker.Round;
+            _swapped.Clear();
+            _facing.Clear();
+
+            // A turn is counted by the active seat changing, and the seat that shot last is often
+            // the one the new deal starts with: two left, it kept its "acted" mark from before the
+            // deal and sat out the game's whole turn timer, twice, before the other seat moved.
+            RoundStarting();
+            AimDrive.RoundStarting();
+
+            foreach (var p in Manager.Instance.Players)
+            {
+                var gp = p != null ? p.GetComponent<PokerGamePlay>() : null;
+                if (gp == null || gp.isOwned) continue;
+                if (gp.Challenger) gp.NetworkChallenger = false;
+                if (gp.CalledLiar) gp.NetworkCalledLiar = false;
+                if (gp.VersusStarted) gp.NetworkVersusStarted = false;
+            }
+        }
+
+        public void Act(PlayerStats p, int moveNo)
+        {
+            var t = Table;
+            var gp = p.GetComponent<PokerGamePlay>();
+            if (t == null || gp == null || gp.TakingAim) return;
+
+            var cards = gp.CardTypes;
+            int c0 = cards != null && cards.Count > 0 ? cards[0] : 0;
+            int c1 = cards != null && cards.Count > 1 ? cards[1] : 0;
+            int shown = moveNo % 2;
+
+            if (t.ChallangeStarted)
+            {
+                Answer(p, gp, t, moveNo, c0, c1, shown);
+                return;
+            }
+
+            if (t.AfterFirstRound && gp.VersusMode)
+            {
+                FaceOff(p, gp, t, c0, c1, shown);
+                return;
+            }
+
+            // The first lap is for swapping and passing; after it, mostly challenges.
+            if (!t.AfterFirstRound || moveNo % 5 == 0)
+            {
+                if (!_swapped.Contains(p.Slot) && (moveNo % 2 == 0 || !gp.HavePass))
+                {
+                    _swapped.Add(p.Slot);
+                    int which = (moveNo / 2) % 2;
+                    Dev.Log("play", $"seat {p.Slot} swaps card {which + 1}");
+                    gp.UserCode_SwapcardCMD__Int32(which);
+                    return;
+                }
+                if (gp.HavePass)
+                {
+                    Dev.Log("play", $"seat {p.Slot} passes");
+                    gp.NetworkHavePass = false;
+                    gp.UserCode_PassCmd();
+                    return;
+                }
+                if (!t.AfterFirstRound)
+                {
+                    // Swapped and passed already, still on the first lap: the only move is another swap.
+                    Dev.Log("play", $"seat {p.Slot} swaps again");
+                    gp.UserCode_SwapcardCMD__Int32(moveNo % 2);
+                    return;
+                }
+            }
+
+            Dev.Log("play", $"seat {p.Slot} challenges, showing card {shown + 1}");
+            gp.UserCode_CmdShowCardsFirst__Int32__Int32__Int32(shown, c0, c1);
+            gp.NetworkChallenger = true;
+            gp.UserCode_ChallangeCmd();
+        }
+
+        /// <summary>A challenge is up: an overall call once two have challenged, else a liar call or a challenge back.</summary>
+        private static void Answer(PlayerStats p, PokerGamePlay gp, PokerGamePlayManager t, int moveNo, int c0, int c1, int shown)
+        {
+            int challengers = 0;
+            foreach (var other in Manager.Instance.Players)
+            {
+                var o = other != null && !other.Dead ? other.GetComponent<PokerGamePlay>() : null;
+                if (o != null && o.Challenger) challengers++;
+            }
+
+            if (challengers > 1 && moveNo % 2 == 0)
+            {
+                Dev.Log("play", $"seat {p.Slot} calls OVERALL on {challengers} challengers");
+                gp.UserCode_CmdShowCardsFirst__Int32__Int32__Int32(shown, c0, c1);
+                gp.NetworkChallenger = true;
+                gp.UserCode_OverallCmd();
+                return;
+            }
+
+            var back = Manager.Instance.findbackplayer();
+            var behind = back != null ? back.GetComponent<PokerGamePlay>() : null;
+            if (behind != null && !behind.Challenger && !gp.Challenger && moveNo % 3 == 0)
+            {
+                Dev.Log("play", $"seat {p.Slot} challenges back, showing card {shown + 1}");
+                gp.UserCode_CmdShowCardsFirst__Int32__Int32__Int32(shown, c0, c1);
+                gp.NetworkChallenger = true;
+                gp.UserCode_ChallangeCmd();
+                return;
+            }
+
+            Dev.Log("play", $"seat {p.Slot} calls LIAR on seat {(t.PokerChallanger != null ? t.PokerChallanger.Slot : -1)}");
+            gp.NetworkCalledLiar = true;
+            gp.UserCode_CmdShowCardsFirst__Int32__Int32__Int32(shown, c0, c1);
+            gp.UserCode_PlayLiarCMD();
+            gp.UserCode_LiarCmd();
+        }
+
+        /// <summary>
+        /// Two left. The first to go shows a card and starts the face-off; the other shows a card and
+        /// then the whole hand; the first then shows theirs, which settles it. The game's own client
+        /// does the last step by itself once the face-off's last call is in.
+        /// </summary>
+        private void FaceOff(PlayerStats p, PokerGamePlay gp, PokerGamePlayManager t, int c0, int c1, int shown)
+        {
+            if (!t.VersusStarted)
+            {
+                Dev.Log("play", $"seat {p.Slot} starts the face-off, showing card {shown + 1}");
+                gp.UserCode_CmdShowCardsFirst__Int32__Int32__Int32(shown, c0, c1);
+                gp.NetworkChallenger = true;
+                gp.UserCode_VersusCmd();
+                gp.NetworkVersusStarted = true;
+                _facing.Add(p.Slot);
+                return;
+            }
+
+            if (!t.VersusLast)
+            {
+                if (!_facing.Contains(p.Slot))
+                {
+                    Dev.Log("play", $"seat {p.Slot} answers the face-off, showing card {shown + 1}");
+                    gp.UserCode_CmdShowCardsFirst__Int32__Int32__Int32(shown, c0, c1);
+                    gp.NetworkChallenger = true;
+                    gp.UserCode_VersusCmd();
+                    gp.NetworkVersusStarted = true;
+                    _facing.Add(p.Slot);
+                }
+                Dev.Log("play", $"seat {p.Slot} shows the whole hand");
+                gp.UserCode_CmdShowCardsFirst__Int32__Int32__Int32(-1, c0, c1);
+                gp.UserCode_LastVersusCmd();
+                return;
+            }
+
+            Dev.Log("play", $"seat {p.Slot} shows the whole hand and ends the face-off");
+            gp.UserCode_CmdShowCardsFirst__Int32__Int32__Int32(-1, c0, c1);
+            gp.UserCode_EndTheVersusCMD();
         }
     }
 }

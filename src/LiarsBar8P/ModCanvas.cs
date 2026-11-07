@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Il2CppInterop.Runtime;
 using TMPro;
 using UnityEngine;
@@ -22,6 +23,11 @@ namespace LiarsBar8P;
 /// to Noto for Chinese and Japanese names, so that is its fallback here. Nothing in the game has
 /// Hangul, Arabic or Thai, so a line holding those is drawn plainly (<see cref="Fits"/>), where
 /// the system's fonts can take over: on the turn line a row of boxes would tell nobody anything.
+///
+/// The faces follow the language (<see cref="Words"/>). Oswald Bold has no Cyrillic, so Russian is
+/// drawn in Oswald Regular, the face the game itself uses for Russian, and Regular stands behind
+/// Bold for any Cyrillic name. Chinese stays in Bold, with its characters from the game's Noto, so
+/// a version number keeps the game's own face. Turkish is in Bold already.
 /// </summary>
 internal static class ModCanvas
 {
@@ -36,13 +42,16 @@ internal static class ModCanvas
 
     private const string Face = "Fonts & Materials/Oswald Bold SDF";
     private const string WideFace = "Fonts & Materials/NotoSansSC-Medium SDF";
+    private const string RegularFace = "Fonts & Materials/Oswald Regular SDF";
 
     private static readonly Color Backing = new(0.03f, 0.025f, 0.02f, 0.82f);
     private static readonly Color Rule = new(0.98f, 0.82f, 0.33f, 0.85f);
 
     private static GameObject _root;
     private static TMP_FontAsset _font;
+    private static TMP_FontAsset _regular;
     private static bool _failed;
+    private static readonly List<Line> _lines = new();
 
     internal static bool Ready { get; private set; }
 
@@ -65,6 +74,29 @@ internal static class ModCanvas
 
             Text.text = words;
             Box.sizeDelta = new Vector2(Text.GetPreferredValues(words, 4000f, Height).x + SideRoom, Height);
+        }
+
+        /// <summary>The face for the language now, and the width measured again in it.</summary>
+        internal void Refont()
+        {
+            Text.font = LineFace();
+            string words = _shown;
+            _shown = null;
+            Set(words);
+        }
+    }
+
+    /// <summary>The face a line is drawn in, for the game's language.</summary>
+    private static TMP_FontAsset LineFace() => Words.Now == Tongue.Ru && _regular != null ? _regular : _font;
+
+    /// <summary>From <see cref="Words"/>, when the game's language changes.</summary>
+    internal static void OnLanguage()
+    {
+        if (!Ready) return;
+        foreach (var line in _lines)
+        {
+            try { line.Refont(); }
+            catch (Exception e) { Plugin.Log.LogWarning($"[words] a line kept its face: {e.Message}"); }
         }
     }
 
@@ -129,14 +161,34 @@ internal static class ModCanvas
         return null;
     }
 
+    /// <summary>The game's face for a language, for text drawn outside this canvas: Regular for Russian, Noto for Chinese.</summary>
+    internal static TMP_FontAsset FaceFor(Tongue tongue) => tongue switch
+    {
+        Tongue.Ru => Load(RegularFace) ?? GameFont(),
+        Tongue.Zh => Load(WideFace) ?? GameFont(),
+        _ => GameFont(),
+    };
+
     private static void CoverOtherScripts()
     {
+        _regular = Load(RegularFace);
+        if (_regular == _font) _regular = null;
         var wide = Load(WideFace);
-        if (wide == null || wide == _font) return;
+        if (wide == _font) wide = null;
 
-        var table = _font.fallbackFontAssetTable ?? new Il2CppSystem.Collections.Generic.List<TMP_FontAsset>();
-        if (!table.Contains(wide)) table.Add(wide);
-        _font.fallbackFontAssetTable = table;
+        // Bold: Cyrillic from Regular, then Chinese from Noto. Regular: Chinese from Noto, for a
+        // Chinese name at a Russian table.
+        Behind(_font, _regular);
+        Behind(_font, wide);
+        Behind(_regular, wide);
+    }
+
+    private static void Behind(TMP_FontAsset font, TMP_FontAsset fallback)
+    {
+        if (font == null || fallback == null) return;
+        var table = font.fallbackFontAssetTable ?? new Il2CppSystem.Collections.Generic.List<TMP_FontAsset>();
+        if (!table.Contains(fallback)) table.Add(fallback);
+        font.fallbackFontAssetTable = table;
     }
 
     /// <summary>Whether the game's fonts can draw all of this.</summary>
@@ -183,7 +235,7 @@ internal static class ModCanvas
         words.offsetMax = new Vector2(-SideRoom / 2f, 0f);
 
         var text = words.gameObject.AddComponent<TextMeshProUGUI>();
-        text.font = _font;
+        text.font = LineFace();
         text.fontSize = size;
         text.color = colour;
         text.alignment = align;
@@ -192,7 +244,9 @@ internal static class ModCanvas
         text.raycastTarget = false;
 
         box.gameObject.SetActive(false);
-        return new Line { Box = box, Text = text, Height = height };
+        var made = new Line { Box = box, Text = text, Height = height };
+        _lines.Add(made);
+        return made;
     }
 
     private static RectTransform Part(string name, Transform parent)

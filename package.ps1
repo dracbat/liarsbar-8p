@@ -57,16 +57,6 @@ MaxPlayers = $MaxPlayers
 # Setting type: Boolean
 # Default value: true
 VerboseDiagnostics = true
-
-## Development self test: auto-host a PRIVATE lobby on startup.
-# Setting type: Boolean
-# Default value: false
-SelfTestAutoHostLobby = false
-
-## Development self test: force a solo match start.
-# Setting type: Boolean
-# Default value: false
-SelfTestForceSoloStart = false
 "@ | Set-Content "$cfgDir\liarsbar.eightplayers.cfg" -Encoding utf8
 
 # 4. one-click installer / uninstaller
@@ -104,23 +94,44 @@ New-Item -ItemType Directory -Force -Path "$Staging\licenses" | Out-Null
 Copy-Item "$Root\licenses\*.txt" "$Staging\licenses" -Force
 
 @"
-Liar's Bar - $MaxPlayers Player Mod
-===================================
+Liar's Bar: Fully Loaded
+========================
+8 Players, Matchmaking and More. An unofficial fan-made mod, not affiliated with or
+endorsed by Curve Animation, the makers of Liar's Bar.
 
-EVERY player must install this, and everyone must use the same MaxPlayers value.
-A vanilla client joining a modded lobby will desync.
+EVERYONE playing together must install this, on the same version. The version you
+run is drawn at the top of the screen in game, beside the FULLY LOADED tag. A table
+won't start until everyone seated at it runs the host's version, and the mod won't
+let you join a table on another version. Players without the mod are turned away
+by the host, because they would desync the table.
+
+RANKED IS OFF while the mod is installed. The ranked button says so and opens the
+lobby list instead. To play ranked, uninstall first (on Linux, take the launch
+option out).
 
 INSTALL
   1. Extract this whole zip somewhere (Desktop is fine).
   2. Double click  install.bat
      It will ask for administrator permission - that is needed because the game
-     lives in Program Files. It finds Liar's Bar through Steam automatically.
+     lives in Program Files. It finds Liar's Bar through Steam automatically,
+     and replaces any copy of the mod already there.
   3. Launch the game. The FIRST launch is slow (a few minutes) while it sets up.
      This happens once. Let it reach the main menu.
 
 If install.bat cannot find the game, it will ask you to paste the folder path.
 You can get that from Steam:
   right click Liar's Bar -> Manage -> Browse local files -> copy the address bar.
+
+UPDATING
+  On v1.1.3 or newer: nothing to download. When the game starts, the mod offers
+  the update in a window; say yes and it installs it and restarts the game. After
+  an update the main menu shows what changed, once. If you set Updates to Off,
+  run the installer from the latest release again instead.
+  On v1.1.2 or older: those versions can't update themselves. Download the latest
+  release and install it as above:
+     https://github.com/dracbat/liarsbar-8p/releases/latest
+  Everyone at a table needs the same version, so when a new one comes out, the
+  whole group updates.
 
 LINUX AND STEAM DECK
   Liar's Bar runs on Linux through Proton, and this is the same mod - the same files,
@@ -147,13 +158,18 @@ LINUX AND STEAM DECK
   Uninstall: bash uninstall.sh
 
 CHECK IT WORKED
-  The mod's version is drawn at the top of the screen in game. For more detail, open
-  BepInEx\LogOutput.log  in the game folder (BepInEx/LogOutput.log on Linux) and look for:
-     === Liar's Bar 8P loaded ===
-     [cap] maxConnections 4 -> 8
+  The FULLY LOADED tag and the version at the top of the screen in game mean it
+  loaded.
+
+SOMETHING WENT WRONG?
+  In the game's settings, at the main menu or during a match, press Save Bug Report,
+  or press F11 anywhere but ranked. It saves a short, cleaned file in
+  BepInEx\bug-reports  in the game folder. Attach that file to an issue at
+     https://github.com/dracbat/liarsbar-8p/issues
+  and say how many players, which mode, and what looked wrong.
 
 SETTINGS
-  BepInEx\config\liarsbar.eightplayers.cfg
+  BepInEx\config\liarsbar.eightplayers.cfg  (README.md explains every setting)
   MaxPlayers must be the SAME for everyone playing together.
 
 UNINSTALL
@@ -168,21 +184,35 @@ UNINSTALL
 #
 # One listing serves both this check and the zip, hidden files included, so nothing can be
 # zipped without having been looked at here first.
+#
+# What is looked for is read from this machine as the package is built - the account name, the
+# machine name and git's email addresses - and never written down here.
 $StagedItems = @(Get-ChildItem $Staging -Recurse -Force)
+$identifiers = @($env:USERNAME, $env:COMPUTERNAME)
+foreach ($scope in @(@(), @('--global'))) {
+    $email = $null
+    try { $email = (& git config @scope user.email); if ($LASTEXITCODE -ne 0) { $email = $null } } catch { $email = $null }
+    if ($email) { $identifiers += "$email".Trim() }
+}
+$global:LASTEXITCODE = 0   # an unset address is not a failure of the build
+$identifiers = @($identifiers | Where-Object { $_ -and $_.Length -ge 3 } | Select-Object -Unique)
 $leak = @()
 foreach ($f in ($StagedItems | Where-Object { -not $_.PSIsContainer })) {
     $bytes = [IO.File]::ReadAllBytes($f.FullName)
+    $found = $false
     foreach ($enc in @([Text.Encoding]::ASCII, [Text.Encoding]::Unicode)) {
-        if ($enc.GetString($bytes) -like "*$env:USERNAME*") {
-            $leak += $f.FullName.Substring($Staging.Length + 1)
-            break
+        $text = $enc.GetString($bytes)
+        foreach ($id in $identifiers) {
+            if ($text -like "*$([Management.Automation.WildcardPattern]::Escape($id))*") { $found = $true; break }
         }
+        if ($found) { break }
     }
+    if ($found) { $leak += $f.FullName.Substring($Staging.Length + 1) }
 }
 if ($leak) {
-    Write-Host "Refusing to package - these carry the build account name:" -ForegroundColor Red
+    Write-Host "Refusing to package - these carry a build-machine identifier (account, machine name or email):" -ForegroundColor Red
     $leak | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
-    throw "build account name found in the package"
+    throw "build-machine identifier found in the package"
 }
 Write-Host "No build-account identifiers in the package" -ForegroundColor Green
 

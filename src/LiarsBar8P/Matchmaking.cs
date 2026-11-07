@@ -45,6 +45,9 @@ namespace LiarsBar8P;
 /// this", and the week after a release half the pool would have vanished in silence. A row that
 /// says which version it needs tells a player exactly what to do about it. Quick Join is the
 /// exception: nobody is choosing there, so it only ever looks at the player's own version.
+/// Nobody plays across versions either way: a copy that enters a lobby on another version by
+/// any route leaves it at once (<see cref="LeaveOtherBuilds"/>), and a host holds Start while
+/// anybody in its lobby shows another version (<see cref="SameVersion"/>).
 ///
 /// <b>Lobbies whose host has gone.</b> Nothing in the game makes a client leave a Steam lobby
 /// when it loses the host: only the leave and kick paths call <c>LeaveLobby</c>. So a host that
@@ -102,7 +105,8 @@ internal static class Matchmaking
 
     /// <summary>
     /// How long <c>InGame</c> has to sit at "off" in a running lobby before it is corrected. A
-    /// host on the way out writes the same value and takes a few seconds to go.
+    /// host on the way out writes the same value and takes a few seconds to go. The same wait
+    /// stands before a lobby the game can no longer write to is put right (see <see cref="Relist"/>).
     /// </summary>
     private const float OffGrace = 10f;
 
@@ -132,8 +136,13 @@ internal static class Matchmaking
 
     private const string WhyHeldProving = "Checking who has the mod";
     private const string WhyHeldArriving = "A player is still arriving";
-    private const string ToTheRoom = "This table needs the 8 Player Mod";
+    private const string WhyHeldRules = "The house rules just changed";
+    private const string ToTheRoom = "This table needs the " + Plugin.DisplayName + " mod";
     private const string InviteFailed = "Could not join that lobby\nIt may be full or in a match";
+    private const string NoVersionWords = "This lobby does not say\nwhich mod version it runs";
+    private const string OtherVersionWords = "This lobby runs mod v{0}\nYou have v{1}";
+    private const string OtherSeatsWords = "This lobby seats {0}\nYours are set to {1}";
+    private const string NeedsTheMod = "{0} needs the mod";
 
     private static float _next;
     private static float _hideAt;
@@ -173,7 +182,7 @@ internal static class Matchmaking
     /// not a question that can be asked from a ticker: when there is no manager it makes one,
     /// and the ranked scene destroys every manager on purpose, shutting Steam down each time.
     /// </summary>
-    private static bool SteamUp
+    internal static bool SteamUp
     {
         get
         {
@@ -186,7 +195,16 @@ internal static class Matchmaking
     /// The current minute by Steam's clock. Both ends of the heartbeat read the same clock, so
     /// it does not matter what the time is on anybody's PC.
     /// </summary>
-    private static int AliveMinute => (int)(SteamUtils.GetServerRealTime() / 60u);
+    internal static int AliveMinute => (int)(SteamUtils.GetServerRealTime() / 60u);
+
+    /// <summary>The lobby the host's upkeep last looked after, or 0. For the test driver.</summary>
+    internal static ulong Upkept { get; private set; }
+
+    /// <summary>The same lobby, kept until the server stops, for <see cref="LeaveHosted"/>.</summary>
+    private static ulong _hosted;
+
+    /// <summary>Whether the upkeep last left the lobby open to joiners, or null before it has said.</summary>
+    internal static bool? Open => _open;
 
     private static void Heartbeat(CSteamID lobby)
     {
@@ -323,27 +341,32 @@ internal static class Matchmaking
     /// Why this copy cannot sit at this lobby, in words for the player, or null if it can.
     /// Everything read here came from another player.
     /// </summary>
-    internal static string WhyNot(CSteamID lobby)
+    internal static string WhyNot(CSteamID lobby, bool shown = false)
     {
         string theirs = SteamMatchmaking.GetLobbyData(lobby, VersionCheck.Key);
         if (string.IsNullOrEmpty(theirs))
-            return "This lobby does not say\nwhich mod version it runs";
+            return Said(shown, NoVersionWords);
         if (theirs != Plugin.Version)
-            return $"This lobby runs mod v{Clean(theirs, LobbyRows.VersionLength)}\nYou have v{Plugin.Version}";
+            return Said(shown, OtherVersionWords, Clean(theirs, LobbyRows.VersionLength), Plugin.Version);
 
         // The config has always said every player must match, and nothing ever checked.
         int seats = SteamMatchmaking.GetLobbyMemberLimit(lobby);
         if (seats > 0 && seats != Limits.LobbySeats)
-            return $"This lobby seats {seats}\nYours are set to {Limits.LobbySeats}";
+            return Said(shown, OtherSeatsWords, seats, Limits.LobbySeats);
 
         return null;
     }
+
+    // A reason is logged in English and shown in the game's language.
+    private static string Said(bool shown, string english, params object[] args) =>
+        shown ? Words.F(english, args) : string.Format(CultureInfo.InvariantCulture, english, args);
 
     /// <summary>Could this copy take a seat at this lobby right now?</summary>
     internal static bool Seatable(CSteamID lobby)
     {
         if (SteamMatchmaking.GetLobbyData(lobby, StateKey) != InTheLobby) return false;
         if (WhyNot(lobby) != null) return false;
+        if (BlockList.HostBlocked(lobby)) return false;
 
         int seats = SteamMatchmaking.GetLobbyMemberLimit(lobby);
         return seats <= 0 || SteamMatchmaking.GetNumLobbyMembers(lobby) < seats;
@@ -351,8 +374,8 @@ internal static class Matchmaking
 
     /// <summary>
     /// Stop a join to a lobby on another build, and say why. The row's button and a controller's
-    /// Submit both end here. Invites and the lobby ID box do not, and are meant not to: they
-    /// keep working as they always have, with the mismatch banner as the warning.
+    /// Submit both end here. Invites and the lobby ID box do not: they reach the lobby on Steam
+    /// first, and <see cref="LeaveOtherBuilds"/> takes the copy straight back out.
     /// </summary>
     [HarmonyPrefix]
     [HarmonyPriority(Priority.First)]
@@ -380,12 +403,66 @@ internal static class Matchmaking
             }
 
             Plugin.Log.LogInfo($"[matchmaking] refused lobby {lobbyID.m_SteamID}: {why.Replace('\n', ' ')}");
-            Say(why, RefusalSeconds);
+            Say(WhyNot(lobbyID, shown: true) ?? why, RefusalSeconds);
             return false;
         }
         catch (Exception e)
         {
             Plugin.Log.LogError($"[matchmaking] join check failed, leaving it to the game: {e.Message}");
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Leave a lobby of the pool whose host shows another mod version, the moment Steam lets this
+    /// copy in, and say why. Invites, a typed lobby ID and Quick Join all arrive here; a row's
+    /// JOIN has already been stopped above. The game's own handler is skipped, so no client is
+    /// started for that lobby and the lobby id stays what it was: a player seated at another table
+    /// who accepted the invite stays at that table. A lobby without the pool's tag is the game's,
+    /// unless its host shows a mod version (a release from before the pool), and ranked is never
+    /// looked at. Last, after Quick Join's own check on the same call.
+    /// </summary>
+    [HarmonyPrefix]
+    [HarmonyPriority(Priority.Last)]
+    [HarmonyPatch(typeof(SteamLobby), nameof(SteamLobby.OnLobbyEntered))]
+    private static bool LeaveOtherBuilds(SteamLobby __instance, LobbyEnter_t callback)
+    {
+        try
+        {
+            if (callback.m_EChatRoomEnterResponse != (uint)EChatRoomEnterResponse.k_EChatRoomEnterResponseSuccess) return true;
+            if (RankedGuard.Near || !SteamUp) return true;
+
+            var lobby = new CSteamID(callback.m_ulSteamIDLobby);
+            if (!SameVersion.HostRunsAnother(lobby, out string theirs)) return true;
+
+            SteamMatchmaking.LeaveLobby(lobby);
+            Plugin.Log.LogWarning($"[matchmaking] left lobby {lobby.m_SteamID} at once: its host shows mod " +
+                                  $"{(theirs == null ? "(none)" : Clean(theirs, LobbyRows.VersionLength))}, this copy is {Plugin.Version}");
+
+            // A join from the list or by ID still holds the game's lock and its clock, and the
+            // game's own failure path clears both. Not while this copy is at a table: then the
+            // lock and the lobby id belong to that table.
+            if (__instance != null && !NetworkServer.active && !NetworkClient.active)
+            {
+                if (__instance.CurrentLobbyID == lobby.m_SteamID) __instance.CurrentLobbyID = 0;
+                if (__instance.JoinLocked)
+                {
+                    __instance.StopMatchMaking();
+                    __instance.WaitforJoin();
+                }
+            }
+
+            var list = LobbyListManager.instance;
+            if (list != null && SceneManager.GetActiveScene().name == Menu)
+            {
+                QuickMatch.OpenList(list);
+                Say(SameVersion.OtherTable, RefusalSeconds);
+            }
+            return false;
+        }
+        catch (Exception e)
+        {
+            Plugin.Log.LogError($"[matchmaking] version check on entry failed, leaving it to the game: {e.Message}");
             return true;
         }
     }
@@ -431,6 +508,9 @@ internal static class Matchmaking
     {
         var list = LobbyListManager.instance;
         if (list == null) return;
+
+        // Every line here is one of the mod's own, so it is said in the game's language.
+        text = Words.T(text);
 
         if (list.ConnectingScreen != null) list.ConnectingScreen.SetActive(true);
 
@@ -504,7 +584,7 @@ internal static class Matchmaking
             }
 
             var label = __instance.lobbyvisible;
-            if (label != null) label.text = note ? _note : _hold;
+            if (label != null) label.text = Words.T(note ? _note : _hold);
         }
         catch (Exception e)
         {
@@ -587,6 +667,7 @@ internal static class Matchmaking
     /// <summary>From <see cref="ModTicker"/>. The box goes on time; the rest once a second.</summary>
     internal static void Tick()
     {
+        SameVersion.Register();
         if (Loopback.Active) return;
 
         float now = Time.unscaledTime;
@@ -612,10 +693,16 @@ internal static class Matchmaking
     private static void Upkeep(float now)
     {
         _hold = null;
+
+        // Before the dead lobby, which is whatever the game entered last: after an invite that is
+        // the other lobby, and never the one this copy was hosting.
+        var sl = SteamLobby.Instance;
+        if (!NetworkServer.active) LeaveHosted(sl);
         LeaveDeadLobby();
 
-        var sl = SteamLobby.Instance;
-        if (sl == null || sl.CurrentLobbyID == 0 || !NetworkServer.active)
+        // The lobby this copy hosts, not whatever CurrentLobbyID names: a host who accepts an
+        // invite has that id moved to the other lobby and goes on hosting this one.
+        if (sl == null || !NetworkServer.active || !Table.Hosted(out var lobby))
         {
             Forget();
             return;
@@ -624,7 +711,7 @@ internal static class Matchmaking
         var nm = sl.manager;
         if (nm == null || nm.Matchmaking || nm.isVelvetRoom || !SteamUp) return;
 
-        HostUpkeep(sl, nm, now);
+        HostUpkeep(lobby, nm, now);
     }
 
     /// <summary>
@@ -654,8 +741,15 @@ internal static class Matchmaking
     [HarmonyPatch(typeof(SteamMatchmaking), nameof(SteamMatchmaking.LeaveLobby))]
     private static void Left(CSteamID steamIDLobby)
     {
+        LastLeft = steamIDLobby.m_SteamID;
         if (steamIDLobby.m_SteamID == _entered) _entered = 0;
     }
+
+    /// <summary>
+    /// The last lobby this copy left, or 0. For the test driver: Steam goes on answering
+    /// <c>GetLobbyOwner</c> for a lobby already left, so asking it proves nothing.
+    /// </summary>
+    internal static ulong LastLeft { get; private set; }
 
     /// <summary>Leave a Steam lobby and forget it. Leaving one already left does nothing.</summary>
     internal static void LeaveCurrent(SteamLobby sl)
@@ -664,6 +758,34 @@ internal static class Matchmaking
 
         SteamMatchmaking.LeaveLobby(new CSteamID(sl.CurrentLobbyID));
         sl.CurrentLobbyID = 0;
+    }
+
+    /// <summary>
+    /// The lobby this copy hosted, once it hosts no more. The game leaves the lobby its lobby
+    /// screen names, and that name follows <c>CurrentLobbyID</c> each time somebody arrives or a
+    /// match ends. After an accepted invite it is the other lobby that gets left, and this one
+    /// stays behind with this copy as its owner and only member: open, listed for minutes on its
+    /// last heartbeat, and sending whoever joins it to a table that has gone. A lobby the game
+    /// still names is the game's to leave, and leaving one already left does nothing.
+    ///
+    /// Once, when the server stops, and not when the table stops counting as hosted: the game drops
+    /// the host's own connection a few seconds before it stops the server, and from that moment
+    /// <see cref="Table.Hosted"/> says no.
+    /// </summary>
+    private static void LeaveHosted(SteamLobby sl)
+    {
+        ulong hosted = _hosted;
+        if (hosted == 0) return;
+        _hosted = 0;
+
+        if (RankedGuard.Near || !SteamUp) return;
+        if (sl != null && sl.CurrentLobbyID == hosted) return;
+
+        var lobby = new CSteamID(hosted);
+        if (SteamMatchmaking.GetLobbyOwner(lobby).m_SteamID != SteamUser.GetSteamID().m_SteamID) return;
+
+        SteamMatchmaking.LeaveLobby(lobby);
+        Plugin.Log.LogInfo("[matchmaking] stopped hosting with the lobby id on another lobby - left the one this copy hosted");
     }
 
     /// <summary>
@@ -700,12 +822,13 @@ internal static class Matchmaking
 
     /// <summary>
     /// What the owner of a lobby has to keep true once strangers can find it. All of it is
-    /// already on the host's own machine, so none of it needs a round trip to anybody.
+    /// already on the host's own machine, so none of it needs a round trip to anybody. The lobby
+    /// comes from <see cref="Table.Hosted"/>, which has already checked this copy owns it.
     /// </summary>
-    private static void HostUpkeep(SteamLobby sl, CustomNetworkManager nm, float now)
+    private static void HostUpkeep(CSteamID lobby, CustomNetworkManager nm, float now)
     {
-        var lobby = new CSteamID(sl.CurrentLobbyID);
-        if (SteamMatchmaking.GetLobbyOwner(lobby).m_SteamID != SteamUser.GetSteamID().m_SteamID) return;
+        Upkept = lobby.m_SteamID;
+        _hosted = Upkept;
 
         // Through a match as well, so the lobby is listed the moment the table is back.
         if (now >= _nextAlive && !MatchmakingSelfTest.NoHeartbeat) Heartbeat(lobby);
@@ -741,9 +864,15 @@ internal static class Matchmaking
         Relist(lobby, room, state, now);
         RefuseUnmodded(lobby, room, nm, now);
 
-        // Both of these end by themselves: a player who shows no mod is sent away, and the wait
-        // for one still arriving has a limit, because a member can fail to arrive for good.
-        _hold = _unproven.Count > 0 ? WhyHeldProving : Arriving(lobby, nm, now) ? WhyHeldArriving : null;
+        // Counted every pass, so the room hears at once when a player on another version sits down.
+        string otherVersion = SameVersion.Hold(SameVersion.Count(lobby, nm));
+
+        // Every hold has an end: a player who shows no mod is sent away, the wait for one still
+        // arriving has a limit, because a member can fail to arrive for good, and the version
+        // hold counts only seated players, so it ends when the last of them on another version
+        // matches or leaves, and the host's kick reaches every one of them.
+        _hold = _unproven.Count > 0 ? WhyHeldProving : Arriving(lobby, nm, now) ? WhyHeldArriving
+              : otherVersion ?? (HouseRules.Holding ? WhyHeldRules : null);
     }
 
     /// <summary>
@@ -779,10 +908,17 @@ internal static class Matchmaking
     /// Back in the lobby scene two things write <c>InGame</c> once each with nothing ordering
     /// them: the new <c>LobbyController</c> writes "lobby", and each returning player's
     /// <c>Update</c> writes "off". When "off" lands last, the lobby never lists again.
+    ///
+    /// The game writes through <c>CurrentLobbyID</c>, so once an accepted invite has moved that
+    /// id, none of its writes reach this lobby. It goes on saying whatever it said when the id
+    /// moved, "ingame" for a match long over, and stays shut. Then anything but "lobby" is wrong.
     /// </summary>
     private static void Relist(CSteamID lobby, LobbyController room, string state, float now)
     {
-        if (state != Off || !room.setted)
+        var sl = SteamLobby.Instance;
+        bool gameWrites = sl != null && sl.CurrentLobbyID == lobby.m_SteamID;
+        bool wrong = gameWrites ? state == Off : state != InTheLobby;
+        if (!wrong || !room.setted)
         {
             _offSince = 0f;
             return;
@@ -793,7 +929,9 @@ internal static class Matchmaking
 
         _offSince = 0f;
         SteamMatchmaking.SetLobbyData(lobby, StateKey, InTheLobby);
-        Plugin.Log.LogInfo("[matchmaking] back from a match - the lobby is listed again");
+        Plugin.Log.LogInfo(gameWrites
+            ? "[matchmaking] back from a match - the lobby is listed again"
+            : $"[matchmaking] the lobby id names another lobby and this one still said '{Clean(state, 12)}' - listed again");
     }
 
     /// <summary>
@@ -804,7 +942,8 @@ internal static class Matchmaking
     /// They get there by invitation or a lobby ID, because no search of theirs can return this
     /// lobby. Every copy of the mod publishes its version the moment it enters a lobby, so a
     /// member still publishing nothing after <see cref="ProveModSeconds"/> has no mod. Another
-    /// version of the mod is left alone: that is a person who can read the banner.
+    /// version of the mod is not sent away here: <see cref="SameVersion"/> holds Start until they
+    /// match or leave, and they can read the banner.
     ///
     /// The connection is matched to the Steam member by the address the transport itself
     /// holds, not <c>PlayerSteamID</c>, which the game fills by position in a list that public
@@ -818,7 +957,7 @@ internal static class Matchmaking
         _seen.Clear();
         foreach (var p in players)
         {
-            if (p == null || p.isOwned || p.ConnectionID < 0 || BotManager.IsBot(p)) continue;
+            if (p == null || p.isOwned || BotManager.IsBot(p)) continue;
 
             var conn = p.connectionToClient;
             if (conn == null) continue;
@@ -837,7 +976,7 @@ internal static class Matchmaking
             string name = Clean(p.PlayerName, 16);
             if (_told.Add(id))
             {
-                HostNote($"{name} needs the mod", NoteSeconds);
+                HostNote(Words.F(NeedsTheMod, name), NoteSeconds);
                 TellTheRoom(ToTheRoom);
                 continue;
             }
@@ -846,7 +985,7 @@ internal static class Matchmaking
             _told.Remove(id);
             _unproven.Remove(id);
 
-            Plugin.Log.LogWarning($"[matchmaking] refused '{name}': connection {p.ConnectionID} has shown no mod " +
+            Plugin.Log.LogWarning($"[matchmaking] refused connection {p.ConnectionID}: it has shown no mod " +
                                   $"after {ProveModSeconds:F0}s - a player without it desyncs the table");
 
             // Sent through the first podium whoever it is for. The podium is only the object
@@ -872,7 +1011,7 @@ internal static class Matchmaking
     /// chat panel, because a client without one would throw on the call, and Mirror can drop
     /// a client for that.
     /// </summary>
-    private static void TellTheRoom(string line)
+    internal static void TellTheRoom(string line)
     {
         try
         {
@@ -933,6 +1072,7 @@ internal static class Matchmaking
 
     private static void Forget()
     {
+        Upkept = 0;
         _open = null;
         _offSince = 0f;
         _nextAlive = 0f;
@@ -940,5 +1080,6 @@ internal static class Matchmaking
         _unproven.Clear();
         _told.Clear();
         _strays.Clear();
+        SameVersion.Forget();
     }
 }

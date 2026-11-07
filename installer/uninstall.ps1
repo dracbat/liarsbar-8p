@@ -103,6 +103,12 @@ foreach ($f in $mine) {
     try { Remove-Item -LiteralPath $f.FullName -Force; Good "removed $($f.Name)"; $removed++ }
     catch { Bad "could not remove $($f.Name) : $($_.Exception.Message)" }
 }
+# The bug reports the mod saved, which are its own too.
+$reports = Join-Path $game 'BepInEx\bug-reports'
+if (Test-Path -LiteralPath $reports) {
+    try { Remove-Item -LiteralPath $reports -Recurse -Force; Good "removed bug-reports"; $removed++ }
+    catch { Bad "could not remove bug-reports : $($_.Exception.Message)" }
+}
 
 # BepInEx itself is shared, so it only goes if nothing else is using it.
 #

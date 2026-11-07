@@ -16,6 +16,210 @@ Versions that were once numbered 1.x and 2.x were folded into the same 0.x line 
 room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order is unchanged: what
 was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v3.0.0 — Fully Loaded: bots, house rules, awards and fair play
+
+- **A new name: Liar's Bar: Fully Loaded.** It is the same mod, with the same eight seats,
+  the same lobby pool and the same settings, and it updates itself as before. The tag at the top
+  of the screen now reads **FULLY LOADED**, and so does the label on each row of the lobby list.
+  The seat count is still in the pill beside it.
+- **Ranked is off while the mod is installed.** The ranked button now says so and opens the lobby
+  list instead, so a copy with the mod never plays there. To play ranked, start the game without
+  the mod.
+- **The shorter emote wait only applies at tables where everyone has the mod.** Anywhere else your
+  emotes keep the game's own 12 seconds.
+- **Liar's Deck 2 is back.** The game's own fourth deck table is on the deck arrows again: right
+  from Chaos, or left from Basic, with a mouse or a controller. Seven cards each, and your hand
+  carries over from round to round, nothing new dealt, until no more than one player still has
+  cards. Its card, its help page and its sound are the game's own. Characters that only hold five
+  cards in their hand, Gerk and Rasim among them, are given room for all seven. Only the host can
+  choose it, only at a table where everyone has the mod, and it stays chosen when the table comes
+  back from a match. A lobby that stops being one where everyone has the mod goes back to Basic
+  after 20 seconds.
+- **The Poker tab's plate says LIAR'S POKER.** The game's own plate there is a picture that still
+  reads TEXAS, the name Liar's Poker had before it came out. It now carries the mode's real name,
+  in Russian and Simplified Chinese as the game's own loading tips write it. It only changes what
+  you see, so it shows at any table, with the mod or without it.
+- **Two-Card Poker, a table the game carries but never put on a menu.** The Poker tab now has
+  arrows like the deck tab's, stepping between LIAR'S POKER and TWO-CARD POKER, an
+  older bluffing game of its own: two cards each from a deck of 21, swap or pass, then challenge,
+  call liar or show down, and the best hand takes the shotgun. Its table, cards and sounds are the
+  game's own, and the ? beside the tab opens a rules page for it. Everyone plays as Scubby there,
+  the only character the table was made for. Only the host can choose it, only at a table where
+  everyone has this version of the mod, never near ranked, and never with bots. It always plays
+  CLASSIC house rules, and the rules row says so. It stays chosen when the table comes back from a
+  Two-Card Poker match. A new lobby starts on the released Liar's Poker, and so does a lobby that
+  comes back from any other match, or that stops being one where everyone has this version of the
+  mod, after 20 seconds. Other players see the choice on their own lobby screen.
+- **The mod speaks Turkish, Russian and Simplified Chinese.** Its words follow the language chosen in
+  the game's own settings, and change as soon as it does: the tag, the lobby count, the update window,
+  the ranked notice, Quick Join and the lobby list's messages, the turn line, the line that says who you
+  are aiming at, the Tab board, the awards, the house rules row, the wardrobe, the block list, the
+  version warning and the What's New window. Russian is drawn in the game's own face for Russian, and
+  its counts take the form Russian gives each number. These translations are machine made: corrections
+  from native speakers are very welcome.
+  Mode names, the mod's name and the presets CLASSIC, QUICK and HARSH stay as they are, and so does
+  anything sent to the whole table's chat, since everyone there may read a different language.
+- **Once you are out, A and D walk round the table.** The game's own spectator cameras now come
+  with one for every other seat, the same camera the game cuts to when that seat wins, in every
+  mode, so you can watch each player in turn instead of only the game's fixed views. They show
+  what anyone at the table could see: hands, dice, reels and hole cards stay as hidden as they are
+  from a chair. Only at tables where everyone has the mod. Liar's Poker with four players or fewer
+  keeps just the game's own views, and so does Two-Card Poker at any size.
+- **The copy icon beside LOBBY ID now copies the ID every time**, and says *(Copied)* for a moment.
+- **JOIN WITH ID says what is wrong** when what was typed or pasted cannot be a lobby ID, instead of
+  doing nothing or trying to join a lobby that does not exist.
+- **The main menu says how many FULLY LOADED lobbies are open**, and how many players are waiting in
+  them, beside ENTER THE BAR. It is looked up once a minute while the menu is up, counts only lobbies
+  you could join, and says nothing at all when there are none. With `ShowUnmoddedLobbies` on it is
+  not shown.
+- **A host who accepts an invite no longer leaves their own lobby untended.** It goes on being
+  shown as alive, shut while a match runs and opened again after, and players without the mod are
+  still turned away. When you stop hosting it closes, as it would have without the invite. Before,
+  all of that stopped the moment the invite was accepted, and the lobby was never closed.
+- **The tag at the top of the screen steps aside from the lobby's round help button** in Liar's
+  Poker and Liar's Dice, where the two used to touch.
+- **Save a bug report with one press.** Save Bug Report in the settings, in the menu and during a
+  match, or F11 anywhere but ranked, writes a short file to `BepInEx\bug-reports` in the game
+  folder, and the top of the screen says where. Attach it to an issue instead of the whole log. It
+  holds the mod's own recent log lines and a few plain facts (versions, mode, table size, system,
+  language). Names, Steam and lobby IDs, file paths and anything that looks like a key are taken out
+  first, and nothing is sent anywhere. The newest five are kept.
+- **The log no longer records players' names.** The mod's lines now name players by seat, so
+  `LogOutput.log` is safer to share as well.
+- **Change outfit in the lobby.** At a table where everyone has the mod, two arrows at the top
+  right, under Ready, step your character through the wardrobe's outfit sets, and everyone sees the
+  change at once. It carries into the match and is still on when the table comes back to the lobby.
+  A controller's D-pad up and down do the same. Dubai and Rasim have no outfits to choose from, so it
+  does not show for them. Right after you change character it waits for the new one, so it never
+  dresses the character you just left.
+- **Hold Tab to see the whole table.** During a match at a table where everyone has the mod, hold
+  Tab for a board of everybody seated: name, still in or out, and the two numbers that matter in
+  that game. Cards in hand and shots survived in Liar's Deck, cards and the chamber in the Chaos
+  deck, lives and each player's bid in Liar's Dice, bullets and folds in Liar's Poker. On a
+  controller, hold the button that shows the hints in Liar's Slots; the key hint at the bottom of the
+  screen shows that button while you play with one. In Liar's Poker, Tab (LB on a
+  controller) still opens the game's hands chart, and the board sits beside it. Liar's Slots keeps
+  its own leaderboard, which is always on screen. A player who leaves stays on the board, marked
+  LEFT. The cards in each hand come from the host, so they show when the host has this version too.
+- **Awards at the end of a match.** The win screen now names up to five award winners: Best Liar,
+  Lie Detector, Nerves of Steel, Luckiest, Sharpshooter, Spot On, Card Shark and more, depending on
+  the game. Every screen at the table shows the same ones. Nobody gets more than two, and nobody who
+  left before the end gets one. At a table where everyone has the mod, the win screen stays up for
+  15 seconds instead of 10, so there is time to read them. You see awards when the host's version
+  has them too; anyone on an older version sees the game's own win screen as before. There are none
+  after the host has left in the middle of a match.
+- **House rules.** At a table where everyone has the mod, the host picks CLASSIC, QUICK or HARSH
+  with two arrows at the top left of the lobby, beside LEAVE. Everyone sees the choice there, with a
+  line saying what it does at the table picked, and the room is told in the chat. CLASSIC is the
+  game as it ships. Every new lobby starts on CLASSIC, a lobby Quick Join opens included, and
+  nothing is saved. The choice is fixed once the match starts and stays for the next match. If
+  anyone in the lobby is on another version of the mod, the table plays CLASSIC until they leave,
+  and the lobby says so. Start stays unlit for 5 seconds after a change, so nobody starts into
+  rules they have not seen. A lobby with house rules says QUICK or HARSH on its row in the lobby
+  list, and when two lobbies are equally full, Quick Join picks the CLASSIC one. On a controller,
+  the D-pad's up and down stay with the wardrobe, so the arrows take the mouse or a Steam Deck's
+  trackpad. What QUICK and HARSH do:
+  - Liar's Deck, Basic and Devil: QUICK gives 15-second turns, a revolver with 4 chambers instead
+    of 6, and 3 cards each instead of 5. HARSH gives 15-second turns and a revolver with 3 chambers.
+    Deck 2 is the same without the shorter hand.
+  - The Chaos deck: QUICK gives 15-second turns and a 4-chamber revolver. HARSH gives a 3-chamber
+    revolver and two chaos cards in every twelve instead of one.
+  - Liar's Dice: QUICK gives 15-second turns and 3 dice each instead of 5. HARSH gives 3 dice each
+    and one drink and you are out.
+  - Liar's Poker: QUICK gives 15-second turns, and every hand starts on 1 bullet instead of none,
+    so even a Coward's Fold can kill. HARSH starts every hand on 1 bullet and takes the Coward's
+    Fold away.
+  - Liar's Slots: QUICK starts everyone on 2 points each round. HARSH makes the dead spin spare
+    about 1 in 7 instead of 2 in 7.
+  - Two-Card Poker: always CLASSIC.
+- **Block a player.** In the lobby, a red cross sits just after every other player's name. Click it
+  twice to block them: the first click turns it gold and asks, the second blocks. After that their
+  lobbies are not in your lobby list, the main menu's count or Quick Join, and when you host, they
+  cannot join: all they see is Failed To Connect. Blocking somebody in a lobby you host also sends
+  them back to the menu. A blocked player's cross stays gold, and one click on it unblocks them.
+  BLOCKED in the lobby list, beside QUICK JOIN, lists everyone you have blocked, each with
+  UNBLOCK. Only Steam IDs are kept, in `%LOCALAPPDATA%\LiarsBar8P\blocked.txt`, never in the log or
+  a bug report. Steam's own block list is not used. An invite or a lobby ID you type still goes
+  through, and a lobby a blocked player is only sitting in cannot be seen from the list, so it is
+  not hidden. In a lobby whose host has an older version of the mod there are no crosses, because
+  an older host can give a player somebody else's Steam ID.
+- **The host's Kick works on podiums 5 to 8.** It was only ever on the game's own four.
+- **Each joiner's Steam ID is now right.** The game gives a new player the Steam ID at their place
+  in the lobby's member list, which is somebody else's when people arrive out of order or a bot is
+  in the room. The host now takes it from the player's own connection.
+- **Ultrawide screens are filled, at 21:9 and 32:9.** The display settings now offer your monitor's
+  own shape after the game's sizes (on 3440x1440 that includes 1720x720, 2580x1080 and 3440x1440),
+  and the first time the game runs full screen on such a monitor it picks that shape at the height
+  you already play at, so 1920x1080 becomes 2580x1080 and the black bars are gone. The menus and
+  the match HUD keep their height, so nothing is cut off at the top or bottom, the menu's video is
+  cropped rather than stretched, and Table Stories gets black at its sides. Liar's Poker's hand
+  rankings open from the left edge and its showdown rows stay out of sight until a showdown, as on a
+  16:9 screen, and the pause screen's fade, loading screen and credits cover the whole width. Your own
+  choice in the settings always wins. It is kept in `%LOCALAPPDATA%\LiarsBar8P\display.txt`, so
+  reinstalling or updating the mod keeps it and never picks again, and playing once on a smaller
+  monitor does not lose it. The game without the mod finds the last of its own sizes you used
+  saved, or 1920x1080 if you never chose one.
+- **Bots can fill empty seats in Liar's Dice, Liar's Deck and the Chaos deck.** A bot is now a real
+  seat at the table on every player's screen: a body and a name (Bot Ace, Bot King, Bot Queen and so
+  on), a character nobody else at the table plays, and its own dice or cards. In Liar's Dice, Basic
+  and Traditional, bots bid, call liar and call spot on, drink when they lose, and can die and win.
+  In Liar's Deck, Basic, Devil and Deck 2, a bot raises its cards as a person does, throws one to
+  three as the round's card, lies now and then, calls liar on a throw it doubts, plays the devil
+  card on its own, and pulls its own trigger when it loses a call. In the Chaos deck it throws one
+  card at a time and plays the chaos card, and when the gun comes to it, it aims at somebody still
+  in the match, most often at whoever has survived the most pulls of their revolver. They play fair:
+  a bot knows only what a person in its chair would, its own dice or cards, the bids and claims,
+  how many dice or cards each player holds, and what everybody has been shown, and it bluffs now
+  and then. Nothing about a bot's hidden dice or cards is shown on the host's screen or written to
+  the log before the game's own reveal, and at a table where everyone runs this version none of it
+  is sent to another player either. If a bot cannot make its move, as can
+  happen after a game update, its turn is passed on as its clock runs out (or 20 seconds later, if
+  the game cannot say whether a liar call is still being settled), so the table never waits on it
+  for long, and no more bots can be added until the game is restarted. The other tables, Liar's Poker,
+  Two-Card Poker and Liar's Slots, still play without bots, and a lobby that switches to one of them
+  sends its bots away and says so in the chat.
+  The host adds and removes them with **ADD BOT** and **REMOVE BOT**, above INVITE in the lobby, at a
+  table where everybody has the mod. REMOVE BOT sends the newest away, and the host's Kick takes a
+  bot away on any podium. At a full table, or one bots do not play yet, ADD BOT says why in the chat.
+  A bot gives its seat to anybody who joins a full table, and a bot whose name somebody in the room
+  also has takes another. The lobby list and Quick Join count the people at a table, not its bots,
+  and a lobby with bots stays listed. A bot is never picked to take over as host, but a host who
+  leaves a table with bots may still end its match. To host without bots, turn off `AllowBots` in
+  the config.
+- **In Liar's Dice, nobody's dice but your own are drawn on your screen until the reveal**, and the
+  reveal shows them all as before. This applies at every table, with the mod or without: it only
+  changes what your own screen draws, so nobody with the mod gets a look that a player without it
+  does not.
+- **Logs and bug reports stay free of anything the table keeps hidden.** Nothing else changes.
+- **At Liar's Poker the mod's turn line no longer covers the ranking ladder on players' screens.**
+  The game shows whose turn it is there itself, and the mod's line was left out only on the host's
+  screen: every other player saw it drawn across the ladder.
+
+### Fair play
+
+- At a table you host, your game settles every revolver and shotgun pull from its own record,
+  counts every Two-Card Poker hand it deals, and removes a player caught cheating. A removed player
+  can't come back until you stop hosting.
+- At a table where everyone runs this version, Liar's Deck and the Chaos deck send each player only
+  their own cards, keep thrown cards face down until the game turns them over, and keep every
+  revolver's loaded chamber with the host. No screen there shows the cards in another player's
+  hand, the host's own screen included.
+- At a table you host, your game checks each player's moves against the rules: only cards that
+  player was dealt, no more of them than a throw allows, bids that go up, dice faces that exist,
+  and moves made on that player's own turn while they are still in. Anything a slow connection
+  could explain is quietly refused, never punished.
+- At a table you host, each chat line shows the name of the player who sent it, and names are
+  tidied so no two players share one.
+- At a table someone else hosts with this version, your game watches for things the rules make
+  impossible, such as a player still alive after more pulls than the revolver has chambers, or a
+  player who was out coming back. If it sees one, it tells you why, leaves the table and puts that
+  host on your BLOCKED list.
+- Everyone at a table needs the same version of Fully Loaded. A table you host won't start until
+  everyone seated at it runs your version, and your game won't join a table on another version,
+  however you reach it: the list, Quick Join, an invite or a lobby ID.
+- New setting `[Fair play] KickCheaters` (on by default). Turn it off to keep a caught player at
+  the table: your game still settles every pull itself and refuses the move.
+
 ## v2.0.0 — Find a game without seven friends
 
 - **Find a game without seven friends.** The lobby list and Quick Join now search a pool of
@@ -129,11 +333,9 @@ was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 - **Emotes come back sooner: after 10 seconds instead of the game's 12.** `EmoteCooldownSeconds`
   in the config sets it, from 1 to 60. The wait is counted on each player's own machine, as the
   game counts it, so your setting is yours whatever the others have.
-- **Liar's Texas: the card held up mid-swap now gets the blank template above four players.**
-  Every other card of another player's shows the blank template, but while a player swaps, the
-  game paints the card they are giving up with its real face for everyone. At four players
-  nobody sits close enough to read it; at eight the neighbours can. Not yet confirmed in a real
-  game — it needs players to watch a neighbour swap at a table of five or more.
+- **Liar's Poker: the card held up mid-swap now gets the blank template above four players**, like
+  every other card of another player's. Not yet confirmed in a real game — it needs players to
+  watch a neighbour swap at a table of five or more.
 
 ## v1.1.2 — Fixes from a real eight-player game
 
@@ -154,13 +356,9 @@ player still on 1.1.1 is flagged as a mismatch. Run your saved `Install-LiarsBar
   screen now says who you are aiming at, where they sit ("2 seats to your right"), and which
   keys move it, and shows "Locked on" when the choice closes. With four or fewer, aiming is
   exactly the game's own.
-- **Liar's Texas could show other players' cards after a swap.** The game stops hiding a
-  player's cards while they are mid-swap, and a swap that never finished left them unhidden for
-  the rest of the match. The host now ends any swap the game refused, clears a leftover swap at
-  every deal, and ends one still open eight seconds after it went through; and every machine
-  puts the question mark back on every card it does not own, every frame, until the showdown.
-  The one card the game deliberately shows everyone mid-swap — the card being given up — is
-  left as the game has it at any table size.
+- **Liar's Poker now keeps every other player's cards hidden through a swap.** Every swap ends
+  on time, and every machine keeps the question mark on every card it does not own until the
+  showdown.
 - **Liar's Texas at eight ran out of cards.** Eight players need 53 cards from a 52-card deck,
   so the fifth table card was never dealt. One player is now offered three cards to switch to
   instead of four in the first betting round, which leaves the deck enough.
@@ -418,8 +616,7 @@ finds itself on a Deck.
 A Windows player and a Linux player have not yet shared a table. They run the same game and
 the same mod, byte for byte, so nothing on the mod's side should tell them apart — but that is
 reasoning, not a result. Shots fired at the Deck table were not seen either: a bot that loses a
-liar call cannot pull its own trigger, because that runs on the loser's own machine and a bot
-has none — the same on Windows. The installers are covered by
+liar call could not yet pull its own trigger in that version — the same on Windows. The installers are covered by
 `tools/test-linux-installers.sh` — every Steam layout above, a download link pointing anywhere
 but this project's releases, a release from before Linux support, a game that is still running.
 
@@ -926,8 +1123,8 @@ again: once play had gone all the way round the table and arrived back at seat 0
 found it had "already played on turn 0", declined to act, and the table sat there
 permanently. Turns are counted now, so the same seat a lap later is a different turn.
 
-**A bot's throw did not move the turn on.** The game passes the turn from a scheduled step
-that runs on the throwing player's own machine, and a bot has none. Clearing the turn flag
+**A bot's throw did not move the turn on.** The game passes the turn on from a scheduled step
+that a bot never ran. Clearing the turn flag
 was not enough — that left the active slot still pointing at the bot that had just played,
 so the watchdog handed the turn straight back to it. The turn is now actually moved on, and
 only if the game has not done it itself two and a half seconds later, so a real player's
@@ -1037,8 +1234,8 @@ faults in the fixes themselves; two would have shipped a broken release to every
 ### Also
 
 - A liar call that never resolves now says so in the log and restarts the round, instead of
-  freezing the table silently. The trigger pull runs on the losing player's own machine, and
-  a bot has none, so this is a step that can genuinely stop. It also checks that the match is
+  freezing the table silently. A bot could not pull that trigger, so this
+  is a step that can genuinely stop. It also checks that the match is
   not simply *over*: it fired at the exact moment a match was won and dealt a fresh hand to a
   table with one player left, stepping on the victory screen.
 - `AutoTestPlayers` sets how many sit down in an automatic test. A partly full table has to

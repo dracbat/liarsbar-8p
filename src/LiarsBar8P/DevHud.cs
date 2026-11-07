@@ -18,6 +18,10 @@ internal sealed class DevHud : MonoBehaviour
     public DevHud(IntPtr ptr) : base(ptr) { }
 
     private static bool _open;
+
+    /// <summary>The panel's F-keys are live. F11 is its own while it is open, not the bug report's.</summary>
+    internal static bool PanelOpen => _open;
+
     private GUIStyle _label;
     private GUIStyle _header;
     private Texture2D _panel;
@@ -27,21 +31,26 @@ internal sealed class DevHud : MonoBehaviour
         if (!Dev.Enabled) return;
         try
         {
-            BotManager.Tick();
             DevAutoTest.Tick();
 
             if (Input.GetKeyDown(KeyCode.F8)) { _open = !_open; Dev.Log("hud", _open ? "panel open" : "panel closed"); }
             if (!_open) return;
 
-            if (Input.GetKeyDown(KeyCode.F1)) BotManager.AddBot();
-            if (Input.GetKeyDown(KeyCode.F2)) BotManager.RemoveBot();
-            if (Input.GetKeyDown(KeyCode.F3)) BotManager.FillToMax();
             if (Input.GetKeyDown(KeyCode.F4)) DevCommands.PrintPlayerList();
             if (Input.GetKeyDown(KeyCode.F5)) DevCommands.PrintSeats();
             if (Input.GetKeyDown(KeyCode.F6)) DevCommands.PrintDeck();
             if (Input.GetKeyDown(KeyCode.F7)) DevCommands.PrintTurn();
-            if (Input.GetKeyDown(KeyCode.F9)) DevCommands.SkipTurn();
             if (Input.GetKeyDown(KeyCode.F10)) DevCommands.PrintPodiums();
+
+            // The keys that change a table work only inside the loopback test harness: developer
+            // mode is a setting anyone can turn on, so on its own it never moves a real table.
+            bool table = Input.GetKeyDown(KeyCode.F1) || Input.GetKeyDown(KeyCode.F2) || Input.GetKeyDown(KeyCode.F3)
+                         || Input.GetKeyDown(KeyCode.F9) || Input.GetKeyDown(KeyCode.F11);
+            if (table && !Fair.TestsAllowed) { Dev.Log("hud", "refused: that key works only in the loopback test harness"); return; }
+            if (Input.GetKeyDown(KeyCode.F1)) BotManager.AddBot();
+            if (Input.GetKeyDown(KeyCode.F2)) BotManager.RemoveBot();
+            if (Input.GetKeyDown(KeyCode.F3)) BotManager.FillToMax();
+            if (Input.GetKeyDown(KeyCode.F9)) DevCommands.SkipTurn();
             if (Input.GetKeyDown(KeyCode.F11)) DevCommands.StartMatch();
         }
         catch (Exception e) { Dev.Warn("hud", $"input failed: {e.Message}"); }

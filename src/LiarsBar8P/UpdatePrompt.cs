@@ -34,6 +34,23 @@ internal static class UpdatePrompt
     // After a yes, the countdown to the restart: long enough to read the window and pick a button.
     private const float RestartDelay = 10f;
     private static float _countFrom = -1f;
+    private static int _stylesFor;
+
+    // What the window says, in one place for the word table. Key letters stay as they are.
+    private const string AvailableTitle = "{0} - UPDATE AVAILABLE";
+    private const string AvailableBody = "v{0} is out. You have v{1}.\nEveryone at a table needs the same version.\n" +
+                                         "Install it? The game restarts by itself to load it.";
+    private const string YesWords = "YES, INSTALL   (Y / A)";
+    private const string NoWords = "NOT NOW   (N / B)";
+    private const string AutomaticWords = "Install updates automatically from now on";
+    private const string OffWords = "Don't check for updates";
+    private const string OffNote = "Updates in the mod's config file turns checks back on, and so does reinstalling the mod.";
+    private const string InstalledTitle = "{0} - UPDATE INSTALLED";
+    private const string InstalledBody = "v{0} is installed. Restarting the game to load it in {1}...";
+    private const string RestartNowWords = "RESTART NOW   (Y / A)";
+    private const string RestartLaterWords = "RESTART LATER   (N / B)";
+    private const string FutureAutomatic = "Future updates will install by themselves.";
+    private const string FutureOff = "The mod will not check for updates again unless it is reinstalled or Updates is changed in its config.";
     private static bool _restartTried;
 
     private static int _polled = -1, _answer;
@@ -160,46 +177,42 @@ internal static class UpdatePrompt
 
             if (asking)
             {
-                GUI.Label(new Rect(cx, cy, cw, 34f), "LIAR'S BAR 8 PLAYER MOD - UPDATE AVAILABLE", _title);
+                GUI.Label(new Rect(cx, cy, cw, 34f), Words.F(AvailableTitle, Plugin.TitleName), _title);
                 cy += 46f;
-                GUI.Label(new Rect(cx, cy, cw, 96f),
-                    $"v{offered} is out. You have v{Plugin.Version}.\n" +
-                    "Everyone at a table needs the same version.\n" +
-                    "Install it? The game restarts by itself to load it.", _text);
+                GUI.Label(new Rect(cx, cy, cw, 96f), Words.F(AvailableBody, offered, Plugin.Version), _text);
                 cy += 100f;
 
                 left.y = right.y = cy;
                 int key = Answer();
-                if (GUI.Button(left, "YES, INSTALL   (Y / A)", _button) || key > 0) AutoUpdate.Accept(Choice());
-                else if (GUI.Button(right, "NOT NOW   (N / B)", _button) || key < 0) AutoUpdate.Decline(Choice());
+                if (GUI.Button(left, Words.T(YesWords), _button) || key > 0) AutoUpdate.Accept(Choice());
+                else if (GUI.Button(right, Words.T(NoWords), _button) || key < 0) AutoUpdate.Decline(Choice());
                 cy += 52f;
 
                 // Either, or neither: ticking one clears the other.
-                bool automatic = Tick(new Rect(cx, cy, cw, 26f), _automatic, "Install updates automatically from now on");
+                bool automatic = Tick(new Rect(cx, cy, cw, 26f), _automatic, Words.T(AutomaticWords));
                 if (automatic != _automatic) { _automatic = automatic; if (automatic) _off = false; }
                 cy += 30f;
-                bool off = Tick(new Rect(cx, cy, cw, 26f), _off, "Don't check for updates");
+                bool off = Tick(new Rect(cx, cy, cw, 26f), _off, Words.T(OffWords));
                 if (off != _off) { _off = off; if (off) _automatic = false; }
                 if (_off)
-                    GUI.Label(new Rect(cx + 24f, cy + 26f, cw - 24f, 22f),
-                              "Updates in the mod's config file turns checks back on, and so does reinstalling the mod.", _small);
+                    GUI.Label(new Rect(cx + 24f, cy + 26f, cw - 24f, 22f), Words.T(OffNote), _small);
                 return;
             }
 
             // The countdown after a yes: a few seconds to read what is happening, then the restart.
-            GUI.Label(new Rect(cx, cy, cw, 34f), "LIAR'S BAR 8 PLAYER MOD - UPDATE INSTALLED", _title);
+            GUI.Label(new Rect(cx, cy, cw, 34f), Words.F(InstalledTitle, Plugin.TitleName), _title);
             cy += 46f;
             if (_countFrom < 0f) _countFrom = Time.realtimeSinceStartup;
             float remaining = RestartDelay - (Time.realtimeSinceStartup - _countFrom);
             GUI.Label(new Rect(cx, cy, cw, 90f),
-                $"v{offered} is installed. Restarting the game to load it in {Mathf.Max(1, Mathf.CeilToInt(remaining))}..." + Future(),
+                Words.F(InstalledBody, offered, Mathf.Max(1, Mathf.CeilToInt(remaining))) + Future(),
                 _text);
 
             left.y = right.y = y + h - pad - 40f;
             int answer = Answer();
-            bool now = GUI.Button(left, "RESTART NOW   (Y / A)", _button) || answer > 0 ||
+            bool now = GUI.Button(left, Words.T(RestartNowWords), _button) || answer > 0 ||
                        (remaining <= 0f && Event.current.type == EventType.Repaint);
-            bool later = !now && (GUI.Button(right, "RESTART LATER   (N / B)", _button) || answer < 0);
+            bool later = !now && (GUI.Button(right, Words.T(RestartLaterWords), _button) || answer < 0);
 
             if (now)
             {
@@ -231,13 +244,16 @@ internal static class UpdatePrompt
     /// <summary>A line for what the tick boxes changed, if they changed anything.</summary>
     private static string Future() => Mode() switch
     {
-        UpdateMode.Automatic => "\nFuture updates will install by themselves.",
-        UpdateMode.Off => "\nThe mod will not check for updates again unless it is reinstalled or Updates is changed in its config.",
+        UpdateMode.Automatic => "\n" + Words.T(FutureAutomatic),
+        UpdateMode.Off => "\n" + Words.T(FutureOff),
         _ => "",
     };
 
     private static void Styles()
     {
+        // Made again in the new language's face when the game's language changes.
+        if (_stylesFor != Words.Generation) { _title = null; _stylesFor = Words.Generation; }
+
         if (_title == null)
         {
             // A plain label to start from, so nothing brings the default grey box with it.
@@ -273,7 +289,7 @@ internal static class UpdatePrompt
     {
         try
         {
-            var face = ModCanvas.GameFont();
+            var face = ModCanvas.FaceFor(Words.Now);
             if (face != null) return face.sourceFontFile;
         }
         catch (Exception e) { Plugin.Log.LogWarning($"[update] could not find the game's font: {e.Message}"); }

@@ -223,7 +223,7 @@ internal static class DeckFix
             {
                 var p = m.Players[i];
                 if (p == null) { sb.Append($"  [{i}]=null"); continue; }
-                sb.Append($"  [{i}] '{p.PlayerName}' slot={p.Slot} dead={p.Dead}");
+                sb.Append($"  [{i}] slot={p.Slot} dead={p.Dead}");
                 if (p.Slot > worst) worst = p.Slot;
             }
 

@@ -46,7 +46,7 @@ internal sealed class VersionHud : MonoBehaviour
         {
             Styles();
 
-            string label = $"Liar's Bar 8P  v{Plugin.Version}  (max {Plugin.MaxPlayers.Value})";
+            string label = $"{Plugin.TagName}  v{Plugin.Version}  {Words.F(VersionTag.MaxWords, Plugin.MaxPlayers.Value)}";
 
             // Top centre. Every mode puts something of its own in the top left - the table
             // card in Liar's Deck, the last bid in Liar's Dice, the last call in Texas - and
@@ -74,11 +74,21 @@ internal sealed class VersionHud : MonoBehaviour
 
             if (!string.IsNullOrEmpty(Mismatch))
             {
-                float wy = y + size.y + 8f;
+                y += size.y + 8f;
                 Vector2 wsize = _warnStyle.CalcSize(new GUIContent(Mismatch));
                 float wx = Mathf.Round((Screen.width - wsize.x) / 2f);
-                GUI.DrawTexture(new Rect(wx - 5f, wy - 2f, wsize.x + 10f, wsize.y + 6f), _backdrop);
-                GUI.Label(new Rect(wx, wy, wsize.x + 4f, 22f), Mismatch, _warnStyle);
+                GUI.DrawTexture(new Rect(wx - 5f, y - 2f, wsize.x + 10f, wsize.y + 6f), _backdrop);
+                GUI.Label(new Rect(wx, y, wsize.x + 4f, 22f), Mismatch, _warnStyle);
+            }
+
+            string report = BugReport.Shown;
+            if (!string.IsNullOrEmpty(report))
+            {
+                y += size.y + 8f;
+                Vector2 rsize = _style.CalcSize(new GUIContent(report));
+                float rx = Mathf.Round((Screen.width - rsize.x) / 2f);
+                GUI.DrawTexture(new Rect(rx - 5f, y - 2f, rsize.x + 10f, rsize.y + 6f), _backdrop);
+                GUI.Label(new Rect(rx, y, rsize.x + 4f, 22f), report, _style);
             }
         }
         catch { /* never let a HUD draw break the game */ }

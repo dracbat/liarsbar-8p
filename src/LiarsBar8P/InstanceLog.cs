@@ -138,7 +138,12 @@ internal static class InstanceLog
         catch { _file = null; }
     }
 
-    /// <summary>Copies everything BepInEx logs into this process's own file.</summary>
+    /// <summary>
+    /// Copies everything BepInEx logs into this process's own file, but not the game's sign-in.
+    /// The game prints the player's Unity access token and player id as it starts, and those
+    /// reached this file word for word. They are masked on the way in, and nothing else is
+    /// touched, because the test tools read these files line by line.
+    /// </summary>
     private sealed class Sink : BepInEx.Logging.ILogListener
     {
         public BepInEx.Logging.LogLevel LogLevelFilter => BepInEx.Logging.LogLevel.All;
@@ -146,7 +151,7 @@ internal static class InstanceLog
         public void LogEvent(object sender, BepInEx.Logging.LogEventArgs args)
         {
             if (args == null) return;
-            Write($"[{args.Level}] {args.Source?.SourceName}: {args.Data}");
+            Write($"[{args.Level}] {args.Source?.SourceName}: {LogScrub.Secrets(args.Data?.ToString())}");
         }
 
         public void Dispose() { }

@@ -121,8 +121,8 @@ internal static class AutoReady
                 // Never the host: the game keeps the host ready by itself anyway.
                 if (p.isOwned || (host != null && p == host)) continue;
 
-                // Bots have no client and are held ready by BotManager every frame.
-                if (p.ConnectionID < 0 || BotManager.IsBot(p)) continue;
+                // Bots have no client and are held ready by BotManager.
+                if (BotManager.IsBot(p)) continue;
 
                 if (p.Kicked) continue;
 
