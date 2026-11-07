@@ -105,9 +105,10 @@ won't start until everyone seated at it runs the host's version, and the mod won
 let you join a table on another version. Players without the mod are turned away
 by the host, because they would desync the table.
 
-RANKED IS OFF while the mod is installed. The ranked button says so and opens the
-lobby list instead. To play ranked, uninstall first (on Linux, take the launch
-option out).
+RANKED IS OFF while Fully Loaded is on. The ranked button says so and opens the
+lobby list instead. To play ranked, or the base game, click FULLY LOADED: ON at
+the bottom of the main menu twice: the game restarts with the mod off. Click it
+twice again to turn the mod back on. To remove it, see UNINSTALL below.
 
 INSTALL
   1. Extract this whole zip somewhere (Desktop is fine).

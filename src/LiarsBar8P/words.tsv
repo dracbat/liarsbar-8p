@@ -11,7 +11,7 @@ MAX {0}	MAKS {0}	МАКС {0}	最多 {0}
 {0} PLAYERS WAITING	{0} OYUNCU BEKLİYOR	{0} ИГРОК ЖДЁТ|{0} ИГРОКА ЖДУТ|{0} ИГРОКОВ ЖДУТ	{0} 名玩家等待中
 VERSION MISMATCH	SÜRÜM UYUŞMAZLIĞI	РАЗНЫЕ ВЕРСИИ	版本不一致
 OLD or NO MOD	ESKİ ya da MODSUZ	СТАРАЯ ВЕРСИЯ или БЕЗ МОДА	旧版本或未安装模组
-Ranked is off while the mod is installed\nStart the game without it to play ranked	Mod yüklüyken dereceli kapalı\nDereceli oynamak için oyunu modsuz başlat	Рейтинговые игры отключены, пока установлен мод\nЗапусти игру без него, чтобы играть в рейтинговые	安装模组时无法进行排位赛\n请在不加载模组的情况下启动游戏来玩排位赛
+Ranked is off while FULLY LOADED is on\nTurn it off on the main menu to play ranked	FULLY LOADED açıkken dereceli kapalı\nDereceli oynamak için ana menüden kapat	Рейтинговые игры отключены, пока включён мод FULLY LOADED\nВыключи его в главном меню, чтобы играть в рейтинговые	FULLY LOADED 开启时无法进行排位赛\n请在主菜单中关闭它以进行排位赛
 #
 # The update window and the line under the tag
 {0} - UPDATE AVAILABLE	{0} - GÜNCELLEME VAR	{0} - ДОСТУПНО ОБНОВЛЕНИЕ	{0} - 有可用更新

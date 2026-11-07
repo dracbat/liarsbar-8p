@@ -36,7 +36,7 @@ internal static class RankedGuard
     internal const string Scene = "MatchMaking";
 
     // Every word a player sees from this class.
-    private const string Refusal = "Ranked is off while the mod is installed\nStart the game without it to play ranked";
+    private const string Refusal = "Ranked is off while FULLY LOADED is on\nTurn it off on the main menu to play ranked";
 
     private const string SwitchName = "LIARSBAR8P_RANKED";
 

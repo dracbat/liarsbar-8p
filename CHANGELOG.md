@@ -19,6 +19,7 @@ was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 ## v3.0.1 — Turn Fully Loaded off without uninstalling
 
 - A **FULLY LOADED: ON / OFF** button on the main menu. Click it twice to turn the mod off: the game restarts and plays exactly like the base game, ranked included, with only that button left. Click it twice again to turn everything back on.
+- The **RANKED** button now says to turn Fully Loaded off on the main menu, instead of telling you to uninstall.
 
 ## v3.0.0 — Fully Loaded: bots, house rules, awards and fair play
 

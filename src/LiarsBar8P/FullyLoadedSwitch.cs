@@ -41,11 +41,16 @@ internal static class FullyLoadedSwitch
     /// <summary>How long the first click waits for the second.</summary>
     private const float ArmSeconds = 4f;
 
+    /// <summary>A second click sooner than this after the first is the same double-click, so it only asks.</summary>
+    private const float AnswerAfterSeconds = 0.4f;
+
     private static GameObject _button;
     private static TMP_Text _text;
-    private static IntPtr _on;
-    private static float _armedUntil = -1f;
-    private static bool _restarting, _failed, _missing;
+    private static TMP_FontAsset _face;     // the face the copy came with, and its look
+    private static Material _faceMat;
+    private static IntPtr _on, _refusedOn;
+    private static float _armedAt = -1f, _armedUntil = -1f;
+    private static bool _restarting, _failed, _missing, _unplaced;
 
     /// <summary>From <see cref="ModTicker"/>, in both modes.</summary>
     internal static void Tick()
@@ -55,14 +60,13 @@ internal static class FullyLoadedSwitch
 
         if (_button == null || _on != menu.Pointer)
         {
+            if (_refusedOn == menu.Pointer) return;   // this menu's copy did not take: not again every tick
             Build(menu);
             if (_button == null) return;
         }
 
         Place(menu);
-
-        string words = Words();
-        if (_text != null && _text.text != words) _text.text = words;
+        Show();
     }
 
     /// <summary>The main menu, while it shows, with no table and no connection.</summary>
@@ -83,6 +87,8 @@ internal static class FullyLoadedSwitch
     {
         _button = null;
         _text = null;
+        _face = null;
+        _faceMat = null;
 
         var like = menu.Find(LikeName);
         if (like == null)
@@ -94,12 +100,18 @@ internal static class FullyLoadedSwitch
 
         // UISlide goes too: it moves a button about by itself, and this one sits where it is put.
         var copy = UiClone.Make(like.gameObject, menu, Name, Click, "UISlide");
-        if (copy == null) return;
+        if (copy == null)
+        {
+            _refusedOn = menu.Pointer;   // UiClone has said why, once
+            return;
+        }
 
         var text = copy.GetComponent<TMP_Text>() ?? copy.GetComponentInChildren<TMP_Text>(true);
         if (text == null)
         {
             UnityEngine.Object.Destroy(copy);
+            _refusedOn = menu.Pointer;
+            Plugin.Log.LogWarning($"[switch] the copy of {LikeName} has no text - the switch is not shown");
             return;
         }
 
@@ -112,6 +124,8 @@ internal static class FullyLoadedSwitch
 
         _button = copy;
         _text = text;
+        _face = text.font;
+        _faceMat = text.fontSharedMaterial;
         _on = menu.Pointer;
         Plugin.Log.LogInfo($"[switch] the {Plugin.TagName} switch is on the main menu ({(Plugin.Off ? "off" : "on")})");
     }
@@ -122,12 +136,20 @@ internal static class FullyLoadedSwitch
         var last = menu.Find(LastName)?.GetComponent<RectTransform>();
         var above = menu.Find(AboveName)?.GetComponent<RectTransform>();
         var mine = _button.GetComponent<RectTransform>();
-        if (last == null || mine == null) return;
+        if (last == null || mine == null)
+        {
+            // Nowhere to go: hidden, rather than left on top of the button it was copied from.
+            if (_button.activeSelf) _button.SetActive(false);
+            if (!_unplaced) Plugin.Log.LogWarning($"[switch] no {LastName} on the main menu to go under - the switch is hidden");
+            _unplaced = true;
+            return;
+        }
 
         float gap = above != null ? above.anchoredPosition.y - last.anchoredPosition.y : 70f;
         if (gap < 20f || gap > 200f) gap = 70f;
         var at = new Vector2(last.anchoredPosition.x, last.anchoredPosition.y - gap);
         if (mine.anchoredPosition != at) mine.anchoredPosition = at;
+        if (!_button.activeSelf) _button.SetActive(true);
     }
 
     private static string Words()
@@ -138,17 +160,53 @@ internal static class FullyLoadedSwitch
         return LiarsBar8P.Words.F(Plugin.Off ? OffWords : OnWords, Plugin.TagName);
     }
 
+    /// <summary>The words on the button, in a face that has their letters.</summary>
+    private static void Show()
+    {
+        if (_text == null) return;
+        string words = Words();
+        if (_text.text == words) return;
+        FitFace(words);
+        _text.text = words;
+    }
+
+    /// <summary>
+    /// The copy keeps the face its button had when it was made. With the mod on, the mod's faces
+    /// stand behind the game's (ModCanvas), so every language draws; with it off nothing does. So
+    /// when the words have letters the copied face lacks (Cyrillic in Oswald Bold, say), the button
+    /// takes the game's own face for the language instead, the one ModCanvas.FaceFor gives, and it
+    /// goes back to the copied face and its look as soon as that can draw the words again.
+    /// </summary>
+    private static void FitFace(string words)
+    {
+        var want = _face != null && Draws(_face, words) ? _face : ModCanvas.FaceFor(LiarsBar8P.Words.Now);
+        if (want == null || want == _text.font || !Draws(want, words)) return;
+        _text.font = want;
+        if (want == _face && _faceMat != null) _text.fontSharedMaterial = _faceMat;
+    }
+
+    private static bool Draws(TMP_FontAsset font, string words)
+    {
+        foreach (char c in words)
+            if (c > '~' && !font.HasCharacter(c, true, true)) return false;
+        return true;
+    }
+
     private static void Click()
     {
         try
         {
             if (_restarting || Plugin.FullyLoaded == null) return;
 
-            if (Time.unscaledTime >= _armedUntil)
+            float now = Time.unscaledTime;
+            if (now >= _armedUntil)
             {
-                _armedUntil = Time.unscaledTime + ArmSeconds;
+                _armedAt = now;
+                _armedUntil = now + ArmSeconds;
+                Show();   // the question at once, not at the next tick
                 return;
             }
+            if (now - _armedAt < AnswerAfterSeconds) return;   // a double-click only asks
             _armedUntil = -1f;
 
             bool on = Plugin.Off;   // what it becomes: the other of what is running now
@@ -156,7 +214,12 @@ internal static class FullyLoadedSwitch
             Plugin.Log.LogInfo($"[switch] {Plugin.DisplayName} turned {(on ? "on" : "off")} from the main menu - restarting the game");
 
             _restarting = true;
-            if (!Restart()) _failed = true;
+            Show();
+            if (!Restart())
+            {
+                _failed = true;
+                Show();
+            }
         }
         catch (Exception e)
         {
@@ -176,6 +239,14 @@ internal static class FullyLoadedSwitch
     /// </summary>
     private static bool Restart()
     {
+        // An update waiting for this copy to close goes in as it closes (AutoUpdate.OnQuit). A copy
+        // started now would load the old plugin and hold it, so, as the updater does, no restart:
+        // the player closes the game, and the next start has both the update and the new setting.
+        if (AutoUpdate.Waiting)
+        {
+            Plugin.Log.LogInfo("[switch] an update is waiting for the game to close - restart the game by hand");
+            return false;
+        }
         try
         {
             string exe = BepInEx.Paths.ExecutablePath;

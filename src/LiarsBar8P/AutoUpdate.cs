@@ -104,6 +104,12 @@ internal static class AutoUpdate
     private static string _here;
     private static string _pending;   // new plugin waiting to be moved in when the game closes
 
+    /// <summary>Whether a downloaded update is waiting for the game to close before it goes in (<see cref="OnQuit"/>).</summary>
+    internal static bool Waiting
+    {
+        get { string fresh = _pending; return !string.IsNullOrEmpty(fresh) && File.Exists(fresh); }
+    }
+
     internal static void Start()
     {
         try
