@@ -16,6 +16,10 @@ Versions that were once numbered 1.x and 2.x were folded into the same 0.x line 
 room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order is unchanged: what
 was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v3.0.2 — Liar calls work again in Liar's Dice and Liar's Slots
+
+- **Fixed: a liar call froze Liar's Dice and Liar's Slots.** When anyone but the host called a player a liar (or called spot on in Liar's Dice), the table stopped and only restarting the game got out of it. The host's fair-play check counted the call as out of turn, because the game ends the caller's turn as it announces the call. The host now accepts a call that the caller announced on their own turn, so the check still turns away calls made out of turn. Reported in issue #5.
+
 ## v3.0.1 — Turn Fully Loaded off without uninstalling
 
 - A **FULLY LOADED: ON / OFF** button on the main menu. Click it twice to turn the mod off: the game restarts and plays exactly like the base game, ranked included, with only that button left. Click it twice again to turn everything back on.

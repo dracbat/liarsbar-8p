@@ -253,6 +253,7 @@ internal static class FairSpin
     internal struct Facts
     {
         internal bool Dead, HaveTurn, MovedThisTurn, AnsweredThisTurn, CanGiveBid, CallingLiar;
+        internal bool Announced;   // this liar call was announced on the turn the seat held (FairCalls.Announced)
         internal bool BetBefore, LastBetNone, LastBetIsMe, PenaltyPending;
         internal bool PayerNoted, IsPayer;   // the host noted which seat takes the all-red penalty, and whether it is this one
         internal int LastShowsCount, MaxCount, Count, Points;
@@ -262,10 +263,10 @@ internal static class FairSpin
     /// <summary>The highest claim no copy of any build could send: four reels a seat at the largest table.</summary>
     internal static int HardCeiling(int maxCount) => Math.Max(maxCount, SpinBidCap.ReelsPerSeat * Limits.LobbySeats);
 
-    private static Verdict InTurn(in Facts f, out string why)
+    private static Verdict InTurn(in Facts f, out string why, bool announced = false)
     {
         if (f.Dead) { why = "a move from a seat out of the match"; return Verdict.Refuse; }
-        if (!f.HaveTurn) { why = "a move out of turn"; return Verdict.Refuse; }
+        if (!f.HaveTurn && !announced) { why = "a move out of turn"; return Verdict.Refuse; }
         if (f.MovedThisTurn) { why = "a second move in one turn"; return Verdict.Refuse; }
         why = null;
         return Verdict.Allow;
@@ -296,7 +297,9 @@ internal static class FairSpin
 
     internal static Verdict Call(in Facts f, out string why)
     {
-        var v = InTurn(f, out why);
+        // The game's "LIAR!" announcement ends the caller's turn on the host a moment before the
+        // call itself arrives, so a call announced on the seat's own turn counts as made on it.
+        var v = InTurn(f, out why, f.Announced);
         if (v != Verdict.Allow) return v;
         if (!f.CanGiveBid) { why = "a liar call after the moment to move had passed"; return Verdict.Refuse; }
         if (f.CallingLiar) { why = "a liar call while one is under way"; return Verdict.Refuse; }
@@ -373,7 +376,8 @@ internal static class FairSpin
     private delegate Verdict Rule(in Facts f, out string why);
 
     /// <summary>One move from a remote player: judge it, and let the game's own handler run only when allowed.</summary>
-    private static bool Judge(SpinGamePlay gp, NetworkConnectionToClient sender, Rule rule, int count, string kind, string what)
+    private static bool Judge(SpinGamePlay gp, NetworkConnectionToClient sender, Rule rule, int count, string kind, string what,
+                              bool call = false)
     {
         try
         {
@@ -384,6 +388,7 @@ internal static class FairSpin
             var p = FairLegal.SeatOf(gp);
             if (kind != null) PenaltyFirst(p);
             var f = Gather(gp, p, count);
+            if (call) f.Announced = FairCalls.Announced.Take(p, FairCalls.Announced.Kind.Liar);
             var v = rule(f, out string why);
             if (v == Verdict.Allow)
             {
@@ -416,7 +421,7 @@ internal static class FairSpin
     [HarmonyPriority(Priority.High)]
     [HarmonyPatch(typeof(SpinGamePlay), nameof(SpinGamePlay.UserCode_CallLiar))]
     private static bool CallLiar(SpinGamePlay __instance) =>
-        Judge(__instance, Fair.Sender, Call, 0, Move, "liar call");
+        Judge(__instance, Fair.Sender, Call, 0, Move, "liar call", call: true);
 
     [HarmonyPrefix]
     [HarmonyPriority(Priority.High)]
@@ -510,6 +515,12 @@ internal static class FairSpin
         FairLegalTest.Expect(T, "liar call on an execution", Call(f, out _), Verdict.Refuse, ref failed);
         f = ok; f.CallingLiar = true;
         FairLegalTest.Expect(T, "liar call while one is under way", Call(f, out _), Verdict.Refuse, ref failed);
+        f = ok; f.HaveTurn = false; f.Announced = true;
+        FairLegalTest.Expect(T, "liar call announced on the seat's turn, which the announcement ended", Call(f, out _), Verdict.Allow, ref failed);
+        f = ok; f.HaveTurn = false;
+        FairLegalTest.Expect(T, "liar call out of turn, not announced on the seat's turn", Call(f, out _), Verdict.Refuse, ref failed);
+        f = ok; f.Count = 2; f.HaveTurn = false; f.Announced = true;
+        FairLegalTest.Expect(T, "claim out of turn, even after an announcement", Rise(f, out _), Verdict.Refuse, ref failed);
 
         f = ok; f.PenaltyPending = true;
         FairLegalTest.Expect(T, "all-red penalty taken by another seat", Penalty(f, out _), Verdict.Allow, ref failed);

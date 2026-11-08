@@ -10,7 +10,7 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "liarsbar.eightplayers";
-    public const string Version = "3.0.1";
+    public const string Version = "3.0.2";
 
     /// <summary>
     /// The mod's name as players see it, and the one place it is written. Only words on screen
