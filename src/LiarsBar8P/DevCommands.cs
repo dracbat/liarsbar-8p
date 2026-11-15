@@ -142,9 +142,9 @@ internal static class DevCommands
                 // Two different things, and the gap between them is the bug that made a
                 // table look dealt while nobody physically held a card. Counts only, except
                 // inside the loopback test harness.
-                string values = Fair.TestsAllowed ? $" {Types(gp.cardTypes)}" : "";
-                sb.AppendLine($"  seat {p.Slot}: {Count(gp.cardTypes)} card values{values}, " +
-                              $"{Count(gp.Cards)} card objects, haveCards={gp.HaveCards}");
+                string values = Fair.TestsAllowed ? $" {Types(gp._cardTypes)}" : "";
+                sb.AppendLine($"  seat {p.Slot}: {Count(gp._cardTypes)} card values{values}, " +
+                              $"{Count(gp.cards)} card objects, haveCards={gp.haveCards}");
             }
         }
         catch (Exception e) { sb.AppendLine($"  failed: {e.Message}"); }

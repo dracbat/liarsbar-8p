@@ -74,7 +74,7 @@ internal static class TurnRingProbe
 
                 _reachable = new HashSet<int>();
                 foreach (var p in m.Players)
-                    if (p != null && !p.Dead && !p.Fnished) _reachable.Add(p.Slot);
+                    if (p != null && !p.Dead && !p.Finished) _reachable.Add(p.Slot);
 
                 // Twice round rather than once. Some tables move the turn on themselves - the
                 // Chaos deck throws for a player who is slow - so the sequence this sees is

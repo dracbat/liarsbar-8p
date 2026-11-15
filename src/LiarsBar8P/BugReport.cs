@@ -39,7 +39,7 @@ namespace LiarsBar8P;
 internal static class BugReport
 {
     // Every word a player sees from this class. The button is in the footer's own title case,
-    // beside Back and Restore Defaults.
+    // beside Back, Restore Defaults and Apply.
     private const string ButtonWords = "Save Bug Report";
     private const string SavedWords = "Bug report saved: ";
     private const string FailedWords = "Could not save the bug report";
@@ -386,7 +386,9 @@ internal static class BugReport
         return SceneManager.GetActiveScene().name == Matchmaking.Menu ? "menu" : "elsewhere";
     }
 
-    private static readonly string[] DeckVariants = { "Basic", "Devil", "Chaos", "Deck 2" };
+    // The deck arrows' numbers since the game's 14 Nov 2026 update: 2 is Chaos 2 (the 16-card
+    // deck), 4 the classic Chaos deck.
+    private static readonly string[] DeckVariants = { "Basic", "Devil", "Chaos 2", "Deck 2", "Chaos" };
     private static readonly string[] DiceVariants = { "Basic", "Traditional" };
 
     private static string Mode()
@@ -429,15 +431,26 @@ internal static class BugReport
     internal static class SettingsButton
     {
         /// <summary>
-        /// Back, never <c>btn_back (1)</c> beside it: that one is Restore Defaults, and a copy of it
-        /// that kept a saved click would reset a player's settings. Back exists in the menu's
-        /// settings and in a match's, and its own click only plays a sound.
+        /// Back, never Restore Defaults beside it: a copy of that one that kept a saved call would
+        /// reset a player's settings. Back exists in the menu's settings and in a match's, and its
+        /// own click only plays a sound and goes back.
+        ///
+        /// Since the game's 14 Nov 2026 update the settings are a new screen, the same in the menu
+        /// and in a match: Back, Restore Defaults and Apply side by side in the footer's row, each
+        /// with its words on a child label. The old screens are still in the scenes but never
+        /// shown, so the new footer comes first and the old one is only a fallback.
         /// </summary>
-        private const string MenuBack = "state_settings/footer/btn_back";
-        private const string MatchBack = "Pause/Group/state_settings/footer/btn_back";
+        private static readonly (string Path, bool Menu)[] Backs =
+        {
+            ("SettingsMenu/Footer/Buttons/Button_Back", true),
+            ("PauseMenu/SettingsPage/Footer/Buttons/Button_Back", false),
+            ("state_settings/footer/btn_back", true),
+            ("Pause/Group/state_settings/footer/btn_back", false),
+        };
+
         internal const string Name = "LB8P_SaveReport";
 
-        /// <summary>Left of Restore Defaults in the menu, and in the same spot in a match, which has only Back.</summary>
+        /// <summary>On the old screens: left of Restore Defaults in the menu, and the same spot in a match, which has only Back.</summary>
         private static readonly Vector2 Spot = new(-460f, 20f);
 
         /// <summary>The button, once it is up, for the test driver.</summary>
@@ -451,9 +464,13 @@ internal static class BugReport
             {
                 if (__instance == null || RankedGuard.Near) return;
 
+                Transform back = null;
                 bool menu = true;
-                var back = __instance.transform.Find(MenuBack);
-                if (back == null) { back = __instance.transform.Find(MatchBack); menu = false; }
+                foreach (var (path, inMenu) in Backs)
+                {
+                    back = __instance.transform.Find(path);
+                    if (back != null) { menu = inMenu; break; }
+                }
                 if (back == null)
                 {
                     Plugin.Log.LogWarning("[bugreport] no Back button in these settings - no report button here");
@@ -464,23 +481,41 @@ internal static class BugReport
                 var copy = UiClone.Make(back.gameObject, back.parent, Name, new Action(Pressed));
                 if (copy == null) return;
 
-                var text = copy.GetComponent<TextMeshProUGUI>();
+                // The new footer's buttons are laid out by their row, and each sizes itself to its
+                // words; the old ones were placed by hand, with the words on the button itself.
+                bool row = back.parent.GetComponent<UnityEngine.UI.HorizontalLayoutGroup>() != null;
+                var text = copy.GetComponent<TextMeshProUGUI>() ?? copy.GetComponentInChildren<TextMeshProUGUI>(true);
                 if (text != null)
                 {
-                    float size = text.fontSize;
                     text.text = LiarsBar8P.Words.T(ButtonWords);
-                    text.enableAutoSizing = true;
-                    text.fontSizeMax = size;
-                    text.fontSizeMin = 18f;
+                    if (!row)
+                    {
+                        float size = text.fontSize;
+                        text.enableAutoSizing = true;
+                        text.fontSizeMax = size;
+                        text.fontSizeMin = 18f;
+                    }
 
                     // Those of a scene gone are dropped here, so the list holds only buttons still up.
                     _labels.RemoveAll(l => l == null);
                     _labels.Add(text);
                 }
 
-                var box = copy.GetComponent<RectTransform>();
-                box.anchorMin = box.anchorMax = new Vector2(1f, 0.5f);
-                box.anchoredPosition = Spot;
+                if (row)
+                {
+                    // Last in the row, after Apply, where the row still has room before its prompts.
+                    copy.transform.SetAsLastSibling();
+
+                    // Back's own feel clicks with the game's going-back sound; this one is a plain button.
+                    var feel = copy.GetComponent<UIFeel>();
+                    if (feel != null) feel.overrideClickSound = false;
+                }
+                else
+                {
+                    var box = copy.GetComponent<RectTransform>();
+                    box.anchorMin = box.anchorMax = new Vector2(1f, 0.5f);
+                    box.anchoredPosition = Spot;
+                }
 
                 Made = copy.GetComponent<UnityEngine.UI.Button>();
                 Plugin.Log.LogInfo($"[bugreport] the report button is in the {(menu ? "menu's" : "match's")} settings");

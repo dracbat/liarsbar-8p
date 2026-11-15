@@ -1018,7 +1018,7 @@ internal static class Matchmaking
             if (ChatArayuz.instance == null) return;
 
             var chat = UnityEngine.Object.FindObjectOfType<ChatNetwork>();
-            if (chat != null) chat.RpcHandleMessage(line);
+            if (chat != null) chat.RpcHandleMessage(Plugin.TagName, line);
         }
         catch (Exception e) { Plugin.Log.LogWarning($"[matchmaking] could not tell the room: {e.Message}"); }
     }

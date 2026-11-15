@@ -31,12 +31,12 @@ internal static class HiddenCards
     internal const int DecoyCard = HiddenDeal.DecoyCard;
 
     // The cards of every hand the host does not own: the card objects (Liar's Deck shapes), the
-    // card parts (Chaos shapes) and the poker card parts. Rebuilt a few times a second.
-    private static readonly HashSet<IntPtr> _objects = new(), _cards = new(), _poker = new();
+    // card parts (Chaos shapes). Rebuilt a few times a second.
+    private static readonly HashSet<IntPtr> _objects = new(), _cards = new();
     private static int _builtAt = -1000, _frame = -1;
     private static bool _on;
 
-    internal static int HiddenCount => _objects.Count + _poker.Count;
+    internal static int HiddenCount => _objects.Count;
 
     private static void Register() => Fair.OnTick("hidden cards", Tick);
 
@@ -68,7 +68,6 @@ internal static class HiddenCards
     {
         _objects.Clear();
         _cards.Clear();
-        _poker.Clear();
         _builtAt = -1000;
     }
 
@@ -78,7 +77,6 @@ internal static class HiddenCards
         _builtAt = Time.frameCount;
         _objects.Clear();
         _cards.Clear();
-        _poker.Clear();
         var m = Manager.Instance;
         if (m == null) return;
         foreach (var p in TableHand.Seats(m))
@@ -88,19 +86,10 @@ internal static class HiddenCards
                 if (p == null || p.isOwned) continue;
 
                 var deck = p.GetComponent<DeckGameplay>();
-                if (deck != null) AddCards(deck.Cards);
+                if (deck != null) AddCards(deck.cards);
 
                 var chaos = p.GetComponent<ChaosDeckGameplay>();
                 if (chaos != null) AddCards(chaos.Cards);
-
-                var poker = p.GetComponent<PokerGamePlay>();
-                if (poker != null && poker.Cards != null)
-                    foreach (var go in poker.Cards)
-                    {
-                        if (go == null) continue;
-                        var pc = go.GetComponent<PokerCard>();
-                        if (pc != null) _poker.Add(pc.Pointer);
-                    }
             }
             catch { }
         }
@@ -153,36 +142,7 @@ internal static class HiddenCards
         catch { }
     }
 
-    /// <summary>
-    /// Two-Card Poker paints a card's face from its value every frame. For a hand the host does
-    /// not own, the value is plain for the length of the painting only and put straight back.
-    /// </summary>
-    [HarmonyPrefix]
-    [HarmonyPatch(typeof(PokerCard), nameof(PokerCard.SetCard))]
-    private static void PokerFace(PokerCard __instance, out int __state)
-    {
-        __state = int.MinValue;
-        try
-        {
-            if (__instance == null || __instance.cardtype == DecoyCard || !Ready()) return;
-            if (!_poker.Contains(__instance.Pointer)) return;
-            __state = __instance.cardtype;
-            __instance.cardtype = DecoyCard;
-        }
-        catch { }
-    }
-
-    [HarmonyFinalizer]
-    [HarmonyPatch(typeof(PokerCard), nameof(PokerCard.SetCard))]
-    private static Exception PokerFaceDone(Exception __exception, PokerCard __instance, int __state)
-    {
-        try { if (__state != int.MinValue && __instance != null) __instance.cardtype = __state; }
-        catch { }
-        return __exception;
-    }
-
     // ------------------------------------------------------------------ for the test driver
 
     internal static bool IsHidden(GameObject go) => go != null && _objects.Contains(go.Pointer);
-    internal static bool IsHidden(PokerCard pc) => pc != null && _poker.Contains(pc.Pointer);
 }

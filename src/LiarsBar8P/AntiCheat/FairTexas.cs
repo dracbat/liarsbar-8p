@@ -7,32 +7,45 @@ using UnityEngine;
 namespace LiarsBar8P;
 
 /// <summary>
-/// Liar's Texas (Liar's Poker): at a table this copy hosts, the host accepts a player's call,
+/// Liar's Poker (the lobby's Texas): at a table this copy hosts, the host accepts a player's call,
 /// all-in and fold only in the order the game itself makes them, judged from its own record.
 ///
 /// <list type="bullet">
 /// <item>A call or an all-in needs the seat to hold the turn and not to have called already in
 /// that turn. The one exception is an all-in the host itself asked that seat for when an all-in
-/// round ends: that one is accepted whenever it comes. Anything else is refused quietly.</item>
-/// <item>A fold is accepted when the seat began one (the game's fold always opens with its own
-/// message first) or the host itself told the seat to fold. A fold out of nowhere is refused,
-/// at a table this copy has hosted since the match began. A fold ends only once the host has
-/// rolled the seat's pull (<see cref="HostDecidesTexas"/>); until then its end is refused.</item>
+/// round ends: that one is accepted whenever it comes. Anything else is refused quietly. Nothing
+/// takes the turn from a seat before its call arrives: the game hands the turn on a moment after
+/// the call itself.</item>
+/// <item>A fold is accepted when the seat began one (the game's own fold always opens with its own
+/// message first) or the host itself told the seat to fold. A fold out of nowhere is refused, at a
+/// table this copy has hosted since the match began.</item>
+/// <item>Every fold the seat began takes a pull of its revolver, which its game asks the host for
+/// before it ends the fold. A fold that ends without asking is never refused, which would leave the
+/// table waiting on a turn nobody holds: the host rolls that pull itself, through the game's own
+/// handling, before the fold ends, and answers a late request with the same outcome.</item>
 /// <item>The Coward's Fold is spent once used. The host keeps the last moment its record showed
 /// the seat still had one. A Coward's Fold from a seat whose record has shown none for a long
 /// while, or a fold message in a form the game never sends, removes the player.</item>
 /// </list>
 ///
-/// Turn checks are not used on folds: the game hands the turn on as soon as a fold begins, and
-/// the host itself orders folds and all-ins outside anybody's turn. Bots never send these, and
-/// the host's own seat is never checked.
+/// Since the game's 14 Nov 2026 update the host settles every pull itself (the shot's outcome is
+/// the game's, rolled on the host), so this only keeps the order of the moves. Turn checks are not
+/// used on folds: the game takes the turn from a seat in the very message that begins its fold,
+/// and the host itself orders folds and all-ins outside anybody's turn. Bots never send these, the
+/// host's own seat is never checked, and neither is the test harness playing a seat from the host.
 /// </summary>
-[FairPatch("Liar's Texas: the host accepts only calls and folds the rules allow")]
+[FairPatch("Liar's Poker: the host accepts only calls and folds the rules allow")]
 [HarmonyPatch]
 internal static class FairTexas
 {
     /// <summary>How long the host must have seen a seat without a Coward's Fold before using one is a cheat.</summary>
     internal const float CowardWindow = 30f;
+
+    /// <summary>
+    /// How long a fold the seat began may go without its pull being asked for before the host rolls
+    /// it: many times what any honest game takes, which is the time a revolver takes to come up.
+    /// </summary>
+    internal const float PullDeadline = 30f;
 
     private const string Raise = "texas raise";
 
@@ -45,6 +58,12 @@ internal static class FairTexas
     private static readonly Dictionary<uint, int> _foldAsked = new();
     private static readonly Dictionary<uint, int> _foldBegun = new();
 
+    /// <summary>A fold the seat began whose pull has not been asked for yet, and since when.</summary>
+    private static readonly Dictionary<uint, float> _owed = new();
+
+    /// <summary>A fold whose pull the host rolled itself: a request that comes after gets the same outcome.</summary>
+    private static readonly HashSet<uint> _hostSettled = new();
+
     private static void Fresh()
     {
         if (_match == Fair.Match) return;
@@ -54,6 +73,8 @@ internal static class FairTexas
         _allInAsked.Clear();
         _foldAsked.Clear();
         _foldBegun.Clear();
+        _owed.Clear();
+        _hostSettled.Clear();
     }
 
     private static void Look(TexasGamePlay gp, float now)
@@ -84,25 +105,40 @@ internal static class FairTexas
 
     /// <summary>The host asks a seat to go all in as an all-in round ends: that seat's all-in is then expected.</summary>
     [HarmonyPostfix]
-    [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.ALLINTargetRpc))]
-    private static void AllInAsked(TexasGamePlay __instance)
+    [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.AllInTargetRpc))]
+    private static void AllInAsked(TexasGamePlay __instance, NetworkConnectionToClient cn)
     {
-        try { if (NetworkServer.active && __instance != null) { Fresh(); Count(_allInAsked, __instance.netId, 1); } }
+        try
+        {
+            if (!NetworkServer.active || __instance == null || !Fair.IsRemote(cn)) return;
+            Fresh();
+            Count(_allInAsked, __instance.netId, 1);
+        }
         catch { }
     }
 
-    /// <summary>The host tells a seat to fold: that seat's fold is then expected.</summary>
+    /// <summary>
+    /// The host tells a seat to fold, with a shot it has already rolled: that seat's fold is then
+    /// expected. Since the game's 14 Nov 2026 update the message goes out from inside this, without
+    /// the call it used to go through, and with no opening message from the seat when the host
+    /// asks for none.
+    /// </summary>
     [HarmonyPostfix]
-    [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.FoldTargetRpc))]
-    private static void FoldAsked(TexasGamePlay __instance)
+    [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.ServerFoldShot))]
+    private static void FoldAsked(TexasGamePlay __instance, NetworkConnectionToClient cn)
     {
-        try { if (NetworkServer.active && __instance != null) { Fresh(); Count(_foldAsked, __instance.netId, 1); } }
+        try
+        {
+            if (!NetworkServer.active || __instance == null || !Fair.IsRemote(cn)) return;
+            Fresh();
+            Count(_foldAsked, __instance.netId, 1);
+        }
         catch { }
     }
 
     private static void Register()
     {
-        Fair.OnTick("Liar's Texas record", Tick);
+        Fair.OnTick("Liar's Poker record", Tick);
         Fair.OnDrive("texas", Test);
     }
 
@@ -111,6 +147,7 @@ internal static class FairTexas
 
     private static float _nextLook;
     private static int _texasMatch = -1;
+    private static readonly List<uint> _late = new();
 
     private static void Tick()
     {
@@ -130,6 +167,44 @@ internal static class FairTexas
 
         foreach (var p in m.Players)
             if (p != null) Look(p.GetComponent<TexasGamePlay>(), now);
+
+        // A fold whose pull was never asked for, long past any honest game's time: rolled by the host.
+        if (_owed.Count == 0) return;
+        _late.Clear();
+        foreach (var kv in _owed)
+            if (now - kv.Value >= PullDeadline) _late.Add(kv.Key);
+        foreach (var id in _late)
+        {
+            _owed.Remove(id);
+            foreach (var p in m.Players)
+            {
+                var gp = p != null ? p.GetComponent<TexasGamePlay>() : null;
+                if (gp == null || gp.netId != id) continue;
+                if (!p.Dead && SettleOwed(gp))
+                    Fair.Refused($"connection {(gp.connectionToClient != null ? gp.connectionToClient.connectionId : -1)}: " +
+                                 $"Liar's Poker fold ({SeatName(p)}): its pull was not asked for in {PullDeadline:0} s; the host rolled it");
+                break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Roll a fold's pull for the seat, through the game's own handling of the seat's request: the
+    /// shot, a death and the outcome sent to the seat are all the game's. True when it ran.
+    /// </summary>
+    private static bool SettleOwed(TexasGamePlay gp)
+    {
+        try
+        {
+            Fair.AsSentBy(null, () => gp.UserCode_CmdRequestRevolverOutcome());
+            _hostSettled.Add(gp.netId);
+            return true;
+        }
+        catch (Exception e)
+        {
+            Plugin.Log.LogWarning($"{Fair.Tag} Liar's Poker: the host could not roll a fold's pull: {e.Message}");
+            return false;
+        }
     }
 
     // ------------------------------------------------------------------ the rules
@@ -167,9 +242,12 @@ internal static class FairTexas
         return Verdict.Allow;
     }
 
+    /// <summary>
+    /// The end of a fold. A fold the seat began and whose pull it never asked for is allowed too:
+    /// the host rolls that pull itself first (see the class comment), so it is never a reason here.
+    /// </summary>
     internal static Verdict Folded(in Facts f, out string why)
     {
-        if (f.PullOwed) { why = "a fold that ended before the host had rolled its pull"; return Verdict.Refuse; }
         if (f.FoldExpected > 0 || !f.Watched) { why = null; return Verdict.Allow; }
         why = "a fold the seat never began and the host never asked for";
         return Verdict.Refuse;
@@ -189,7 +267,7 @@ internal static class FairTexas
         bool seen = _since.TryGetValue(id, out float since);
         f.CowardRecently = _hadCoward.TryGetValue(id, out float had) && had >= now - CowardWindow;
         f.WatchedLongEnough = seen && since <= now - CowardWindow;
-        f.PullOwed = HostDecidesTexas.PullOwed(id);
+        f.PullOwed = _owed.ContainsKey(id);
 
         if (p != null)
         {
@@ -209,10 +287,14 @@ internal static class FairTexas
 
     private static string SeatName(PlayerStats p) => p != null ? $"seat {p.Slot}" : "no seat";
 
+    /// <summary>
+    /// A call or an all-in. The seat still holds the turn here when it is its own: the game takes it
+    /// away a moment later, from the call itself (TexasGamePlay.WaitForGiveTurn).
+    /// </summary>
     [HarmonyPrefix]
     [HarmonyPriority(Priority.High)]
-    [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.UserCode_CMDRised__Boolean))]
-    private static bool CMDRised(TexasGamePlay __instance, bool AllInN)
+    [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.UserCode_CmdRised__Boolean))]
+    private static bool CmdRised(TexasGamePlay __instance, bool allIn)
     {
         try
         {
@@ -222,27 +304,32 @@ internal static class FairTexas
 
             var p = FairLegal.SeatOf(__instance);
             var f = Gather(__instance, p);
-            f.AllIn = AllInN;
+            f.AllIn = allIn;
             var v = Rised(f, out string why);
             if (v != Verdict.Allow)
-                return FairLegal.Apply(v, conn, $"Liar's Texas {(AllInN ? "all-in" : "call")} ({SeatName(p)}): {why}");
+                return FairLegal.Apply(v, conn, $"Liar's Poker {(allIn ? "all-in" : "call")} ({SeatName(p)}): {why}");
 
-            if (AllInN && f.AllInAsked) Count(_allInAsked, __instance.netId, -1);
+            if (allIn && f.AllInAsked) Count(_allInAsked, __instance.netId, -1);
             else FairTurnCount.Acted(p, Raise);
             return true;
         }
         catch (Exception e)
         {
-            Plugin.Log.LogWarning($"{Fair.Tag} Liar's Texas call check failed, the game's own handling runs: {e.Message}");
+            Plugin.Log.LogWarning($"{Fair.Tag} Liar's Poker call check failed, the game's own handling runs: {e.Message}");
             return true;
         }
     }
 
-    /// <summary>The message every fold opens with (and the one a shot the host ordered opens with).</summary>
+    /// <summary>
+    /// The message every fold opens with (and the one a showdown shot opens with, which is no fold).
+    /// The game takes the turn away in this very message, so the turn is never asked about here. A
+    /// fold the host asked for is already expected; any other is the seat's own, and its pull is
+    /// then owed until the seat asks for it.
+    /// </summary>
     [HarmonyPrefix]
     [HarmonyPriority(Priority.High)]
-    [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.UserCode_playcmdses__Boolean__Boolean))]
-    private static bool FoldBegin(TexasGamePlay __instance, bool nofold, bool coward)
+    [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.UserCode_PlayCmdSes__Boolean__Boolean))]
+    private static bool FoldBegin(TexasGamePlay __instance, bool noFold, bool coward)
     {
         try
         {
@@ -250,32 +337,96 @@ internal static class FairTexas
             var conn = FairLegal.RemoteOwner(__instance, Fair.Sender);
             if (conn == null) return true;
 
+            // Counted before anything else can fail: a fold that began and was not counted would
+            // have its end refused, and nothing else hands the turn on.
+            Fresh();
+            uint id = __instance.netId;
+            bool own = !noFold && Of(_foldAsked, id) == 0;
+            if (own)
+            {
+                Count(_foldBegun, id, 1);
+                _owed[id] = Time.unscaledTime;
+                _hostSettled.Remove(id);
+            }
+
             var p = FairLegal.SeatOf(__instance);
             var f = Gather(__instance, p);
-            f.NoFold = nofold;
+            f.NoFold = noFold;
             f.Coward = coward;
             var v = FoldBegins(f, out string why);
-            if (v != Verdict.Allow)
-                return FairLegal.Apply(v, conn, $"Liar's Texas fold ({SeatName(p)}): {why}");
+            if (v == Verdict.Allow) return true;
 
-            if (!nofold)
+            if (own)
             {
-                Count(_foldBegun, __instance.netId, 1);
-                HostDecidesTexas.Owe(__instance, fold: true, orderedFold: false);   // every fold takes a pull
+                Count(_foldBegun, id, -1);
+                _owed.Remove(id);
             }
-            return true;
+            return FairLegal.Apply(v, conn, $"Liar's Poker fold ({SeatName(p)}): {why}");
         }
         catch (Exception e)
         {
-            Plugin.Log.LogWarning($"{Fair.Tag} Liar's Texas fold check failed, the game's own handling runs: {e.Message}");
+            Plugin.Log.LogWarning($"{Fair.Tag} Liar's Poker fold check failed, the game's own handling runs: {e.Message}");
             return true;
         }
     }
 
-    /// <summary>The end of a fold. Its body is compiled into Mirror's handler, so the handler is what is patched.</summary>
+    /// <summary>Developer test "fair texas foldend": the armed seat's fold ends before its pull is asked for.</summary>
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.UserCode_PlayCmdSes__Boolean__Boolean))]
+    private static void FoldBegun(TexasGamePlay __instance, bool noFold, bool __runOriginal)
+    {
+        if (_foldEndTest < 0 || noFold || !__runOriginal || !Fair.TestsAllowed) return;
+        try
+        {
+            var conn = FairLegal.RemoteOwner(__instance, Fair.Sender);
+            if (conn == null || conn.connectionId != _foldEndTest) return;
+            _foldEndTest = -1;
+            FoldEndsNow(__instance, conn);
+        }
+        catch (Exception e) { Fair.Result("texas foldend", false, $"the test failed: {e.Message}"); }
+    }
+
+    /// <summary>
+    /// A request for a seat's pull. Its pull is no longer owed. If the host already rolled it for a
+    /// fold that ended first, the seat gets that same outcome, and the game does not roll again.
+    /// </summary>
     [HarmonyPrefix]
     [HarmonyPriority(Priority.High)]
-    [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.InvokeUserCode_CMDFolded))]
+    [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.UserCode_CmdRequestRevolverOutcome))]
+    private static bool PullAsked(TexasGamePlay __instance)
+    {
+        try
+        {
+            if (!Fair.Hosting) return true;
+            var conn = FairLegal.RemoteOwner(__instance, Fair.Sender);
+            if (conn == null) return true;
+
+            Fresh();
+            uint id = __instance.netId;
+            _owed.Remove(id);
+            if (!_hostSettled.Remove(id)) return true;
+
+            __instance.TargetReceiveRevolverOutcome(conn, __instance._shotWillDie, __instance._shotGodSave);
+            Plugin.Log.LogInfo($"{Fair.Tag} connection {conn.connectionId}: a late request for a Liar's Poker pull the host " +
+                               "already rolled - the same outcome sent again, no second roll");
+            return false;
+        }
+        catch (Exception e)
+        {
+            Plugin.Log.LogWarning($"{Fair.Tag} Liar's Poker pull request not checked, the game's own handling runs: {e.Message}");
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// The end of a fold. Its body is compiled into Mirror's handler, so the handler is what is
+    /// patched. Every honest end follows a fold the seat began or the host asked for, and a fold the
+    /// seat began has asked for its pull before it ends: Mirror keeps each connection's messages in
+    /// order. One that has not is let through once the host has rolled the pull itself.
+    /// </summary>
+    [HarmonyPrefix]
+    [HarmonyPriority(Priority.High)]
+    [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.InvokeUserCode_CmdFolded))]
     private static bool FoldEnd(NetworkBehaviour obj, NetworkConnectionToClient senderConnection)
     {
         try
@@ -289,34 +440,67 @@ internal static class FairTexas
             var f = Gather(gp, p);
             var v = Folded(f, out string why);
             if (v != Verdict.Allow)
-                return FairLegal.Apply(v, conn, $"Liar's Texas fold ({SeatName(p)}): {why}");
+                return FairLegal.Apply(v, conn, $"Liar's Poker fold ({SeatName(p)}): {why}");
 
-            // One expected fold is used up: the one the seat began first, else one the host asked for.
             uint id = gp.netId;
-            if (Of(_foldBegun, id) > 0) Count(_foldBegun, id, -1);
-            else Count(_foldAsked, id, -1);
-            HostDecidesTexas.FoldEnded(id);
+            if (_owed.Remove(id) && p != null && !p.Dead && SettleOwed(gp))
+                Fair.Refused($"connection {conn.connectionId}: Liar's Poker fold ({SeatName(p)}): " +
+                             "a fold that ended before its pull was asked for; the host rolled it");
+
+            // One expected fold is used up: one the host asked for first, as the seat's own opening
+            // message counts as none while one is waiting; else the one the seat began.
+            if (Of(_foldAsked, id) > 0) Count(_foldAsked, id, -1);
+            else Count(_foldBegun, id, -1);
             return true;
         }
         catch (Exception e)
         {
-            Plugin.Log.LogWarning($"{Fair.Tag} Liar's Texas fold check failed, the game's own handling runs: {e.Message}");
+            Plugin.Log.LogWarning($"{Fair.Tag} Liar's Poker fold check failed, the game's own handling runs: {e.Message}");
             return true;
         }
     }
 
     // ------------------------------------------------------------------ developer tests
 
+    private static int _foldEndTest = -1;
+
+    /// <summary>
+    /// The test's fold end: the game's own handler for the seat's message, as that seat's copy
+    /// would send it, run right after the seat's fold began and before its pull is asked for.
+    /// </summary>
+    private static void FoldEndsNow(TexasGamePlay gp, NetworkConnectionToClient conn)
+    {
+        int refused = Fair.RefusedCount;
+        bool owed = _owed.ContainsKey(gp.netId);
+        var writer = NetworkWriterPool.Get();
+        var reader = NetworkReaderPool.Get(writer.ToArray());
+        try { Fair.AsSentBy(conn, () => TexasGamePlay.InvokeUserCode_CmdFolded(gp, reader, conn)); }
+        finally
+        {
+            NetworkReaderPool.Return(reader);
+            NetworkWriterPool.Return(writer);
+        }
+        var p = FairLegal.SeatOf(gp);
+        bool settled = _hostSettled.Contains(gp.netId);
+        Fair.Result("texas foldend", owed && settled && Fair.RefusedCount == refused + 1,
+                    $"connection {conn.connectionId} {SeatName(p)}: its fold ended before its pull was asked for - " +
+                    $"pull owed {owed}, rolled by the host {settled} (it {(gp._shotWillDie ? "fired" : "was empty")}), " +
+                    $"the fold went on: folded {gp.Folded}; its own request, when it comes, gets the same outcome");
+    }
+
     /// <summary>
     /// "fair texas": every rule against a table of cases, nothing at the table touched.
     /// "fair texas seat [conn] call|allin|fold|coward|end [turn=0|1] [raised=0|1] [asked=0|1]
-    /// [count=N] [recent=0|1] [watched=0|1] [expected=N] [owed=0|1] [enforce]": what the host would do
-    /// right now with that message from that player's seat. Nothing runs for the seat.
+    /// [count=N] [recent=0|1] [watched=0|1] [whole=0|1] [expected=N] [owed=0|1] [enforce]": what the
+    /// host would do right now with that message from that player's seat. Nothing runs for the seat.
+    /// "fair texas foldend [conn]": at that seat's next fold, the host ends the fold as the seat's
+    /// copy, before the seat asks for its pull, as a copy that skipped the request would.
     /// </summary>
     private static void Test(string rest)
     {
         var (words, pairs) = FairLegalTest.Parse(rest);
         if (words.Count > 0 && words[0].Equals("seat", StringComparison.OrdinalIgnoreCase)) { Seat(words, pairs); return; }
+        if (words.Count > 0 && words[0].Equals("foldend", StringComparison.OrdinalIgnoreCase)) { ArmFoldEnd(words); return; }
 
         int failed = 0;
         const string T = "texas";
@@ -337,8 +521,10 @@ internal static class FairTexas
         FairLegalTest.Expect(T, "all-in out of turn after a host migration", Rised(f, out _), Verdict.Allow, ref failed);
 
         FairLegalTest.Expect(T, "a plain fold begins", FoldBegins(ok, out _), Verdict.Allow, ref failed);
+        f = ok; f.HaveTurn = false;
+        FairLegalTest.Expect(T, "a fold begins, the turn already taken by the game", FoldBegins(f, out _), Verdict.Allow, ref failed);
         f = ok; f.NoFold = true;
-        FairLegalTest.Expect(T, "a shot the host ordered begins", FoldBegins(f, out _), Verdict.Allow, ref failed);
+        FairLegalTest.Expect(T, "a showdown shot begins", FoldBegins(f, out _), Verdict.Allow, ref failed);
         f = ok; f.Coward = true;
         FairLegalTest.Expect(T, "a Coward's Fold the seat has", FoldBegins(f, out _), Verdict.Allow, ref failed);
         f = ok; f.Coward = true; f.CowardCount = 0; f.CowardRecently = true;
@@ -357,11 +543,22 @@ internal static class FairTexas
         f = ok; f.FoldExpected = 0; f.Watched = false;
         FairLegalTest.Expect(T, "a fold ends after a host migration", Folded(f, out _), Verdict.Allow, ref failed);
         f = ok; f.FoldExpected = 1; f.PullOwed = true;
-        FairLegalTest.Expect(T, "a fold ends before the host rolled its pull", Folded(f, out _), Verdict.Refuse, ref failed);
+        FairLegalTest.Expect(T, "a fold ends before its pull was asked for (the host rolls it)", Folded(f, out _), Verdict.Allow, ref failed);
         f = ok; f.FoldExpected = 1; f.PullOwed = false;
-        FairLegalTest.Expect(T, "a fold ends after the host rolled its pull", Folded(f, out _), Verdict.Allow, ref failed);
+        FairLegalTest.Expect(T, "a fold ends after its pull was asked for", Folded(f, out _), Verdict.Allow, ref failed);
 
         Fair.Result(T, failed == 0, failed == 0 ? "every rule gave the expected verdict" : $"{failed} rule(s) gave the wrong verdict");
+    }
+
+    private static void ArmFoldEnd(List<string> words)
+    {
+        const string T = "texas foldend";
+        if (!Fair.Hosting) { Fair.Result(T, false, $"not hosting ({Fair.Why})"); return; }
+        var conn = Fair.TestConnection(FairLegalTest.ConnArg(words, 1));
+        var p = FairLegalTest.SeatOf(conn);
+        if (p == null || p.GetComponent<TexasGamePlay>() == null) { Fair.Result(T, false, "no remote player seated at a Liar's Poker table"); return; }
+        _foldEndTest = conn.connectionId;
+        Plugin.Log.LogInfo($"{Fair.Tag} test: at connection {conn.connectionId}'s next fold, the host ends it before its pull is asked for");
     }
 
     private static void Seat(List<string> words, Dictionary<string, string> pairs)
@@ -372,7 +569,7 @@ internal static class FairTexas
         var conn = Fair.TestConnection(FairLegalTest.ConnArg(words, 1));
         var p = FairLegalTest.SeatOf(conn);
         var gp = p != null ? p.GetComponent<TexasGamePlay>() : null;
-        if (gp == null) { Fair.Result(T, false, "no remote player seated at a Liar's Texas table"); return; }
+        if (gp == null) { Fair.Result(T, false, "no remote player seated at a Liar's Poker table"); return; }
 
         string move = "call";
         foreach (var w in words) if (w is "call" or "allin" or "fold" or "coward" or "end") move = w;
@@ -399,7 +596,8 @@ internal static class FairTexas
         };
         string detail = $"connection {conn.connectionId} seat {p.Slot} {move}: {v}{(why != null ? $" ({why})" : "")} " +
                         $"- turn {f.HaveTurn}, called {f.RaisedThisTurn}, all-in asked {f.AllInAsked}, coward count {f.CowardCount}, " +
-                        $"fold expected {f.FoldExpected}, pull owed {f.PullOwed}, whole match {f.Watched}";
+                        $"fold expected {f.FoldExpected}, pull owed {f.PullOwed}" +
+                        $"{(move == "end" && f.PullOwed && v == Verdict.Allow ? " (the host would roll it first)" : "")}, whole match {f.Watched}";
         FairLegalTest.Finish(T, v, words, pairs, conn, detail, why);
     }
 }

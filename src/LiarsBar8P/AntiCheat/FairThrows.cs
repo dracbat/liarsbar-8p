@@ -316,7 +316,7 @@ internal static class FairThrows
                 LastRan = false;
                 var list = Copy(types);
                 Seat(__instance, out _, out bool dead, out bool longDead, out bool turn);
-                var held = FairHands.Checked(__instance, __instance.cardTypes);
+                var held = FairHands.Checked(__instance, __instance._cardTypes);
                 var v = JudgeThrow(false, list, dead, longDead, turn, held, out string why);
                 if (!Act(v, why, conn, __instance, "Liar's Deck throw")) return false;
                 __state = list;
@@ -361,7 +361,7 @@ internal static class FairThrows
                 if (!Fair.Hosting || !Fair.SentBy(__instance, out var conn)) return true;
                 LastRan = false;
                 var idx = indexes == null ? null : new List<int>(indexes);
-                var v = JudgeHide(false, idx, Active(__instance.Cards), Pending(__instance), out string why);
+                var v = JudgeHide(false, idx, Active(__instance.cards), Pending(__instance), out string why);
                 if (!Act(v, why, conn, __instance, "Liar's Deck hand")) return false;
                 __state = true;
                 return true;
@@ -449,7 +449,7 @@ internal static class FairThrows
             {
                 if (_relay != kind || gp == null || gp.Pointer != _relayFor) return true;
                 if (!Fair.Hosting || !Fair.SentBy(gp, out var conn)) return true;
-                int places = gp.Cards != null ? gp.Cards.Count : 0;
+                int places = gp.cards != null ? gp.cards.Count : 0;
                 var v = JudgeRelay(count, places, Pending(gp), DeckMax, out int truth, out string why);
                 if (!Act(v, why, conn, gp, kind == Relay.Meshes ? "Liar's Deck thrown cards" : "Liar's Deck throw props")) return false;
                 count = truth;
@@ -701,7 +701,7 @@ internal static class FairThrows
         private static NetworkBehaviour Part(DeckGameplay d, ChaosDeckGameplay c) => d != null ? d : c;
 
         private static FairHands.Held Record(DeckGameplay d, ChaosDeckGameplay c) =>
-            d != null ? FairHands.Checked(d, d.cardTypes) : FairHands.Checked(c, c.CardTypes);
+            d != null ? FairHands.Checked(d, d._cardTypes) : FairHands.Checked(c, c.CardTypes);
 
         /// <summary>Runs the host's own throw handler for the seat, as if it had sent this throw.</summary>
         private static void Throw(NetworkConnectionToClient conn, DeckGameplay d, ChaosDeckGameplay c, List<int> types)
@@ -823,7 +823,7 @@ internal static class FairThrows
             });
 
             var part = Part(d, c);
-            var cards = d != null ? d.Cards : c.Cards;
+            var cards = d != null ? d.cards : c.Cards;
             switch (what)
             {
                 case "oob":

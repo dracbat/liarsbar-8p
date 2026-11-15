@@ -69,7 +69,6 @@ internal static class HiddenDeal
         Add("System.Void DeckGameplay::SetCardsRpc(System.Int32[])", "SetCardsRpc", Shape.Hand);
         Add("System.Void DeckGameplay::RestoreCardsRpc(System.Int32[],System.Int32[],System.Boolean)", "RestoreCardsRpc", Shape.Restore);
         Add("System.Void ChaosDeckGameplay::RpcDealHand(System.Int32[])", "RpcDealHand", Shape.Hand);
-        Add("System.Void PokerGamePlay::RandomCards(System.Int32,System.Int32)", "PokerRandomCards", Shape.Ints, 2);
         Add("System.Void BlorfGamePlay::RandomCards(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)",
             "BlorfRandomCards", Shape.Ints, 5);
         Add("System.Void BlorfGamePlay::RandomCardsDeck2(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)",

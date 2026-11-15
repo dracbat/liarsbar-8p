@@ -244,7 +244,7 @@ internal static class BotSeats
         ["TexasGamePlay::ResetLose"] = Rule.Run,
         ["TexasGamePlay::SetReload"] = Rule.Run,
         ["TexasGamePlay::FoldTargetRpc"] = Rule.Run,
-        ["TexasGamePlay::ALLINTargetRpc"] = Rule.Run,
+        ["TexasGamePlay::AllInTargetRpc"] = Rule.Run,   // ALLINTargetRpc before the game's 14 Nov 2026 update
         ["TexasGamePlay::TargetReceiveRevolverOutcome"] = Rule.Run,
         ["TexasGamePlay::ApplySwitchTarget"] = Rule.Run,
         ["TexasGamePlay::SetDeadAnim"] = Rule.Run,

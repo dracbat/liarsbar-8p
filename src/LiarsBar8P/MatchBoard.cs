@@ -849,7 +849,7 @@ internal static class MatchBoard
             {
                 var deck = p != null ? p.GetComponent<DeckGameplay>() : null;
                 var chaos = p != null ? p.GetComponent<ChaosDeckGameplay>() : null;
-                var dealt = deck != null ? deck.cardTypes : chaos != null ? chaos.CardTypes : null;
+                var dealt = deck != null ? deck._cardTypes : chaos != null ? chaos.CardTypes : null;
                 if (deck == null && chaos == null) continue;
                 int held = HeldBy(p);
                 sb.Append($" {p.Slot}={(dealt != null ? dealt.Count : -1)}/{(held >= 0 ? held.ToString() : "?")}");

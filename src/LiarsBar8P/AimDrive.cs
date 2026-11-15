@@ -504,7 +504,7 @@ internal static class AimDrive
         // whether an aim points at anybody.
         var live = new List<int>();
         foreach (var p in seated)
-            if (p != null && !p.Dead && !p.Fnished) live.Add(p.Slot);
+            if (p != null && !p.Dead && !p.Finished) live.Add(p.Slot);
 
         if (live.Count < 2) return;
 
@@ -514,7 +514,7 @@ internal static class AimDrive
 
         foreach (var p in seated)
         {
-            if (p == null || p.Dead || p.Fnished) continue;
+            if (p == null || p.Dead || p.Finished) continue;
 
             var cc = Play(p);
             if (cc == null) continue;
@@ -627,7 +627,7 @@ internal static class AimDrive
     private static void Note(CharController cc, int aim, HashSet<int> seen)
     {
         var t = AskGetAim(cc, aim, true);
-        if (t != null && !t.Dead && !t.Fnished) seen.Add(t.Slot);
+        if (t != null && !t.Dead && !t.Finished) seen.Add(t.Slot);
     }
 
     private static readonly Dictionary<string, MethodInfo> _getAim = new();
@@ -652,7 +652,6 @@ internal static class AimDrive
                 args = new[] { typeof(int), typeof(bool) };
             }
             else if (cc.TryCast<ChaosGamePlay>() != null) owner = typeof(ChaosGamePlay);
-            else if (cc.TryCast<PokerGamePlay>() != null) owner = typeof(PokerGamePlay);
             else return null;
 
             if (args == null) args = new[] { typeof(int) };
@@ -681,9 +680,6 @@ internal static class AimDrive
 
             var chaos = p.GetComponent<ChaosGamePlay>();
             if (chaos != null) return chaos;
-
-            var poker = p.GetComponent<PokerGamePlay>();
-            if (poker != null) return poker;
         }
         catch { }
         return null;
@@ -752,14 +748,6 @@ internal static class AimDrive
             Plugin.Log.LogWarning(
                 $"[aim] {Name(p, me)} was aiming at {meant}, who went out before the shot - " +
                 $"not fired (aim {landed}, {n} seats)");
-        else if (n <= Limits.VanillaPlayers && cc.TryCast<PokerGamePlay>() != null)
-            // Two-Card Poker at a size the mod leaves alone: its aim keys, pressed from the host
-            // for a seat played on another machine, do not always move that seat's aim, and the
-            // shot goes where the game's own first aim put it. Not the ring, which is the game's
-            // own here, so not an error.
-            Plugin.Log.LogWarning(
-                $"[aim] {Name(p, me)} could not be steered onto {meant}; the game's own aim stayed on {got} " +
-                $"(aim {landed}, {n} seats)");
         else
             Plugin.Log.LogError(
                 $"[aim] {Name(p, me)} meant to shoot {meant} but the aim resolved to {got} " +
@@ -853,7 +841,6 @@ internal static class AimDrive
 
             MethodInfo mi = null;
             if (cc.TryCast<ChaosGamePlay>() != null) mi = Key(typeof(ChaosGamePlay), key);
-            else if (cc.TryCast<PokerGamePlay>() != null) mi = Key(typeof(PokerGamePlay), key);
 
             if (mi == null)
             {

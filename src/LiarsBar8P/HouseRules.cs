@@ -62,7 +62,7 @@ internal static class HouseRules
         { Rule.Cylinder4,     "4-chamber revolver" },
         { Rule.Cylinder3,     "3-chamber revolver" },
         { Rule.ShortHand,     "3 cards each" },
-        { Rule.ChaosStorm,    "2 chaos cards in 12" },
+        { Rule.ChaosStorm,    "2 chaos cards a deck" },
         { Rule.ThreeDice,     "3 dice each" },
         { Rule.OneSip,        "one drink and you are out" },
         { Rule.HotTable,      "every hand starts on 1 bullet" },
@@ -155,9 +155,9 @@ internal static class HouseRules
     }
 
     /// <summary>
-    /// The lobby's table, from the game mode and the deck arrows' choice (0 Basic, 1 Devil, 2 Chaos,
-    /// 3 Deck 2). The lobby switches its mode to the Chaos one while the Chaos deck is chosen. The
-    /// lobby says Liar's Poker for both tables on the Poker tab; mode 3 is only ever seen at the door.
+    /// The lobby's table, from the game mode and the deck arrows' choice (0 Basic, 1 Devil, 2 Chaos 2,
+    /// 3 Deck 2, 4 Chaos). The lobby switches its mode to the Chaos one while the Chaos deck is chosen.
+    /// The lobby says Liar's Poker for both tables on the Poker tab; mode 3 is only ever seen at the door.
     /// </summary>
     internal static Game GameOf(int mode, int deckMode)
     {
@@ -165,10 +165,11 @@ internal static class HouseRules
         {
             case CustomNetworkManager.GameMode.LiarsChaos: return Game.Chaos;
             case CustomNetworkManager.GameMode.LiarsDeck:
-                return deckMode == 2 ? Game.Chaos : deckMode == HiddenTables.Deck2 ? Game.Deck2 : Game.Deck;
+                // Chaos 2 (2, the 16-card deck the game's 14 Nov 2026 update added) and Chaos (4, the
+                // 12-card deck v3.0.2 knew as mode 2) are both the Chaos deck table.
+                return deckMode == 2 || deckMode == CustomNetworkManager.ChaosDeckMode ? Game.Chaos : deckMode == HiddenTables.Deck2 ? Game.Deck2 : Game.Deck;
             case CustomNetworkManager.GameMode.LiarsDice: return Game.Dice;
             case CustomNetworkManager.GameMode.LiarsTexas: return TwoCardPoker.Shown ? Game.TwoCard : Game.Poker;
-            case CustomNetworkManager.GameMode.LiarsPoker: return Game.TwoCard;
             case CustomNetworkManager.GameMode.LiarsSpin: return Game.Slots;
             default: return Game.Other;
         }

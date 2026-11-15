@@ -215,16 +215,13 @@ internal static class RoundCensus
         try
         {
             var deck = p.GetComponent<DeckGameplay>();
-            if (deck != null) return Build(deck.cardTypes, deck.Cards, deck.HaveCards);
+            if (deck != null) return Build(deck._cardTypes, deck.cards, deck.haveCards);
 
             var chaosDeck = p.GetComponent<ChaosDeckGameplay>();
             if (chaosDeck != null) return Build(chaosDeck.CardTypes, chaosDeck.Cards, chaosDeck.HaveCards);
 
             var chaos = p.GetComponent<ChaosGamePlay>();
             if (chaos != null) return Build(chaos.CardTypes, chaos.Cards, chaos.HaveCards);
-
-            var poker = p.GetComponent<PokerGamePlay>();
-            if (poker != null) return Build(poker.CardTypes, poker.Cards, poker.HaveCards);
 
             // Texas holds its cards as its own component type rather than as bare objects.
             var texas = p.GetComponent<TexasGamePlay>();

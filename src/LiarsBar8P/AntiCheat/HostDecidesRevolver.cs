@@ -93,18 +93,20 @@ internal static class HostRevolver
         }
 
         internal bool Alive => Part != null && (Chaos ? _chaos != null : _deck != null);
-        internal int Current => Chaos ? _chaos.currentrevoler : _deck.currentRevolver;
-        internal int Bullet => Chaos ? _chaos.revolverbulllet : _deck.revolverBullet;
+        internal int Current => Chaos ? _chaos.currentrevoler : _deck.CurrentRevolver;
+        internal int Bullet => Chaos ? _chaos.revolverbulllet : _deck.RevolverBullet;
 
         /// <summary>Writes the field only, never the network setter: nothing is marked to send.</summary>
         internal void PutBullet(int value)
         {
             if (Chaos) _chaos.revolverbulllet = value;
-            else _deck.revolverBullet = value;
+            else _deck._RevolverBullet_k__BackingField = value;   // the backing field: the property setter would mark it to send
         }
 
-        internal ulong CurrentBit => Chaos ? 0x20UL : 0x10UL;
-        internal ulong BulletBit => Chaos ? 0x40UL : 0x20UL;
+        // Liar's Deck's bits moved in the game's 14 Nov 2026 update (the bullet now comes first);
+        // the Chaos deck's did not.
+        internal ulong CurrentBit => Chaos ? 0x20UL : 0x04UL;
+        internal ulong BulletBit => Chaos ? 0x40UL : 0x02UL;
 
         internal PlayerStats Stats
         {
@@ -123,18 +125,20 @@ internal static class HostRevolver
 
         internal string Mode => Chaos ? "Chaos deck" : "Liar's Deck";
 
-        /// <summary>The game's own server handler for a pull that fired.</summary>
+        /// <summary>
+        /// The game's own server handler for a pull that fired. Chaos deck only: since the game's
+        /// 14 Nov 2026 update Liar's Deck settles its own pulls on the host, so no Liar's Deck pull
+        /// is ever noted here.
+        /// </summary>
         internal void Fire()
         {
             if (Chaos) _chaos.UserCode_CommandBeDead();
-            else _deck.UserCode_CmdKillPlayer();
         }
 
-        /// <summary>The game's own server handler for an empty chamber.</summary>
+        /// <summary>The game's own server handler for an empty chamber, Chaos deck only (see <see cref="Fire"/>).</summary>
         internal void Click()
         {
             if (Chaos) _chaos.UserCode_CmdRevolverSurvived();
-            else _deck.UserCode_CmdRevolverSurvived();
         }
 
         /// <summary>After a value goes out: note whether the table now sees the two as equal, and since when.</summary>

@@ -38,6 +38,24 @@ internal static class CapPatches
         }
     }
 
+    // --- The lobby's own idea of a full table ----------------------------------------
+    // Since the game's 14 Nov 2026 update the lobby asks CustomNetworkManager.LobbyMaxPlayers
+    // (4 at a table, 10 in the Arena) for its Steam member limit and, every frame, for whether
+    // to show the host's START button: more players than that and the button goes away, so a
+    // table of five or more could never start. Tables get the mod's limit; the Arena keeps its own.
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(CustomNetworkManager), nameof(CustomNetworkManager.LobbyMaxPlayers), MethodType.Getter)]
+    private static void LobbyMaxPlayers_Postfix(CustomNetworkManager __instance, ref int __result)
+    {
+        try
+        {
+            if (__result < Target && __instance != null && __instance.Mode != CustomNetworkManager.GameMode.Arena)
+                __result = Target;
+        }
+        catch { }
+    }
+
     // --- Mirror connection limit --------------------------------------------------
     // CustomNetworkManager inherits NetworkManager.maxConnections. It is a serialized
     // inspector field, so it is re-applied every time the manager starts.

@@ -148,7 +148,7 @@ internal static class AimRing
             if (stats == null) return false;
             me = stats.Slot;
 
-            m = self.manager;
+            m = self.Manager;
             if (m == null) m = Manager.Instance;
             if (m == null) return false;
 
@@ -270,13 +270,8 @@ internal static class AimRing
             else
             {
                 var chaos = self.TryCast<ChaosGamePlay>();
-                if (chaos != null) aim = chaos.Aim;
-                else
-                {
-                    var poker = self.TryCast<PokerGamePlay>();
-                    if (poker == null) return null;
-                    aim = poker.Aim;
-                }
+                if (chaos == null) return null;
+                aim = chaos.Aim;
             }
 
             return Target(m, me, aim, n, true);
@@ -294,9 +289,6 @@ internal static class AimRing
 
             var chaos = self.TryCast<ChaosGamePlay>();
             if (chaos != null) return chaos.Aim;
-
-            var poker = self.TryCast<PokerGamePlay>();
-            if (poker != null) return poker.Aim;
         }
         catch { }
         return 0;
@@ -312,9 +304,6 @@ internal static class AimRing
 
             var chaos = self.TryCast<ChaosGamePlay>();
             if (chaos != null) return chaos.TakingAim;
-
-            var poker = self.TryCast<PokerGamePlay>();
-            if (poker != null) return poker.TakingAim;
         }
         catch { }
         return false;
@@ -535,47 +524,6 @@ internal static class AimRing
     [HarmonyPrefix]
     [HarmonyPatch(typeof(ChaosGamePlay), "RightAim")]
     private static bool ChaosRight(ChaosGamePlay __instance)
-        => !Move(__instance, +1, __instance.Aim, v => __instance.NetworkAim = v);
-
-    // -------------------------------------------------------------------- Liar's Poker
-
-    [HarmonyPrefix]
-    [HarmonyPatch(typeof(PokerGamePlay), "GetAim")]
-    private static bool PokerGetAim(PokerGamePlay __instance, int aim, ref PlayerStats __result)
-    {
-        if (!Who(__instance, out var m, out int me, out int n)) return true;
-        __result = Target(m, me, aim, n, true);
-        return false;
-    }
-
-    /// <summary>Poker's version sets the aim rather than returning it, so this does the same.</summary>
-    [HarmonyPrefix]
-    [HarmonyPatch(typeof(PokerGamePlay), "GetFirstAim")]
-    private static bool PokerFirstAim(PokerGamePlay __instance)
-    {
-        if (!Who(__instance, out var m, out int me, out int n)) return true;
-
-        try
-        {
-            int a = First(m, me, n);
-            __instance.NetworkAim = a;
-            ShowPose(__instance, n, a);
-        }
-        catch (Exception e) { Dev.Warn("aim", $"could not set the opening aim: {e.Message}"); }
-        return false;
-    }
-
-    // Poker's UpdateCall really does call these two when A or D is pressed, so here the
-    // patch is on the key path.
-
-    [HarmonyPrefix]
-    [HarmonyPatch(typeof(PokerGamePlay), "LeftAim")]
-    private static bool PokerLeft(PokerGamePlay __instance)
-        => !Move(__instance, -1, __instance.Aim, v => __instance.NetworkAim = v);
-
-    [HarmonyPrefix]
-    [HarmonyPatch(typeof(PokerGamePlay), "RightAim")]
-    private static bool PokerRight(PokerGamePlay __instance)
         => !Move(__instance, +1, __instance.Aim, v => __instance.NetworkAim = v);
 
     /// <summary>

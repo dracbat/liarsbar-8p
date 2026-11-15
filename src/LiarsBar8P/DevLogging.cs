@@ -107,7 +107,7 @@ internal static class DevLogging
             {
                 if (p == null) continue;
                 var gp = p.GetComponent<DeckGameplay>();
-                int n = gp?.cardTypes?.Count ?? -1;
+                int n = gp?._cardTypes?.Count ?? -1;
                 sb.Append($" seat{p.Slot}={n}");
                 if (n > 0) dealt++; else empty++;
             }

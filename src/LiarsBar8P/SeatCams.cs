@@ -100,14 +100,6 @@ internal static class SeatCams
             return;
         }
 
-        // Two-Card Poker gets none either, at any size: nobody has shown that a camera this close
-        // to a seat never catches a card there.
-        if (me.playerStats.GetComponent<PokerGamePlay>() != null)
-        {
-            Plugin.Log.LogInfo($"[seatcam] none added: Two-Card Poker (this copy is seat {mine} of {seats})");
-            return;
-        }
-
         int vanilla = parent.childCount;
         int showing = Mathf.Clamp(me.speccamindex, 0, vanilla - 1);
 

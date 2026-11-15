@@ -10,7 +10,7 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "liarsbar.eightplayers";
-    public const string Version = "3.0.2";
+    public const string Version = "3.1.0";
 
     /// <summary>
     /// The mod's name as players see it, and the one place it is written. Only words on screen
@@ -202,6 +202,16 @@ public class Plugin : BasePlugin
         // the other, and the watchdog in ModTicker needs no patch at all.
         Apply(harmony, typeof(RankedGuard.ButtonLine), "ranked: the button says ranked is off");
         Apply(harmony, typeof(RankedGuard.SearchLine), "ranked: no search from a modded copy");
+        Apply(harmony, typeof(RankedGuard.ScreenSearchLine), "ranked: no search the ranked screen starts itself");
+        Apply(harmony, typeof(RankedGuard.ArenaLine), "ranked: the Arena's ranked screen stays shut");
+
+        // Then the update check and the ticker, before anything a game update can break: whatever
+        // fails further down, this copy can still be offered the release that fixes it. In 3.0.2 a
+        // class the game had moved threw out of a step near the end of this load, and nothing after
+        // it ran, the update check included. The check runs in the background, and the ticker's
+        // first tick comes after this load has finished, so starting them here changes nothing else.
+        Step("the update check", () => LiarsBar8P.AutoUpdate.Start());
+        Step("the version tag and the ticker", SpawnHud);
 
         // Patch each area independently so one broken hook cannot disable the rest.
         Apply(harmony, typeof(CapPatches),     "player caps");
@@ -239,10 +249,8 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(DiceRowOrder),   "Liar's Dice reveal rows lit in reading order");
         Apply(harmony, typeof(MechanicsTrace),  "devil and chaos mechanics trace");
         Apply(harmony, typeof(HiddenTables),   "Liar's Deck 2 on the deck arrows");
-        TwoCardPoker.Patched =
-            Apply(harmony, typeof(TwoCardPoker), "Two-Card Poker: the table behind the Poker tab");
-        Apply(harmony, typeof(TwoCardPoker.MatchLog), "Two-Card Poker: the match, for the log");
-        Apply(harmony, typeof(TwoCardLobby),   "Two-Card Poker: its arrows, name and rules page in the lobby");
+        // Two-Card Poker is coming back soon: the game's 14 Nov 2026 update removed its table (TwoCardPoker).
+        Apply(harmony, typeof(PokerPlate),     "the Poker tab's plate reads LIAR'S POKER");
         Apply(harmony, typeof(LobbyId.Copy),   "lobby ID: the copy icon copies and says so");
         Apply(harmony, typeof(BugReport.SettingsButton), "bug report: a button in the settings");
 
@@ -273,8 +281,8 @@ public class Plugin : BasePlugin
         if (Ultrawide.TestSize != null)
             Ultrawide.TestReady =
                 Apply(harmony, typeof(Ultrawide.TestWindow), "wide screens: the test size, in a window");
-        Apply(harmony, typeof(LobbyWardrobe.Build), "a skin picker in the lobby");
-        Apply(harmony, typeof(LobbyWardrobe.Follow), "the skin picker waits for a character change");
+        // The lobby's skin picker is the game's own since its 14 Nov 2026 update (the SKINS tab), so
+        // LobbyWardrobe is no longer put up.
         Apply(harmony, typeof(MatchStats.CoreHooks),   "awards: the start and end of a match");
         Apply(harmony, typeof(MatchStats.DeckHooks),   "awards: Liar's Deck");
         Apply(harmony, typeof(MatchStats.ChaosHooks),  "awards: the Chaos deck");
@@ -360,35 +368,31 @@ public class Plugin : BasePlugin
         if (Loopback.Requested) Apply(harmony, typeof(LoopbackNoSteamLobbies), "loopback: a test copy never opens or joins a Steam lobby");
 
         if (DiagDeckPatchTest != null && DiagDeckPatchTest.Value && Dev.Enabled)
-        {
-            Log.LogInfo("  [selftest] exercising the deck size patch for 5 players...");
-            DeckSizePatch.ApplyFor(5);
-        }
+            Step("the deck size self test", () =>
+            {
+                Log.LogInfo("  [selftest] exercising the deck size patch for 5 players...");
+                DeckSizePatch.ApplyFor(5);
+            });
 
         // The turn-order constants live in compiled code, so they are rewritten rather than
         // patched. Done here so the log says plainly whether it worked, and retried at the
-        // start of a round if the game was not ready yet.
-        TurnOrderFix.Install();
-        DealArrayPatch.Install();
+        // start of a round if the game was not ready yet. Each step below is on its own, like
+        // the patches above.
+        Step("turn order", TurnOrderFix.Install);
+        Step("the deal arrays", DealArrayPatch.Install);
 
         // Watches the log for the fault that kills a Liar's Dice reveal above four players.
         // Not a developer tool: the bug reaches players, so the recovery has to as well.
-        DiceRevealGuard.Listen();
+        Step("the Liar's Dice reveal guard", DiceRevealGuard.Listen);
 
         // The data channel between copies that both run the mod. Registered this early on
         // purpose: see ModNet.Install. Not a patch, so not in the list above.
-        ModNet.Install();
-        ModNetProof.Install();   // nothing unless developer mode, the loopback harness and LIARSBAR8P_NETPROOF
-        AwardPanel.Install();    // what to do with the host's awards when they arrive
-        MatchBoard.Install();    // and with its count of the cards in each hand
+        Step("the mod's own channel", ModNet.Install);
+        Step("the channel proof", ModNetProof.Install);   // nothing unless developer mode, the loopback harness and LIARSBAR8P_NETPROOF
+        Step("awards", AwardPanel.Install);               // what to do with the host's awards when they arrive
+        Step("the Tab board", MatchBoard.Install);        // and with its count of the cards in each hand
         // SeatCams patches nothing: the game's own spectator keys walk the cameras it adds, from ModTicker.
-        HouseRules.Install();    // and with the house rules the host has picked
-        TwoCardPoker.Install();  // and with the table the host has chosen on the Poker tab
-
-        SpawnHud();
-
-        // In the background: the game never waits on the network to start.
-        LiarsBar8P.AutoUpdate.Start();
+        Step("house rules", HouseRules.Install);          // and with the house rules the host has picked
 
         Log.LogInfo("=== Liar's Bar 8P loaded ===");
     }
@@ -430,6 +434,8 @@ public class Plugin : BasePlugin
 
         Apply(harmony, typeof(RankedGuard.ButtonLine), "ranked: the button says ranked is off");
         Apply(harmony, typeof(RankedGuard.SearchLine), "ranked: no search from a modded copy");
+        Apply(harmony, typeof(RankedGuard.ScreenSearchLine), "ranked: no search the ranked screen starts itself");
+        Apply(harmony, typeof(RankedGuard.ArenaLine), "ranked: the Arena's ranked screen stays shut");
         // The driver's 'hostprivate' lobby is forced private here, the one Steam lobby a bare copy
         // may open (MatchmakingSelfTest.BareRefuses says why it opens and joins no other).
         Apply(harmony, typeof(DiagAutoHost), "self test: auto host");
@@ -522,6 +528,17 @@ public class Plugin : BasePlugin
         catch (System.Exception e)
         {
             Log.LogError($"  version HUD failed: {e.Message}");
+        }
+    }
+
+    /// <summary>One step of the load that is not a patch, on its own as the patches are: one that throws costs only itself.</summary>
+    private static void Step(string label, System.Action step)
+    {
+        try { step(); }
+        catch (System.Exception e)
+        {
+            var inner = e is System.TypeInitializationException && e.InnerException != null ? e.InnerException : e;
+            Log.LogError($"  FAILED: {label}: {inner.GetType().Name}: {inner.Message}");
         }
     }
 

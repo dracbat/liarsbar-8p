@@ -7,7 +7,14 @@ using UnityEngine;
 namespace LiarsBar8P;
 
 /// <summary>
-/// Liar's Deck 2, the game's own fourth deck table, back on the deck arrows.
+/// Liar's Deck 2 at a table of the mod's. Since the game's 14 Nov 2026 update the game's own deck
+/// arrows reach Deck 2 again (and Chaos 2), for everybody, so the mod no longer adds the step or
+/// sends a lobby that stops counting as modded back to Basic: the arrows and the choice are the
+/// game's. What is left here: the lobby keeps a host's Deck 2 after a match, a character that holds
+/// fewer than seven cards gets room for the seven Deck 2 deals, and its rounds are noted for the
+/// bots and the log.
+///
+/// What follows was written when the mod put Deck 2 back itself:
 ///
 /// It was never taken out of the game. Its deal of seven, the round that keeps everybody's hand,
 /// its card art, its help page and its sound are all still there; only the arrows stop one short
@@ -65,46 +72,7 @@ internal static class HiddenTables
     private static bool _saidNetworked;
     private static readonly System.Collections.Generic.HashSet<IntPtr> _roomy = new();
 
-    // ------------------------------------------------------------------ the arrows
-
-    [HarmonyPrefix]
-    [HarmonyPatch(typeof(LobbyController), nameof(LobbyController.ChangeGameModeDeckRight))]
-    private static bool Right(LobbyController __instance) => Onto(__instance, Chaos, "right arrow");
-
-    [HarmonyPrefix]
-    [HarmonyPatch(typeof(LobbyController), nameof(LobbyController.ChangeNextDeckOrDiceMode))]
-    private static bool PadRight(LobbyController __instance) => Onto(__instance, Chaos, "controller, next");
-
-    [HarmonyPrefix]
-    [HarmonyPatch(typeof(LobbyController), nameof(LobbyController.ChangeGameModeDeckLeft))]
-    private static bool Left(LobbyController __instance) => Onto(__instance, Basic, "left arrow");
-
-    [HarmonyPrefix]
-    [HarmonyPatch(typeof(LobbyController), nameof(LobbyController.ChangePrevDeckOrDiceMode))]
-    private static bool PadLeft(LobbyController __instance) => Onto(__instance, Basic, "controller, previous");
-
-    /// <summary>
-    /// The one step the game no longer takes. Taken whole rather than corrected afterwards, so the
-    /// game's own step neither plays a second sound nor remembers the variant it would have chosen.
-    /// </summary>
-    private static bool Onto(LobbyController lobby, int from, string how)
-    {
-        try
-        {
-            if (lobby == null || !lobby.isServer || lobby.DeckMode != from || !OnDeck(lobby)) return true;
-            if (!Allowed(lobby)) return true;
-
-            Choose(lobby);
-            lobby.PlaySes(Deck2Sound);
-            Plugin.Log.LogInfo($"[deck2] Liar's Deck 2 chosen ({how})");
-            return false;
-        }
-        catch (Exception e)
-        {
-            Plugin.Log.LogWarning($"[deck2] could not step onto Liar's Deck 2, leaving it to the game: {e.Message}");
-            return true;
-        }
-    }
+    // ------------------------------------------------------------------ choosing it
 
     private static void Choose(LobbyController lobby)
     {
@@ -172,11 +140,8 @@ internal static class HiddenTables
         _mine = null;
         _handSaid = null;
 
-        var room = LobbyController.Instance;
-        if (room != null) ShowHelpPage(room);
-
-        if (NetworkServer.active) InLobby();
-        else
+        // The game's own arrows and help pages serve Deck 2 again, for everybody (14 Nov 2026).
+        if (!NetworkServer.active)
         {
             _keptFor = -1;
             _notModdedSince = -1f;
@@ -241,7 +206,7 @@ internal static class HiddenTables
     /// <summary>True once this hand can show seven cards, or never will be able to.</summary>
     private static bool MakeRoom(DeckGameplay gp)
     {
-        var cards = gp.Cards;
+        var cards = gp.cards;
         if (cards == null) return false;
         int had = cards.Count;
         if (had >= Deck2Hand) return true;
@@ -386,7 +351,7 @@ internal static class HiddenTables
             var gp = p.GetComponent<DeckGameplay>();
             string body = p.gameObject.name.StartsWith("Char_", StringComparison.Ordinal) ? p.gameObject.name : "player";
             if (sb.Length > 0) sb.Append(", ");
-            sb.Append($"seat {p.Slot} {body} {(gp != null && gp.Cards != null ? gp.Cards.Count : -1)}");
+            sb.Append($"seat {p.Slot} {body} {(gp != null && gp.cards != null ? gp.cards.Count : -1)}");
         }
         return sb.ToString();
     }
@@ -410,7 +375,7 @@ internal static class HiddenTables
         foreach (var p in Dev.TablePlayers())
         {
             var gp = p.GetComponent<DeckGameplay>();
-            var cards = gp != null ? gp.cardTypes : null;
+            var cards = gp != null ? gp._cardTypes : null;
             if (sb.Length > 0) sb.Append(' ');
             sb.Append($"seat {p.Slot}=").Append(p.Dead ? "out" : (cards != null ? cards.Count : 0).ToString());
         }
@@ -431,13 +396,13 @@ internal static class HiddenTables
                 if (gp != null && gp.isOwned) { _mine = gp; break; }
         if (_mine == null) return;
 
-        var values = _mine.cardTypes;
+        var values = _mine._cardTypes;
         int shown = 0;
-        if (_mine.Cards != null)
-            foreach (var c in _mine.Cards)
+        if (_mine.cards != null)
+            foreach (var c in _mine.cards)
                 if (c != null && c.activeSelf) shown++;
 
-        string said = $"{(values != null ? values.Count : 0)} cards dealt to it, {shown} card objects in hand, holding={_mine.HaveCards}";
+        string said = $"{(values != null ? values.Count : 0)} cards dealt to it, {shown} card objects in hand, holding={_mine.haveCards}";
         if (said == _handSaid) return;
         bool first = _handSaid == null;
         _handSaid = said;
@@ -445,11 +410,11 @@ internal static class HiddenTables
 
         // Once a match: where the hand's card objects sit, to compare a character that holds
         // seven with one that holds fewer.
-        if (!first || _mine.Cards == null) return;
+        if (!first || _mine.cards == null) return;
         var sb = new StringBuilder();
-        for (int i = 0; i < _mine.Cards.Count; i++)
+        for (int i = 0; i < _mine.cards.Count; i++)
         {
-            var c = _mine.Cards[i];
+            var c = _mine.cards[i];
             if (c == null) continue;
             var t = c.transform;
             sb.Append($" [{i} {(t.parent != null ? t.parent.name : "-")} p{t.localPosition.x:0.000},{t.localPosition.y:0.000},{t.localPosition.z:0.000} " +

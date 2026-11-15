@@ -178,7 +178,38 @@ internal static class BlockButtons
         bool gold = BlockList.IsBlocked(id) || Armed(slotName, id);
         var image = block.GetComponent<UnityEngine.UI.Image>();
         var want = gold ? ModCanvas.Gold : ModCanvas.Warning;
-        if (image != null && image.color != want) image.color = want;
+        if (image == null) return;
+
+        // Since the game's 14 Nov 2026 update each of its buttons redraws the colours it tints every
+        // frame from the colour each had when the button woke, the kick cross's cream for this
+        // copy. So the colour is given to that tint instead, which keeps its hover and press
+        // shading; a cross without one is coloured as before.
+        var tint = TintOf(block, image);
+        if (tint != null)
+        {
+            if (tint.authored != want)
+            {
+                tint.authored = want;
+                tint.current = want;
+                image.color = want;
+            }
+        }
+        else if (image.color != want) image.color = want;
+    }
+
+    /// <summary>The entry of the button's own colour tints that draws this picture, or null.</summary>
+    private static UIFeel.Tint TintOf(Transform button, UnityEngine.UI.Graphic picture)
+    {
+        try
+        {
+            var feel = button.GetComponent<UIFeel>();
+            var tints = feel != null ? feel.tints : null;
+            if (tints == null || picture == null) return null;
+            foreach (var t in tints)
+                if (t != null && t.graphic != null && t.graphic.Pointer == picture.Pointer) return t;
+        }
+        catch { }
+        return null;
     }
 
     private static bool Armed(string slotName, ulong id) =>
@@ -279,7 +310,7 @@ internal static class BlockButtons
         try
         {
             var chat = ChatArayuz.instance;
-            if (chat != null) chat.AddMessage(line);
+            if (chat != null) chat.AddMessage(Plugin.TagName, line);
         }
         catch (Exception e) { Plugin.Log.LogWarning($"[block] could not say it in the chat: {e.Message}"); }
     }
@@ -337,8 +368,11 @@ internal static class BlockButtons
             string colour = "";
             if (block != null && block.gameObject.activeSelf)
             {
+                // The colour asked for: the button's own tint while it has one, else the picture's.
                 var image = block.GetComponent<UnityEngine.UI.Image>();
-                colour = image != null && image.color == ModCanvas.Gold ? " gold" : " red";
+                var tint = TintOf(block, image);
+                var shown = tint != null ? tint.authored : image != null ? image.color : default;
+                colour = shown == ModCanvas.Gold ? " gold" : " red";
             }
             sb.Append($" {i + 1}: {who}, block {(block != null && block.gameObject.activeSelf ? "on" + colour : "off")}" +
                       $"{(kick != null && kick.gameObject.activeSelf ? ", kick on" : "")};");

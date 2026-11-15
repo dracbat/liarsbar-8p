@@ -194,12 +194,12 @@ internal static class DiceRevealGuard
                 try
                 {
                     var gp = p.GetComponent<DiceGamePlay>();
-                    if (gp != null && gp.DiceValues != null) dice = gp.DiceValues.Count;
+                    if (gp != null && gp.diceValues != null) dice = gp.diceValues.Count;
                 }
                 catch { }
 
                 Plugin.Log.LogWarning(
-                    $"[dicefix]   seat {p.Slot} dead={p.Dead} finished={p.Fnished} dice={dice}");
+                    $"[dicefix]   seat {p.Slot} dead={p.Dead} finished={p.Finished} dice={dice}");
             }
         }
         catch (Exception e) { Plugin.Log.LogWarning($"[dicefix] could not describe the table: {e.Message}"); }

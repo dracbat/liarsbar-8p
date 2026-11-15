@@ -14,9 +14,10 @@ namespace LiarsBar8P;
 /// Every effect happens on the host and reaches the other copies through the game's own network
 /// values and calls, so nothing here needs a client to have the rule. Each one starts by asking
 /// <see cref="HouseRules.Host"/>, which is false on every copy that is not the table's server and
-/// at every CLASSIC table, so a CLASSIC table runs exactly the game's own code. The only two that
-/// act on a client are cosmetic: the chamber count shown over the other seats, and the drink that
-/// kills looking like one.
+/// at every CLASSIC table, so a CLASSIC table runs exactly the game's own code. The only one that
+/// acts on a client is cosmetic: the chamber count shown over the other seats. (The drink that
+/// kills looking like one is the host's since the game's 14 Nov 2026 update, which sends each
+/// drink's count from the host.)
 ///
 /// None of them rewrites compiled code or the game's data, so there is nothing to put back: the
 /// rules end when <see cref="HouseRules"/> says the match is over. The methods the turn order, the
@@ -31,10 +32,9 @@ internal static class RuleEffects
     private const int Dice = 3;
     private const int HeadStartPoints = 2;
 
-    // The twelve raw values the chaos deck draws from: 1-5 are Kings, 6-10 Queens, 11 the chaos
-    // card and 12 the joker. One King made a chaos card gives four, five, two and one.
-    private const int KingCard = 1;
-    private const int ChaosCard = 11;
+    // The card types the Chaos deck's raw values stand for (the game's own DeckCardToType).
+    private const int KingType = 1;
+    private const int ChaosType = 3;
 
     private static readonly HashSet<string> _said = new();
 
@@ -100,7 +100,8 @@ internal static class RuleEffects
         private const HouseRules.Rule Either = HouseRules.Rule.Cylinder4 | HouseRules.Rule.Cylinder3;
 
         [HarmonyPrefix]
-        [HarmonyPatch(typeof(DeckGameplay), "set_NetworkrevolverBullet")]
+        // The bullet's network property is named with angle brackets, so it is found by that name.
+        [HarmonyPatch(typeof(DeckGameplay), "Network<RevolverBullet>k__BackingField", MethodType.Setter)]
         private static void Deck(DeckGameplay __instance, ref int value)
         {
             try
@@ -137,7 +138,7 @@ internal static class RuleEffects
             try
             {
                 if (!HouseRules.On(Either) || __instance.isOwned) return;
-                Show(__instance.RoundText, __instance.CurrentRevolver);
+                Show(__instance.roundText, __instance.CurrentRevolver);
             }
             catch (Exception e) { Failed("Short Cylinder", e); }
         }
@@ -204,8 +205,14 @@ internal static class RuleEffects
     // ------------------------------------------------------------------ 4. Chaos Storm
 
     /// <summary>
-    /// Two chaos cards in every twelve the chaos deck draws from, instead of one. The pool is
-    /// built again each time it runs out, and each build gets one more.
+    /// Two chaos cards in every deck the Chaos deck table draws from, instead of one: one King
+    /// becomes a second chaos card. The pool is built again each time it runs out, and each build
+    /// gets one more.
+    ///
+    /// Since the game's 14 Nov 2026 update that table has two decks, and each numbers its cards its
+    /// own way: Chaos (deck mode 4) draws from twelve, 1-5 Kings, 6-10 Queens, 11 the chaos card
+    /// and 12 the joker; Chaos 2 (deck mode 2) from sixteen, 1-6 Kings, 7-12 Queens, 13 the chaos
+    /// card and 14-16 jokers. So the game itself is asked which value is which.
     /// </summary>
     [HarmonyPatch]
     internal static class ChaosStorm
@@ -220,13 +227,20 @@ internal static class RuleEffects
                 var pool = __instance.serverDeckPool;
                 if (pool == null) return;
 
-                int at = pool.IndexOf(KingCard);
+                int chaosRaw = -1;
+                for (int n = 1; n <= __instance.DeckSize && chaosRaw < 0; n++)
+                    if (__instance.DeckCardToType(n) == ChaosType) chaosRaw = n;
+                if (chaosRaw < 0) return;
+
+                int at = -1;
+                for (int i = 0; i < pool.Count && at < 0; i++)
+                    if (__instance.DeckCardToType(pool[i]) == KingType) at = i;
                 if (at < 0) return;
-                pool[at] = ChaosCard;
+                pool[at] = chaosRaw;
 
                 int chaos = 0;
                 for (int i = 0; i < pool.Count; i++)
-                    if (pool[i] == ChaosCard) chaos++;
+                    if (__instance.DeckCardToType(pool[i]) == ChaosType) chaos++;
                 Each("Chaos Storm", $"{chaos} chaos cards in a pool of {pool.Count}");
             }
             catch (Exception e) { Failed("Chaos Storm", e); }
@@ -322,8 +336,8 @@ internal static class RuleEffects
             if (OffForTest || !HouseRules.On(HouseRules.Rule.ThreeDice)) return;
             try
             {
-                var dealt = __instance.DiceValues;
-                var cup = __instance.dicerenders;
+                var dealt = __instance.diceValues;
+                var cup = __instance.diceRenders;
                 if (dealt == null || cup == null) return;
                 int have = dealt.Count;
                 if (have <= 0 || cup.Count <= have) return;
@@ -353,26 +367,27 @@ internal static class RuleEffects
     /// <summary>
     /// The drink that kills plays as the last drink, not the first. The game picks the animation
     /// from the count of drinks. Never set before a loss: one drink also gives the poisoned look.
+    ///
+    /// Since the game's 14 Nov 2026 update the host counts each drink and sends the count to the
+    /// drinker's copy, which plays the drink for that count. So it is the host's count that is
+    /// raised, just before the host adds the drink: the drink goes out as the second, the last. A
+    /// seat with a life to spare is left alone, as that drink does not kill.
     /// </summary>
     [HarmonyPatch]
     internal static class OneSipLook
     {
         [HarmonyPrefix]
-        [HarmonyPatch(typeof(DiceGamePlayManager),
-                      nameof(DiceGamePlayManager.InvokeUserCode_ReduceDice__NetworkConnectionToClient__PlayerStats))]
-        private static void LastDrink()
+        [HarmonyPatch(typeof(DiceGamePlayManager), nameof(DiceGamePlayManager.ServerDrink))]
+        private static void LastDrink(PlayerStats player)
         {
             try
             {
-                if (!HouseRules.On(HouseRules.Rule.OneSip)) return;
+                if (player == null || player.Health > 1 || !HouseRules.Host(HouseRules.Rule.OneSip)) return;
 
-                foreach (var hand in UnityEngine.Object.FindObjectsOfType<DiceGamePlay>())
-                {
-                    if (hand == null || !hand.isOwned || hand.drinkCount != 0) continue;
-                    hand.NetworkdrinkCount = 1;
-                    Each("One Sip", "the first drink plays as the last");
-                    break;
-                }
+                var hand = player.GetComponent<DiceGamePlay>();
+                if (hand == null || hand.drinkCount != 0) return;
+                hand.NetworkdrinkCount = 1;
+                Each("One Sip", "the first drink plays as the last");
             }
             catch (Exception e) { Failed("One Sip", e); }
         }
@@ -439,12 +454,17 @@ internal static class RuleEffects
     /// <summary>
     /// Liar's Slots: every living seat starts each round on two points, set the way the game adds
     /// points, so the leaderboard and each player's own count agree.
+    ///
+    /// The first round's are given as the host puts the leaderboard up, once, just before the first
+    /// turn: since the game's 14 Nov 2026 update the first turn is drawn inside the match's start
+    /// itself, and the call this used to follow is not made any more. Nothing writes the points
+    /// between the two.
     /// </summary>
     [HarmonyPatch]
     internal static class HeadStart
     {
         [HarmonyPostfix]
-        [HarmonyPatch(typeof(LiarsSpinGameplayManager), nameof(LiarsSpinGameplayManager.SetFirstTurnRandomly))]
+        [HarmonyPatch(typeof(LeaderboardSpin), nameof(LeaderboardSpin.CreateLeaderboard))]
         private static void First() => Give("the first round");
 
         [HarmonyPostfix]

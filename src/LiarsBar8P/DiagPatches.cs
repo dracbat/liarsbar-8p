@@ -39,7 +39,6 @@ internal static class DiagPatches
             Line($"    ChaosPlayerPrefabs       = {CountOf(__instance.ChaosPlayerPrefabs)}");
             Line($"    ChaosDeckPlayerPrefabs   = {CountOf(__instance.ChaosDeckPlayerPrefabs)}");
             Line($"    DicePlayerPrefabs        = {CountOf(__instance.DicePlayerPrefabs)}");
-            Line($"    PokerPlayerPrefabs       = {CountOf(__instance.PokerPlayerPrefabs)}");
             Line($"    TexasPlayerPrefabs       = {CountOf(__instance.TexasPlayerPrefabs)}");
             Line($"    LiarsSpinPrefabs         = {CountOf(__instance.LiarsSpinPrefabs)}");
 

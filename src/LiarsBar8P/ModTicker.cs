@@ -31,9 +31,6 @@ internal sealed class ModTicker : MonoBehaviour
         try { BugReport.Frame(); }
         catch (Exception e) { Plugin.Log.LogError($"[bugreport] key failed: {e.Message}"); }
 
-        try { LobbyWardrobe.Frame(); }
-        catch (Exception e) { Plugin.Log.LogError($"[wardrobe] pad failed: {e.Message}"); }
-
         try { MatchBoard.Frame(); }
         catch (Exception e) { Plugin.Log.LogError($"[board] frame failed: {e.Message}"); }
 
@@ -168,14 +165,8 @@ internal sealed class ModTicker : MonoBehaviour
         try { HiddenTables.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[deck2] tick failed: {e.Message}"); }
 
-        try { TwoCardPoker.Tick(); }
-        catch (Exception e) { Plugin.Log.LogError($"[twocard] tick failed: {e.Message}"); }
-
-        try { TwoCardLobby.Tick(); }
-        catch (Exception e) { Plugin.Log.LogError($"[twocard] lobby tick failed: {e.Message}"); }
-
-        try { LobbyWardrobe.Tick(); }
-        catch (Exception e) { Plugin.Log.LogError($"[wardrobe] tick failed: {e.Message}"); }
+        try { PokerPlate.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[pokerplate] tick failed: {e.Message}"); }
 
         try { MatchStats.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[awards] tick failed: {e.Message}"); }

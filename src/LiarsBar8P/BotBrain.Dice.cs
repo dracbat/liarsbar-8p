@@ -85,7 +85,7 @@ internal static partial class BotBrain
                 if (p.Dead || !p.HaveTurn || resolving) { Idle(mind); continue; }
 
                 var gp = seat.Dice;
-                var own = gp != null ? gp.DiceValues : null;
+                var own = gp != null ? gp.diceValues : null;
                 if (own == null || own.Count == 0) continue;   // not rolled yet
 
                 string moment = $"{_round}:{bet}:{d.LastCount}:{d.LastDice}";
@@ -142,7 +142,7 @@ internal static partial class BotBrain
         private static View Look(Manager m, DiceGamePlayManager d, BotSeats.Seat seat)
         {
             var view = new View { Traditional = (int)d.DiceMode == 1 };
-            foreach (int v in seat.Dice.DiceValues) view.Mine.Add(v);
+            foreach (int v in seat.Dice.diceValues) view.Mine.Add(v);
 
             foreach (var q in m.Players)
             {

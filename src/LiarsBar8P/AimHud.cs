@@ -66,7 +66,6 @@ internal sealed class AimHud : MonoBehaviour
     private static CharController _me;
     private static ChaosDeckGameplay _deck;
     private static ChaosGamePlay _chaos;
-    private static PokerGamePlay _poker;
     private static float _meAt = -999f;
 
     private GUIStyle _style;
@@ -178,7 +177,7 @@ internal sealed class AimHud : MonoBehaviour
         bool gone = false;
         if (!ReferenceEquals(_target, null))
         {
-            try { gone = _target == null || _target.Dead || _target.Fnished; }
+            try { gone = _target == null || _target.Dead || _target.Finished; }
             catch { gone = true; }
         }
 
@@ -189,7 +188,7 @@ internal sealed class AimHud : MonoBehaviour
         _lastWords = Words.Generation;
 
         _target = AimRing.AimingAt(_me);
-        _hint = locked ? null : Words.T(_poker != null ? PokerKeys : DeckKeys);
+        _hint = locked ? null : Words.T(DeckKeys);
 
         if (_target == null)
         {
@@ -228,7 +227,6 @@ internal sealed class AimHud : MonoBehaviour
         {
             if (_deck != null) return _deck.TakingAim;
             if (_chaos != null) return _chaos.TakingAim;
-            if (_poker != null) return _poker.TakingAim;
         }
         catch { }
         return false;
@@ -240,7 +238,6 @@ internal sealed class AimHud : MonoBehaviour
         {
             if (_deck != null) return _deck.Aim;
             if (_chaos != null) return _chaos.Aim;
-            if (_poker != null) return _poker.Aim;
         }
         catch { }
         return 0;
@@ -269,7 +266,6 @@ internal sealed class AimHud : MonoBehaviour
         _me = null;
         _deck = null;
         _chaos = null;
-        _poker = null;
 
         try
         {
@@ -286,7 +282,6 @@ internal sealed class AimHud : MonoBehaviour
 
                 _deck = c.TryCast<ChaosDeckGameplay>();
                 if (_deck == null) _chaos = c.TryCast<ChaosGamePlay>();
-                if (_deck == null && _chaos == null) _poker = c.TryCast<PokerGamePlay>();
 
                 // A mode with no aiming at all is still remembered, so it is not looked for
                 // again until the lookup runs out.

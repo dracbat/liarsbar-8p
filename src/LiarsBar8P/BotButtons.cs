@@ -143,15 +143,16 @@ internal static class BotButtons
 
         // INVITE's words may run past the screen's edge; these are longer, so they stay over the button.
         float wide = box != null ? box.sizeDelta.x : 0f;
-        Dress(lit, words, mark, ring, ModCanvas.Gold, wide);
-        Dress(unlit, words, mark, ring, Color.white, wide);
+        var feel = copy.GetComponent<UIFeel>();
+        Dress(lit, words, mark, ring, ModCanvas.Gold, wide, feel);
+        Dress(unlit, words, mark, ring, Color.white, wide, feel);
         Hover(copy, lit.gameObject, unlit.gameObject);
         Rest(copy);
         return copy;
     }
 
     /// <summary>One of the two looks, lit or not: its words, and the ring with the mark in place of INVITE's picture.</summary>
-    private static void Dress(Transform look, string words, string mark, Sprite ring, Color tint, float wide)
+    private static void Dress(Transform look, string words, string mark, Sprite ring, Color tint, float wide, UIFeel feel)
     {
         var label = Label(look);
         if (label != null)
@@ -171,6 +172,7 @@ internal static class BotButtons
 
         picture.sprite = ring;
         picture.color = tint;
+        Untint(feel, picture);
 
         var copy = UnityEngine.Object.Instantiate(label.gameObject, picture.transform, false);
         copy.name = MarkName;
@@ -188,6 +190,26 @@ internal static class BotButtons
         text.alignment = TextAlignmentOptions.Center;
         text.raycastTarget = false;
         text.text = mark;
+    }
+
+    /// <summary>
+    /// Since the game's 14 Nov 2026 update INVITE redraws the colours of its pictures and words every
+    /// frame with its own, so the ring's gold or white would not hold. The ring is taken off the
+    /// copy's list of what it tints; the words keep INVITE's colours.
+    /// </summary>
+    private static void Untint(UIFeel feel, Graphic picture)
+    {
+        try
+        {
+            var tints = feel != null ? feel.tints : null;
+            if (tints == null || picture == null) return;
+            for (int i = tints.Count - 1; i >= 0; i--)
+            {
+                var t = tints[i];
+                if (t != null && t.graphic != null && t.graphic.Pointer == picture.Pointer) tints.RemoveAt(i);
+            }
+        }
+        catch (Exception e) { Plugin.Log.LogWarning($"[bot] the ring keeps INVITE's colours: {e.Message}"); }
     }
 
     /// <summary>A look's words: its text that is not the mark.</summary>
@@ -276,7 +298,7 @@ internal static class BotButtons
         try
         {
             var chat = ChatArayuz.instance;
-            if (chat != null) chat.AddMessage(line);
+            if (chat != null) chat.AddMessage(Plugin.TagName, line);
         }
         catch (Exception e) { Plugin.Log.LogWarning($"[bot] could not say it in the chat: {e.Message}"); }
     }

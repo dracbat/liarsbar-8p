@@ -59,8 +59,8 @@ left to turn it back on. To remove the mod, [uninstall](#uninstall) it.
 
 ### Eight at the table
 
-Every mode seats up to eight: Liar's Deck (Basic, Devil and Deck 2), the Chaos deck, Liar's Dice
-(Basic and Traditional), Liar's Poker, Liar's Slots and Two-Card Poker. The chairs are spaced
+Every mode seats up to eight: Liar's Deck (Basic, Devil and Deck 2), the Chaos deck (Chaos and
+Chaos 2), Liar's Dice (Basic and Traditional), Liar's Poker and Liar's Slots. The chairs are spaced
 evenly round whatever table the bar has, everyone is dealt, the turn goes round every seat, and in
 the Chaos deck the revolver can be aimed at any other player, with the name of the one you are
 aiming at shown while you choose. The lobby gets a second row of podiums, with every name plate
@@ -120,7 +120,7 @@ pulls its own trigger.
   the lobby list and Quick Join count the people at a table, not its bots.
 - The host's Kick takes a bot away from any podium. A bot is never picked to take over as host,
   but a host who leaves a table of bots may end its match.
-- Liar's Poker, Two-Card Poker and Liar's Slots play without bots for now, and a lobby that
+- Liar's Poker and Liar's Slots play without bots for now, and a lobby that
   switches to one of them sends its bots away and says so in the chat.
 - Bots live entirely inside the host's own game. Nothing else is started on your PC for them.
 - To host without bots, turn off `AllowBots`.
@@ -141,36 +141,27 @@ nobody starts into rules they have not seen.
 |---|---|---|
 | Liar's Deck, Basic and Devil | 15-second turns, a 4-chamber revolver, 3 cards each | 15-second turns, a 3-chamber revolver |
 | Liar's Deck 2 | 15-second turns, a 4-chamber revolver | 15-second turns, a 3-chamber revolver |
-| The Chaos deck | 15-second turns, a 4-chamber revolver | a 3-chamber revolver, two chaos cards in every twelve |
+| The Chaos deck (Chaos and Chaos 2) | 15-second turns, a 4-chamber revolver | a 3-chamber revolver, two chaos cards in every deck |
 | Liar's Dice | 15-second turns, 3 dice each | 3 dice each, one drink and you are out |
 | Liar's Poker | 15-second turns, every hand starts on 1 bullet | every hand starts on 1 bullet, no Coward's Fold |
 | Liar's Slots | everyone starts each round on 2 points | the dead spin spares about 1 in 7 instead of 2 in 7 |
-| Two-Card Poker | always CLASSIC | always CLASSIC |
 
 ![The house rules row in the lobby, on QUICK](docs/images/house-rules-quick.jpg)
 
 *House rules at the top left of the lobby, here on QUICK, with what it does at the table picked.*
 
-### Two more tables
+### Deck 2, Chaos 2 and Two-Card Poker
 
-- **Liar's Deck 2 is back** on the deck arrows: right from Chaos, or left from Basic. Seven cards
-  each, and your hand carries over from round to round until no more than one player still has
-  cards. Its card, help page and sound are the game's own.
-- **Two-Card Poker**, an older bluffing game the game carries but never put on a menu, is on the
-  Poker tab's new arrows. Two cards each from a deck of 21, swap or pass, then challenge, call liar
-  or show down, and the best hand takes the shotgun. The ? beside the tab opens its rules.
-  Everyone plays as Scubby there, the only character the table was made for.
-- The Poker tab's plate now reads **LIAR'S POKER**, the mode's real name.
-
-Only the host can choose either table, and only at a table where everyone has the mod.
+- **Liar's Deck 2 and Chaos 2** are on the game's own deck arrows since its Season 6 update
+  (14 November 2026), for everyone. Fully Loaded seats eight at both. Liar's Deck 2 deals seven
+  cards each, and your hand carries over from round to round until no more than one player still
+  has cards.
+- **Two-Card Poker is coming back soon.** The game's Season 6 update removed its table, cards and
+  all, so for now the Poker tab is the released Liar's Poker.
 
 ![A Liar's Deck 2 match](docs/images/liars-deck-2.jpg)
 
 *Liar's Deck 2 at a table of eight: seven cards each.*
-
-![Two-Card Poker](docs/images/two-card-poker.jpg)
-
-*Two-Card Poker: everyone plays as Scubby here.*
 
 ### During a match
 
@@ -185,8 +176,7 @@ Only the host can choose either table, and only at a table where everyone has th
 - **Once you are out, A and D walk round the table.** Alongside the game's own spectator views
   there is a camera at every other seat, so you can watch each player in turn. They show only what
   anyone at the table could see: hands, dice, reels and hole cards stay as hidden as they are from
-  a chair. Liar's Poker with four players or fewer keeps just the game's own views, and so does
-  Two-Card Poker at any size.
+  a chair. Liar's Poker with four players or fewer keeps just the game's own views.
 - **A line says whose turn it is**, and who you are aiming at.
 - **Emotes come back after 10 seconds** instead of the game's 12, at tables where everyone has the
   mod.
@@ -201,9 +191,7 @@ Only the host can choose either table, and only at a table where everyone has th
 
 ### In the lobby
 
-- **Change outfit.** Two arrows at the top right, under Ready, step your character through the
-  wardrobe's outfit sets, and everyone sees the change at once. A controller's D-pad up and down do
-  the same.
+- **Outfits** are the game's own SKINS tab in the lobby now, since its Season 6 update.
 - **Block a player.** A red cross sits just after every other player's name. Click it twice to
   block them: the first click turns it gold and asks, the second blocks. Their lobbies then vanish
   from your list, the menu's count and Quick Join, and when you host, all they see is Failed To
@@ -214,15 +202,12 @@ Only the host can choose either table, and only at a table where everyone has th
 - **Joiners are marked ready** as they arrive and when everyone comes back from a match, so the
   host only has to press Start. Anyone can un-ready with the game's own button.
 
-![The lobby's outfit arrows and a block cross](docs/images/lobby-outfit-and-block.jpg)
-
-*The outfit arrows under READY, and the red block cross just after another player's name.*
-
 ### Fair play
 
-- At a table you host, your game settles every revolver and shotgun pull from its own record,
-  counts every Two-Card Poker hand it deals, and removes a player caught cheating. A removed player
-  can't come back until you stop hosting.
+- At a table you host, every revolver pull is settled by the host: by the game itself in Liar's
+  Deck and Liar's Poker since its Season 6 update, and by your game from its own record in the
+  Chaos deck. Your game removes a player caught cheating, and a removed player can't come back until
+  you stop hosting.
 - At a table where everyone runs this version, Liar's Deck and the Chaos deck send each player only
   their own cards, keep thrown cards face down until the game turns them over, and keep every
   revolver's loaded chamber with the host. No screen there shows the cards in another player's
@@ -231,8 +216,8 @@ Only the host can choose either table, and only at a table where everyone has th
   player was dealt, no more of them than a throw allows, bids that go up, dice faces that exist,
   and moves made on that player's own turn while they are still in. Anything a slow connection
   could explain is quietly refused, never punished.
-- At a table you host, each chat line shows the name of the player who sent it, and names are
-  tidied so no two players share one.
+- Each chat line shows the name of the player who sent it (the game itself does this since its
+  Season 6 update), and at a table you host, names are tidied so no two players share one.
 - At a table someone else hosts with this version, your game watches for things the rules make
   impossible, such as a player still alive after more pulls than the revolver has chambers, or a
   player who was out coming back. If it sees one, it tells you why, leaves the table and puts that
@@ -295,7 +280,11 @@ of the screen mean it loaded.
 
 ### Updating
 
-- **On v1.1.3, v2.0.0 or v3.0.0:** nothing to download. When the game starts, the mod offers the
+- **Liar's Bar's Season 6 update (14 November 2026) stopped v3.0.2 and older from loading far
+  enough to update themselves.** Download `Install-LiarsBar8P.bat` again from the
+  [latest release](../../releases/latest) and run it once. From v3.1.0 on, the update check starts
+  before anything a game update can break.
+- **On v3.1.0 or newer:** nothing to download. When the game starts, the mod offers the
   update in a window; say yes and it installs it and restarts the game. If you set `Updates` to
   `Off`, run the installer again instead. While Fully Loaded is switched off the mod doesn't look
   for updates, so switch it back on to get them.

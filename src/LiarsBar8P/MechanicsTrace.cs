@@ -20,8 +20,9 @@ namespace LiarsBar8P;
 /// <item>the <b>devil's deal</b>, offered when a liar call or a spot-on call resolves in the
 /// Devil deck - the game runs it from inside the resolve routine rather than from any button,
 /// so it needs a call to be made and then followed through;</item>
-/// <item>a <b>chaos card</b> thrown in the Chaos deck, which stops the round and sends the
-/// table into the aiming phase.</item>
+/// <item>a <b>chaos card</b> turned over by a liar call in the Chaos deck, which sends every
+/// seat into the aiming phase at once (since the game's 14 Nov 2026 update; before it, throwing
+/// the card did that by itself).</item>
 /// </list>
 ///
 /// Each is reported with the seat that caused it and how many were at the table, because the
@@ -98,32 +99,21 @@ internal static class MechanicsTrace
 
     // ------------------------------------------------------------------- the chaos
 
-    /// <summary>A chaos card reached the table and the round turned into an aiming phase.</summary>
+    /// <summary>
+    /// A liar call turned the chaos card over and every seat took aim. Since the game's 14 Nov 2026
+    /// update this is where chaos starts: a thrown chaos card stays face down like any other until
+    /// somebody calls it.
+    /// </summary>
     [HarmonyPostfix]
-    [HarmonyPatch(typeof(ChaosDeckGamePlayManager), nameof(ChaosDeckGamePlayManager.BeginChaosFromThrow))]
-    private static void ChaosThrown(GameObject thrower,
-                                    Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<int> thrownTypes)
+    [HarmonyPatch(typeof(ChaosDeckGamePlayManager), nameof(ChaosDeckGamePlayManager.StartAllPlayersChaosAim))]
+    private static void ChaosRevealed(ChaosDeckGamePlayManager __instance)
     {
         try
         {
-            // The card types only inside the loopback test harness; anywhere else, how many.
-            string cards = "nothing";
-            if (thrownTypes != null && thrownTypes.Length > 0 && !Fair.TestsAllowed)
-                cards = $"{thrownTypes.Length} card(s)";
-            else if (thrownTypes != null && thrownTypes.Length > 0)
-            {
-                var sb = new System.Text.StringBuilder();
-                for (int i = 0; i < thrownTypes.Length; i++)
-                {
-                    if (i > 0) sb.Append(", ");
-                    sb.Append(thrownTypes[i]);
-                }
-                cards = sb.ToString();
-            }
-
+            var thrower = __instance != null ? __instance.LastBetPlayer : null;
             string who = thrower != null ? Who(thrower.transform) : "somebody";
             Plugin.Log.LogWarning(
-                $"[mechanic] CHAOS thrown by {who} at a table of {Seats()} - cards {cards}");
+                $"[mechanic] CHAOS: a call turned over the chaos card {who} threw, at a table of {Seats()} - every seat aims");
             _chaos++;
         }
         catch { }
@@ -179,9 +169,11 @@ internal static class MechanicsTrace
     /// machine that presses the key and never on the one that resolves the round. Watching it
     /// counted nothing at all here: a table that bid, raised and called liar all the way
     /// through a match reported zero bids, which reads exactly like a mode where nobody moved.
+    /// Since the game's 14 Nov 2026 update the body every bid reaches is <c>ApplyBid</c>: Mirror's
+    /// handler goes straight to it, past the command's own body.
     /// </summary>
     [HarmonyPostfix]
-    [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.UserCode_PlaceBet__Int32__Int32))]
+    [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.ApplyBid))]
     private static void DiceBid(DiceGamePlay __instance, int count, int dice, bool __runOriginal)
     {
         if (!__runOriginal) return;
@@ -232,23 +224,23 @@ internal static class MechanicsTrace
     /// every move was refused should not read like a run where every move was made.
     /// </summary>
     [HarmonyPostfix]
-    [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.UserCode_CMDRised__Boolean))]
-    private static void TexasRaised(TexasGamePlay __instance, bool AllInN, bool __runOriginal)
+    [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.UserCode_CmdRised__Boolean))]
+    private static void TexasRaised(TexasGamePlay __instance, bool allIn, bool __runOriginal)
     {
         if (!__runOriginal) return;
         try
         {
             _raises++;
-            if (AllInN) _allIns++;
+            if (allIn) _allIns++;
             if (Plugin.Verbose != null && Plugin.Verbose.Value)
-                Plugin.Log.LogInfo($"[mechanic] TEXAS {(AllInN ? "all in" : "call")} by {Who(__instance)} " +
+                Plugin.Log.LogInfo($"[mechanic] TEXAS {(allIn ? "all in" : "call")} by {Who(__instance)} " +
                                    $"at a table of {Seats()}");
         }
         catch { }
     }
 
     [HarmonyPostfix]
-    [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.UserCode_CMDFolded))]
+    [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.UserCode_CmdFolded))]
     private static void TexasFolded(TexasGamePlay __instance)
     {
         try
@@ -310,7 +302,7 @@ internal static class MechanicsTrace
             _shots == 0 && _raises == 0 && _folds == 0 && _claims == 0) return;
 
         Plugin.Log.LogWarning(
-            $"[mechanic] this match: {_devils} devil's deal(s), {_chaos} chaos throw(s) " +
+            $"[mechanic] this match: {_devils} devil's deal(s), {_chaos} chaos card(s) turned over " +
             $"({_chaosDone} resolved, {_shots} aimed shot(s)), {_bids} dice bid(s), " + $"{_diceLiar} dice liar call(s), " +
             $"{_diceSpotOn} spot-on call(s), {_raises} texas call(s) ({_allIns} all in), " +
             $"{_folds} fold(s), {_claims} spin claim(s), {_spinLiar} spin liar call(s)");

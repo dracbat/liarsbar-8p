@@ -72,6 +72,9 @@ internal static class LobbySkinClick
 
             Vector2 mouse = Input.mousePosition;
             bool onBody = OnBody(cam, _local.transform.position, mouse);
+            // The game's SKINS drawer is drawn over the lobby: where it covers the character, the
+            // drawer has the mouse, background and all, as it does with four.
+            if (onBody && OnDrawer(TopHit(mouse))) onBody = false;
             Light(__instance, onBody, mouse);
 
             bool next = Input.GetMouseButtonDown(0);
@@ -84,8 +87,10 @@ internal static class LobbySkinClick
             var player = _local.GetComponent<PlayerObjectController>();
             if (player == null) return;
 
+            // The game's own sound for a change of character, which plays it through the button
+            // feel its select targets have, or their audio source without one.
             var sound = UnityEngine.Object.FindObjectOfType<SkinChangerLobby>();
-            if (sound != null && sound.audioSource != null) sound.audioSource.Play();
+            if (sound != null) sound.PlayChangeSound();
 
             if (next) player.SetSkin();
             else player.SetSkinBack();
@@ -221,4 +226,20 @@ internal static class LobbySkinClick
     /// <summary>A button, the mode arrows, the chat box - anything that owns its own clicks.</summary>
     private static bool IsControl(GameObject go) =>
         go != null && go.GetComponentInParent<UnityEngine.UI.Selectable>() != null;
+
+    /// <summary>Anywhere on the game's SKINS drawer, its background included (new in its 14 Nov 2026 update).</summary>
+    private static bool OnDrawer(GameObject go) =>
+        go != null && go.GetComponentInParent<LobbySkinDrawer>() != null;
+
+    /// <summary>For the test driver: what this would make of the mouse at a point on screen.</summary>
+    internal static string Probe(Vector2 at)
+    {
+        var cam = LobbyPodiums.HeldCamera;
+        var local = _local != null ? _local : GameObject.Find(LocalPlayer);
+        bool body = cam != null && local != null && OnBody(cam, local.transform.position, at);
+        var top = TopHit(at);
+        return $"at {at.x:0},{at.y:0}: on the character {body}, the wide shot {(LobbyPodiums.PulledBack ? "held" : "off")}, " +
+               $"top '{(top != null ? top.name : "nothing")}', select target {IsSelectTarget(top)}, control {IsControl(top)}, " +
+               $"the SKINS drawer {OnDrawer(top)}";
+    }
 }

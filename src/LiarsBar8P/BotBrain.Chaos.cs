@@ -10,16 +10,22 @@ internal static partial class BotBrain
     /// The Chaos deck: throw one card as the round's card, or call the last throw a lie, and when
     /// the gun comes to the bot, aim it.
     ///
-    /// The choice of card or call is Liar's Deck's, one card at a time, as the table allows. The
-    /// chaos card is thrown whenever the bot holds it, sooner rather than later: nobody can call it,
-    /// and it hands the thrower the gun.
+    /// The choice of card is Liar's Deck's, one card at a time, as the table allows. Since the
+    /// game's 14 Nov 2026 update the chaos card is a lie like any card that is not the round's: it
+    /// goes face down and does nothing until somebody calls it, and then every seat takes aim at
+    /// once. So a bot throws it only as it would any lie. Every throw at this table is a single card
+    /// that is honest about half the time, so the call is made against the deck's own share of
+    /// honest cards: a bot calls when what it holds makes the last card look less likely than that,
+    /// by a margin its own suspicion moves. Without that, bots never called here, and with the chaos
+    /// card no longer starting a shot when thrown, a table of bots went whole rounds without one.
     ///
-    /// The gun comes to whoever threw the chaos card or caught a liar. A bot aims at somebody still
-    /// in the match, never itself and never a seat that is out, picked at random but weighted to
-    /// whoever has survived the most pulls of their own revolver, which everybody at the table has
-    /// watched: each pull survived leaves fewer empty chambers. It aims once, after a moment's
-    /// thought, the way the game's own keys set the aim, and the game fires when its countdown ends,
-    /// as it does for a person. An aim the game has locked on somebody is left alone.
+    /// The gun comes to whoever caught a liar, to whoever was called on a joker, and to every seat
+    /// when a call turns the chaos card over. A bot aims at somebody still in the match, never
+    /// itself and never a seat that is out, picked at random but weighted to whoever has survived
+    /// the most pulls of their own revolver, which everybody at the table has watched: each pull
+    /// survived leaves fewer empty chambers. It aims once, after a moment's thought, the way the
+    /// game's own keys set the aim, and the game fires when its countdown ends, as it does for a
+    /// person. An aim the game has locked on somebody is left alone.
     /// </summary>
     private static class Chaos
     {
@@ -28,13 +34,22 @@ internal static partial class BotBrain
         /// <summary>The Chaos deck's own card. The round card there is only ever 1 or 2.</summary>
         private const int ChaosCard = 3;
 
-        private const double CallBelow = 0.3;
+        /// <summary>
+        /// How far below the deck's honest share the last card's chance has to fall before a bot
+        /// calls it, before the bot's own suspicion moves it.
+        /// </summary>
+        private const double CallMargin = 0.05;
+
         private const float RaiseWait = 2.5f;
         private const float HoldAfterThrow = 1.5f;
         private const float CallTaken = 2f;
 
-        /// <summary>The share of the Chaos deck that is honest for a round: the round's card and jokers.</summary>
-        private const double GoodShare = 0.45;
+        /// <summary>
+        /// The share of a Chaos deck that is honest for a round: the round's card (Kings or Queens)
+        /// and the jokers. Chaos deals from twelve, five Kings, five Queens, one chaos card and one
+        /// joker; Chaos 2 from sixteen, six Kings, six Queens, one chaos card and three jokers.
+        /// </summary>
+        private static double GoodShare(ChaosDeckGamePlayManager cm) => cm.ChaosRules ? 6.0 / 12.0 : 9.0 / 16.0;
 
         /// <summary>How long a bot holding the gun takes to aim.</summary>
         private const float MinAim = 0.8f;
@@ -204,7 +219,8 @@ internal static partial class BotBrain
             if (canCall)
             {
                 double honest = Honest(cm, hand, round);
-                if (hand.Count == 0 || honest < CallBelow + mind.Suspicion || (TestCallAll && Fair.TestsAllowed))
+                double callBelow = GoodShare(cm) - CallMargin + mind.Suspicion;
+                if (hand.Count == 0 || honest < callBelow || (TestCallAll && Fair.TestsAllowed))
                 {
                     Dev.Log("bot", $"seat {p.Slot} calls LIAR on seat {last}");
                     mind.CalledAt = Time.time;
@@ -215,16 +231,15 @@ internal static partial class BotBrain
             }
             if (hand.Count == 0) return;
 
-            // One card: the chaos card when it holds it, most of the time, then an honest one, then a lie.
-            var chaos = hand.Find(c => c.Type == ChaosCard);
+            // One card: an honest one, now and then a lie, and a lie when it has nothing honest. The
+            // chaos card is one of the lies.
             var good = hand.FindAll(c => c.Type == round || c.Type == Joker);
-            var bad = hand.FindAll(c => c.Type != round && c.Type != Joker && c.Type != ChaosCard);
+            var bad = hand.FindAll(c => c.Type != round && c.Type != Joker);
 
             Cards.Held pick;
-            if (chaos != null && (mind.Rng.NextDouble() < 0.7 || good.Count == 0 && bad.Count == 0)) pick = chaos;
-            else if (good.Count > 0 && !(bad.Count > 0 && mind.Rng.NextDouble() < mind.Bluff)) pick = good[mind.Rng.Next(good.Count)];
+            if (good.Count > 0 && !(bad.Count > 0 && mind.Rng.NextDouble() < mind.Bluff)) pick = good[mind.Rng.Next(good.Count)];
             else if (bad.Count > 0) pick = bad[mind.Rng.Next(bad.Count)];
-            else pick = chaos ?? hand[0];
+            else pick = hand[0];
 
             Cards.Select(gp.Cards, gp.selectedCards, new List<Cards.Held> { pick });
             mind.Throw = new List<GameObject> { pick.Go };
@@ -246,7 +261,7 @@ internal static partial class BotBrain
             int inPlay = Math.Max(1, cm.CardsOnTable + held);
             int mineGood = hand.FindAll(c => c.Type == round || c.Type == Joker).Count;
             int unseen = Math.Max(1, inPlay - hand.Count);
-            double each = (GoodShare * inPlay - mineGood) / unseen;
+            double each = (GoodShare(cm) * inPlay - mineGood) / unseen;
             each = Math.Min(0.98, Math.Max(0.02, each));
             return Math.Pow(each, Math.Max(1, cm.LastRoundCount));
         }

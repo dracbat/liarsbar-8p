@@ -91,7 +91,7 @@ internal static class BotPuppet
     private static void Deck(Animator anim, BotSeats.Seat seat)
     {
         bool dead = seat.Player.Dead;
-        anim.SetBool(Holding, seat.Deck.HaveCards && !dead);
+        anim.SetBool(Holding, seat.Deck.haveCards && !dead);
         anim.SetBool(Raised, seat.Looking && !dead);
     }
 

@@ -16,6 +16,32 @@ Versions that were once numbered 1.x and 2.x were folded into the same 0.x line 
 room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order is unchanged: what
 was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v3.1.0 — Works with Liar's Bar's Season 6 update
+
+- **Works with the game's 14 November update (Season 6).** That update moved and renamed a large
+  part of the game's code, so v3.0.2 stopped loading part of the way through: lobbies stayed at
+  four, and much of the rest never switched on. Eight seats, bots, house rules, awards, the Tab
+  board and fair play all work again.
+- **The update check now starts first.** v3.0.2's check came last, so it never ran on the new game
+  and could not offer this update: if you are reading this after updating by hand, that is why.
+  From now on a game update that breaks part of the mod can't also stop the fix reaching you.
+- **Liar's Deck 2 and Chaos 2 are on the game's own deck arrows now**, for everyone, so the mod no
+  longer adds Deck 2 there or keeps it to tables where everyone has the mod. Deck 2, Chaos and
+  Chaos 2 all seat eight, and the house rules treat Chaos 2 as a Chaos table: Chaos Storm puts a
+  second chaos card in either deck.
+- **Bots call liar at the Chaos deck.** The game's update changed the chaos card: thrown, it stays
+  face down like any other until somebody calls it, and only then does everyone take aim. Bots now
+  throw it as a bluff and call often enough for the shooting to start.
+- **The lobby's outfit arrows are gone**: the game has its own SKINS tab in the lobby now.
+- **Two-Card Poker is coming back soon.** The game's update removed its table, cards and all, so
+  the Poker tab is the released Liar's Poker for now. Its plate still reads LIAR'S POKER.
+- **START works at a table of five or more.** The updated lobby hid the button above four players.
+- **Ranked stays off while Fully Loaded is on**, including the searches the new ranked screen
+  starts by itself, and the Arena's ranked screen.
+- **Fair play:** the game now settles every revolver pull in Liar's Deck and Liar's Poker on the
+  host by itself, and fills in each chat line's name, so the mod leaves those to the game. The
+  mod's own messages in the chat now come from FULLY LOADED.
+
 ## v3.0.2 — Liar calls work again in Liar's Dice and Liar's Slots
 
 - **Fixed: a liar call froze Liar's Dice and Liar's Slots.** When anyone but the host called a player a liar (or called spot on in Liar's Dice), the table stopped and only restarting the game got out of it. The host's fair-play check counted the call as out of turn, because the game ends the caller's turn as it announces the call. The host now accepts a call that the caller announced on their own turn, so the check still turns away calls made out of turn. Reported in issue #5.

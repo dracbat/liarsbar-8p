@@ -445,7 +445,7 @@ internal static class HostCheck
                 var deck = p.GetComponent<DeckGameplay>();
                 if (deck != null)
                 {
-                    int pulls = deck.NetworkcurrentRevolver;
+                    int pulls = deck.CurrentRevolver;
                     if (seat.PastTheCylinder(now, dead, pulls))
                     {
                         Trip($"a seat alive after {pulls} pulls of a six-chamber cylinder", SawRevolver, pulls);

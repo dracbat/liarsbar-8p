@@ -52,7 +52,7 @@ internal sealed class TableHand
     {
         get
         {
-            try { return _deck != null ? _deck.cardTypes : _chaos.CardTypes; }
+            try { return _deck != null ? _deck._cardTypes : _chaos.CardTypes; }
             catch { return null; }
         }
     }
@@ -72,7 +72,7 @@ internal sealed class TableHand
         var held = new System.Collections.Generic.List<(int Index, Card Card)>();
         try
         {
-            var cards = _deck != null ? _deck.Cards : _chaos.Cards;
+            var cards = _deck != null ? _deck.cards : _chaos.Cards;
             if (cards == null) return held;
             for (int i = 0; i < cards.Count; i++)
             {
@@ -97,7 +97,7 @@ internal sealed class TableHand
 
     internal bool Holding
     {
-        get { try { return _deck != null ? _deck.HaveCards : _chaos.HaveCards; } catch { return false; } }
+        get { try { return _deck != null ? _deck.haveCards : _chaos.HaveCards; } catch { return false; } }
     }
 
     internal void Throw(Il2CppSystem.Collections.Generic.List<int> types, bool emptied)
@@ -182,7 +182,6 @@ internal sealed class TableHand
         if (p.GetComponent<DeckGameplay>() != null) return Kind.Deck;
         if (p.GetComponent<ChaosDeckGameplay>() != null) return Kind.ChaosDeck;
         if (p.GetComponent<ChaosGamePlay>() != null) return Kind.Chaos;
-        if (p.GetComponent<PokerGamePlay>() != null) return Kind.Poker;
         if (p.GetComponent<TexasGamePlay>() != null) return Kind.Texas;
         if (p.GetComponent<DiceGamePlay>() != null) return Kind.Dice;
         if (p.GetComponent<SpinGamePlay>() != null) return Kind.Spin;

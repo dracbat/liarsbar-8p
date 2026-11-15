@@ -332,9 +332,8 @@ internal static class HandsTests
         var m = Manager.Instance;
         if (m == null) { Fair.Result("hands draw", false, "no table"); return; }
 
-        int cards = 0, odd = 0, poker = 0;
+        int cards = 0, odd = 0;
         Mesh shape = null;
-        string face = null;
         Mesh deckPlain = null;
         try { deckPlain = Card.ResolveMesh(HiddenCards.DecoyCard); } catch { }
 
@@ -343,7 +342,7 @@ internal static class HandsTests
             if (p == null || p.isOwned) continue;
             var deck = p.GetComponent<DeckGameplay>();
             var chaos = p.GetComponent<ChaosDeckGameplay>();
-            var list = deck != null ? deck.Cards : chaos != null ? chaos.Cards : null;
+            var list = deck != null ? deck.cards : chaos != null ? chaos.Cards : null;
             if (list != null)
                 foreach (var go in list)
                 {
@@ -357,31 +356,15 @@ internal static class HandsTests
                     else if (mesh != shape) odd++;
                     if (deck != null && deckPlain != null && mesh != deckPlain) odd++;
                 }
-
-            var pk = p.GetComponent<PokerGamePlay>();
-            if (pk != null && pk.Cards != null)
-                foreach (var go in pk.Cards)
-                {
-                    if (go == null || !go.activeInHierarchy) continue;
-                    var pc = go.GetComponent<PokerCard>();
-                    var r = go.GetComponent<Renderer>();
-                    if (pc == null || r == null) continue;
-                    if (!HiddenCards.IsHidden(pc)) { odd++; continue; }
-                    poker++;
-                    var mat = r.sharedMaterial;
-                    string name = mat != null ? mat.name.Replace(" (Instance)", "") : "";
-                    if (face == null) face = name;
-                    else if (name != face) odd++;
-                }
         }
 
-        if (cards + poker == 0)
+        if (cards == 0)
         {
             Fair.Result("hands draw", false, "no other seat holds a card on this screen right now (check during a round)");
             return;
         }
         Fair.Result("hands draw", odd == 0, odd == 0
-            ? $"{cards + poker} cards in other seats' hands, all drawn alike"
-            : $"{odd} of {cards + poker} cards in other seats' hands are drawn differently");
+            ? $"{cards} cards in other seats' hands, all drawn alike"
+            : $"{odd} of {cards} cards in other seats' hands are drawn differently");
     }
 }

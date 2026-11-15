@@ -34,10 +34,33 @@ internal static class HostDecidesChaos
     private static bool Empty(NetworkBehaviour obj, NetworkConnectionToClient senderConnection) =>
         HostRevolver.Report(obj, senderConnection, true, saysFired: false);
 
-    /// <summary>A seat goes out by the game's own path: shots due at the same moment land with it.</summary>
+    /// <summary>
+    /// A seat goes out by the game's own path (a bot's pull, the host's own): shots due at the same
+    /// moment land with it. Since the game's 14 Nov 2026 update that path is written into the pull
+    /// itself, with no call of its own left to hook, so the seat's dead flag is watched instead:
+    /// only its change to out, as the game sets the flag again for every dead seat each round.
+    /// </summary>
     [HarmonyPrefix]
-    [HarmonyPatch(typeof(ChaosDeckGameplay), "ServerBeDeadFromRevolver")]
-    private static void GoingOut(ChaosDeckGameplay __instance) => HostRevolver.GoingOut(__instance);
+    [HarmonyPatch(typeof(PlayerStats), nameof(PlayerStats.NetworkDead), MethodType.Setter)]
+    private static void Dying(PlayerStats __instance, out bool __state)
+    {
+        __state = false;
+        try { __state = __instance != null && __instance.Dead; }
+        catch { }
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(PlayerStats), nameof(PlayerStats.NetworkDead), MethodType.Setter)]
+    private static void GoingOut(PlayerStats __instance, bool value, bool __state)
+    {
+        try
+        {
+            if (!value || __state || !NetworkServer.active || !Fair.Hosting || __instance == null) return;
+            var gp = __instance.GetComponent<ChaosDeckGameplay>();
+            if (gp != null) HostRevolver.GoingOut(gp);
+        }
+        catch (Exception e) { Plugin.Log.LogError($"{Fair.Tag} a Chaos deck seat going out could not be noted: {e.Message}"); }
+    }
 
     [HarmonyPrefix]
     [HarmonyPatch(typeof(ChaosDeckGameplay), nameof(ChaosDeckGameplay.UserCode_CommandBeDead))]
@@ -84,6 +107,11 @@ internal static class HostDecidesChaos
 
     internal static void Register()
     {
+        // The host's revolver record: its deadline tick and the "fair revolver" drives. Liar's Deck
+        // registered it until the game took over Liar's Deck pulls (14 Nov 2026); the Chaos deck
+        // still needs it, or a pull whose message never comes is never settled.
+        HostRevolver.Register();
+
         // "fair chaosfire [conn]": the host checks a fire command as if that seat had sent one.
         Fair.OnDrive("chaosfire", rest =>
         {

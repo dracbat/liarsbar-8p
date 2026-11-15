@@ -60,17 +60,17 @@ internal static class DealFallback
                 var gp = p.GetComponent<DeckGameplay>();
                 if (gp == null) continue;
 
-                if (gp.cardTypes == null || gp.cardTypes.Count == 0) { novalues++; continue; }
+                if (gp._cardTypes == null || gp._cardTypes.Count == 0) { novalues++; continue; }
 
                 dealt++;
-                int want = gp.cardTypes.Count;
+                int want = gp._cardTypes.Count;
                 int showing = Showing(gp);
 
                 bool mine = IsLocal(p);
 
                 report.Add($"  seat {p.Slot}{(mine ? " (this machine)" : "")}: " +
-                           $"{want} cards dealt, {showing} of {Count(gp.Cards)} card objects " +
-                           $"switched on, holding={gp.HaveCards}");
+                           $"{want} cards dealt, {showing} of {Count(gp.cards)} card objects " +
+                           $"switched on, holding={gp.haveCards}");
 
                 // Two different things can be wrong, and they want different answers.
                 //
@@ -85,7 +85,7 @@ internal static class DealFallback
                 // whole hand handed over.
                 bool hasCards = showing >= want;
 
-                if (gp.HaveCards && hasCards) holding++;
+                if (gp.haveCards && hasCards) holding++;
                 else if (hasCards) flagOnly.Add(p);
                 else waiting.Add(p);
             }
@@ -151,9 +151,9 @@ internal static class DealFallback
     {
         try
         {
-            if (gp.Cards == null) return 0;
+            if (gp.cards == null) return 0;
             int n = 0;
-            foreach (var c in gp.Cards)
+            foreach (var c in gp.cards)
                 if (c != null && c.activeSelf) n++;
             return n;
         }
@@ -181,9 +181,9 @@ internal static class DealFallback
     {
         try
         {
-            if (gp.Cards == null) return 0;
+            if (gp.cards == null) return 0;
             int n = 0;
-            foreach (var c in gp.Cards)
+            foreach (var c in gp.cards)
                 if (c != null && c.activeInHierarchy) n++;
             return n;
         }
@@ -199,12 +199,12 @@ internal static class DealFallback
         try
         {
             var gp = p.GetComponent<DeckGameplay>();
-            if (gp == null || gp.cardTypes == null) return;
+            if (gp == null || gp._cardTypes == null) return;
 
-            int count = gp.cardTypes.Count;
+            int count = gp._cardTypes.Count;
             var types = new Il2CppStructArray<int>(count);
             var active = new Il2CppStructArray<int>(count);
-            for (int i = 0; i < count; i++) { types[i] = gp.cardTypes[i]; active[i] = i; }
+            for (int i = 0; i < count; i++) { types[i] = gp._cardTypes[i]; active[i] = i; }
 
             // Applying the state here is what actually puts the cards in the hand on this
             // machine - sending the message alone did not, which cost a test run to learn.
@@ -214,7 +214,7 @@ internal static class DealFallback
             gp.SetHaveCards(true);
             gp.SetCardsRpc(types);
 
-            int objects = gp.Cards != null ? gp.Cards.Count : -1;
+            int objects = gp.cards != null ? gp.cards.Count : -1;
             Plugin.Log.LogInfo($"[dealcards] seat {p.Slot} handed {count} cards ({objects} card objects)");
         }
         catch (Exception e)

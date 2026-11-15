@@ -35,6 +35,12 @@ internal static class RankedGuard
     /// <summary>The ranked screen's scene.</summary>
     internal const string Scene = "MatchMaking";
 
+    /// <summary>The Arena's ranked screen (Liar's Roulette), in the game since its 14 Nov 2026 update.</summary>
+    internal const string ArenaScene = "ArenaMatchMaking";
+
+    /// <summary>Whether this scene is one of the ranked screens.</summary>
+    internal static bool IsRankedScene(string name) => name == Scene || name == ArenaScene;
+
     // Every word a player sees from this class.
     private const string Refusal = "Ranked is off while FULLY LOADED is on\nTurn it off on the main menu to play ranked";
 
@@ -92,7 +98,7 @@ internal static class RankedGuard
             {
                 var nm = Mirror.NetworkManager.singleton;
                 if (nm != null && nm.Matchmaking) return true;
-                return SceneManager.GetActiveScene().name == Scene;
+                return IsRankedScene(SceneManager.GetActiveScene().name);
             }
             catch { return true; }
         }
@@ -129,6 +135,41 @@ internal static class RankedGuard
             if (Allowed) return true;
 
             Plugin.Log.LogWarning("[ranked] a ranked search was stopped before it began");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// The search itself, in a class of its own so a rename of either entry costs only that one.
+    /// Since the game's 14 Nov 2026 update the ranked screen also starts it on its own, from its
+    /// frame (a requeue, a controller), without Find Match: refused the same way.
+    /// </summary>
+    [HarmonyPatch]
+    internal static class ScreenSearchLine
+    {
+        [HarmonyPrefix, HarmonyPriority(Priority.First)]
+        [HarmonyPatch(typeof(MatchmakerTicketer), nameof(MatchmakerTicketer.search))]
+        private static bool NoSearch()
+        {
+            if (Allowed) return true;
+
+            Plugin.Log.LogWarning("[ranked] a ranked search the screen started itself was stopped");
+            return false;
+        }
+    }
+
+    /// <summary>The Arena's ranked button (Liar's Roulette, since the game's 14 Nov 2026 update), refused like the ranked one.</summary>
+    [HarmonyPatch]
+    internal static class ArenaLine
+    {
+        [HarmonyPrefix, HarmonyPriority(Priority.First)]
+        [HarmonyPatch(typeof(LoadingInGame), nameof(LoadingInGame.LoadArenaMatchmakingScene))]
+        private static bool Refuse()
+        {
+            if (Allowed || (SkipButtonForTest && Fair.TestsAllowed)) return true;
+
+            Plugin.Log.LogInfo("[ranked] refused - the Arena's ranked screen stays shut while the mod is installed");
+            Tell();
             return false;
         }
     }

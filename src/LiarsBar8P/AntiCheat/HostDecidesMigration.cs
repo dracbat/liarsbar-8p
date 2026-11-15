@@ -49,7 +49,7 @@ internal static class HostDecidesMigration
         if (NetworkServer.active || !NetworkClient.active || !PlayingAtATable()) return;
 
         var counts = new List<(PlayerStats Ps, int Pulled)>();
-        foreach (var d in UnityEngine.Object.FindObjectsOfType<DeckGameplay>()) Add(counts, d, d.currentRevolver);
+        foreach (var d in UnityEngine.Object.FindObjectsOfType<DeckGameplay>()) Add(counts, d, d.CurrentRevolver);
         foreach (var c in UnityEngine.Object.FindObjectsOfType<ChaosDeckGameplay>()) Add(counts, c, c.currentrevoler);
         foreach (var c in UnityEngine.Object.FindObjectsOfType<ChaosGamePlay>()) Add(counts, c, c.currentrevoler);
         if (counts.Count == 0) return;
@@ -119,7 +119,7 @@ internal static class HostDecidesMigration
     [HarmonyPrefix]
     [HarmonyPatch(typeof(DeckGameplay), nameof(DeckGameplay.ApplyMigrationRevolverState))]
     private static bool Deck(DeckGameplay __instance, ref int current, ref int bullet) =>
-        Rebuild(__instance, __instance.currentRevolver, HouseRules.Chambers, ref current, ref bullet, "Liar's Deck");
+        Rebuild(__instance, __instance.CurrentRevolver, HouseRules.Chambers, ref current, ref bullet, "Liar's Deck");
 
     [HarmonyPrefix]
     [HarmonyPatch(typeof(ChaosDeckGameplay), nameof(ChaosDeckGameplay.ServerApplyMigrationRevolverState))]
@@ -233,16 +233,16 @@ internal static class HostDecidesMigration
             if (mine == null) { Fair.Result("migrate", false, "that connection has no Liar's Deck seat at this table"); return; }
 
             int n = HouseRules.Chambers;
-            int before = mine.currentRevolver;
+            int before = mine.CurrentRevolver;
             AsNumbersFrom(conn, () => mine.ApplyMigrationRevolverState(0, -1));
-            int after = mine.currentRevolver, loaded = mine.revolverBullet;
+            int after = mine.CurrentRevolver, loaded = mine.RevolverBullet;
             Fair.Result("migrate", after >= before && loaded >= after && loaded < n,
                         $"own seat: count kept={after >= before}, bullet ahead of the hammer inside the cylinder={loaded >= after && loaded < n}");
 
             if (other == null) { Fair.Result("migrate", true, "no second seat to try a foreign seat on (skipped)"); return; }
-            int oc = other.currentRevolver, ob = other.revolverBullet;
+            int oc = other.CurrentRevolver, ob = other.RevolverBullet;
             AsNumbersFrom(conn, () => other.ApplyMigrationRevolverState(0, 0));
-            Fair.Result("migrate", other.currentRevolver == oc && other.revolverBullet == ob,
+            Fair.Result("migrate", other.CurrentRevolver == oc && other.RevolverBullet == ob,
                         "another seat's numbers from that player: refused, nothing changed");
         });
     }

@@ -550,7 +550,7 @@ internal static class UltrawideArt
 
     // ------------------------------------------------------------------ shared
 
-    private static bool Ranked() => SceneManager.GetActiveScene().name == RankedGuard.Scene;
+    private static bool Ranked() => RankedGuard.IsRankedScene(SceneManager.GetActiveScene().name);
 
     private static bool IsRoot(Transform at)
     {

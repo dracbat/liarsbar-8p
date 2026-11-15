@@ -58,11 +58,6 @@ internal static class ResetAnimFix
         Deliver(obj, reader, "Chaos");
 
     [HarmonyPrefix]
-    [HarmonyPatch(typeof(PokerGamePlayManager), nameof(PokerGamePlayManager.InvokeUserCode_PlayResetAnim__Int32))]
-    private static bool Poker(NetworkBehaviour obj, NetworkReader reader) =>
-        Deliver(obj, reader, "Poker");
-
-    [HarmonyPrefix]
     [HarmonyPatch(typeof(BlorfGamePlayManager), nameof(BlorfGamePlayManager.InvokeUserCode_PlayResetAnim__Int32))]
     private static bool Blorf(NetworkBehaviour obj, NetworkReader reader) =>
         Deliver(obj, reader, "Blorf");
@@ -116,9 +111,6 @@ internal static class ResetAnimFix
 
         var chaos = obj.TryCast<ChaosGamePlayManager>();
         if (chaos != null) { chaos.UserCode_PlayResetAnim__Int32(Map(slot, Length(chaos.clips), mode)); return; }
-
-        var poker = obj.TryCast<PokerGamePlayManager>();
-        if (poker != null) { poker.UserCode_PlayResetAnim__Int32(Map(slot, Length(poker.clips), mode)); return; }
 
         var blorf = obj.TryCast<BlorfGamePlayManager>();
         if (blorf != null) { blorf.UserCode_PlayResetAnim__Int32(Map(slot, Length(blorf.clips), mode)); return; }

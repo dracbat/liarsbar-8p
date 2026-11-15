@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using HarmonyLib;
 using Mirror;
 
@@ -13,8 +14,9 @@ namespace LiarsBar8P;
 /// the game's own reveal; the host keeps them and puts them in place as the reveal begins, so
 /// everything from the reveal on (the cards turned over, the devil animation, who was lying) is
 /// the game's own, from the real cards. The count of cards on the table and every count-driven
-/// screen stay exactly as they were. A throw with the chaos card in it is turned face up by the
-/// game at once, so it is never held back.
+/// screen stay exactly as they were. Since the game's 14 Nov 2026 update the chaos card is hidden
+/// until a liar call like any card: the game no longer turns it face up when it is thrown, and only
+/// the call that turns it over starts the chaos, from the real cards put back for the reveal.
 ///
 /// <b>Safe by construction.</b> Only the values the game writes during the throw change; the
 /// thrower's own list is put back the moment the throw is done, so nothing after it sees a
@@ -28,7 +30,6 @@ namespace LiarsBar8P;
 internal static class HiddenThrow
 {
     internal const int DecoyCard = HiddenDeal.DecoyCard;
-    private const int ChaosCard = 3;
 
     internal enum Table { Deck, Chaos }
 
@@ -86,7 +87,7 @@ internal static class HiddenThrow
             // Every throw replaces the last round's cards, so what the record held for it is stale now.
             For(Table.Deck).Round.Clear();
             if (!Fair.HideHands) return;
-            __state = Hide(types, m.LastRoundSpotOn, chaos: false);
+            __state = Hide(types, m.LastRoundSpotOn);
         }
         catch (Exception e) { Plugin.Log.LogError($"{Fair.Tag} hidden throw: {e.Message}"); }
     }
@@ -117,7 +118,7 @@ internal static class HiddenThrow
             if (m == null) return;
             For(Table.Chaos).Round.Clear();
             if (!Fair.HideHands) return;
-            __state = Hide(types, null, chaos: true);
+            __state = Hide(types, null);
         }
         catch (Exception e) { Plugin.Log.LogError($"{Fair.Tag} hidden throw: {e.Message}"); }
     }
@@ -135,16 +136,16 @@ internal static class HiddenThrow
         return __exception;
     }
 
-    /// <summary>Swap the throw's values for plain cards while the game records it.</summary>
-    private static Throw Hide(Il2CppSystem.Collections.Generic.List<int> types, SyncList<int> spotOn, bool chaos)
+    /// <summary>
+    /// Swap the throw's values for plain cards while the game records it. The chaos card too: one
+    /// value left real among the plain ones would tell any copy that reads the table which throw
+    /// held it.
+    /// </summary>
+    private static Throw Hide(Il2CppSystem.Collections.Generic.List<int> types, SyncList<int> spotOn)
     {
         if (types == null || types.Count == 0) return null;
         var truth = new int[types.Count];
-        for (int i = 0; i < truth.Length; i++)
-        {
-            truth[i] = types[i];
-            if (chaos && truth[i] == ChaosCard) return null;   // turned face up by the game at once
-        }
+        for (int i = 0; i < truth.Length; i++) truth[i] = types[i];
 
         var t = new Throw { Types = types, Truth = truth, SpotOnBefore = spotOn != null ? spotOn.Count : 0 };
         for (int i = 0; i < truth.Length; i++) types[i] = DecoyCard;
@@ -298,20 +299,54 @@ internal static class HiddenThrow
         }
         return wrote;
     }
+}
 
-    // Each reveal coroutine opens with a pause; its first step is the earliest moment a reveal
-    // has begun, whatever began it (a player's call, the automatic call after the last throw).
-    [HarmonyPrefix]
-    [HarmonyPatch(typeof(DeckGamePlayManager._ResolveLiarRoutine_d__190), nameof(DeckGamePlayManager._ResolveLiarRoutine_d__190.MoveNext))]
-    private static void DeckLiarStep() => Reveal(Table.Deck, "liar");
+/// <summary>
+/// The reveal coroutines themselves. Each opens with a pause, so its first step is the earliest
+/// moment a reveal has begun, whatever began it (a player's call, the automatic call after the
+/// last throw). The compiler numbers these coroutines afresh in every build of the game, so they
+/// are found by name, not by number: a game update then needs no change here.
+/// </summary>
+[FairPatch("thrown cards turned over as the reveal begins")]
+[HarmonyPatch]
+internal static class HiddenThrowReveals
+{
+    private static readonly (Type Owner, string Routine, HiddenThrow.Table Table, string Why)[] Routines =
+    {
+        (typeof(DeckGamePlayManager), "ResolveLiarRoutine", HiddenThrow.Table.Deck, "liar"),
+        (typeof(DeckGamePlayManager), "ResolveSpotOnRoutine", HiddenThrow.Table.Deck, "spot on"),
+        (typeof(ChaosDeckGamePlayManager), "ResolveLiarRoutine", HiddenThrow.Table.Chaos, "liar"),
+    };
+
+    private static readonly Dictionary<MethodBase, (HiddenThrow.Table Table, string Why)> _found = new();
+
+    private static IEnumerable<MethodBase> TargetMethods()
+    {
+        foreach (var (owner, routine, table, why) in Routines)
+        {
+            var step = Coroutine(owner, routine);
+            if (step == null) { Plugin.Log.LogWarning($"{Fair.Tag} hidden throw: no {owner.Name}.{routine} coroutine in this build"); continue; }
+            _found[step] = (table, why);
+            yield return step;
+        }
+    }
+
+    /// <summary>MoveNext of the coroutine the compiler made for <paramref name="routine"/>, whatever its number.</summary>
+    internal static MethodBase Coroutine(Type owner, string routine)
+    {
+        string prefix = "_" + routine + "_d__";
+        foreach (var nested in owner.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic))
+            if (nested.Name.StartsWith(prefix, StringComparison.Ordinal))
+                return AccessTools.Method(nested, "MoveNext");
+        return null;
+    }
 
     [HarmonyPrefix]
-    [HarmonyPatch(typeof(DeckGamePlayManager._ResolveSpotOnRoutine_d__196), nameof(DeckGamePlayManager._ResolveSpotOnRoutine_d__196.MoveNext))]
-    private static void DeckSpotOnStep() => Reveal(Table.Deck, "spot on");
-
-    [HarmonyPrefix]
-    [HarmonyPatch(typeof(ChaosDeckGamePlayManager._ResolveLiarRoutine_d__235), nameof(ChaosDeckGamePlayManager._ResolveLiarRoutine_d__235.MoveNext))]
-    private static void ChaosLiarStep() => Reveal(Table.Chaos, "liar");
+    private static void Step(MethodBase __originalMethod)
+    {
+        try { if (__originalMethod != null && _found.TryGetValue(__originalMethod, out var r)) HiddenThrow.Reveal(r.Table, r.Why); }
+        catch (Exception e) { Plugin.Log.LogError($"{Fair.Tag} hidden throw: {e.Message}"); }
+    }
 }
 
 /// <summary>

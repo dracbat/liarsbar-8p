@@ -265,7 +265,7 @@ internal static class LobbyWardrobe
         if (_shownFor != setter.character)
         {
             _shownFor = setter.character;
-            Plugin.Log.LogInfo($"[wardrobe] skin picker up for character {setter.character} ({setter.Skins.Count} outfits)");
+            Plugin.Log.LogInfo($"[wardrobe] skin picker up for character {setter.character} ({setter.skins.Count} outfits)");
         }
     }
 
@@ -324,7 +324,7 @@ internal static class LobbyWardrobe
     {
         if (RankedGuard.Near || !Table.Modded || Manager.Instance != null || !Mine(out var setter)) return false;
 
-        int n = setter.Skins.Count;
+        int n = setter.skins.Count;
         string key = Keys[setter.character];
         int now = Wrap(PlayerPrefs.GetInt(key, 0), n);
         int next = Wrap(now + by, n);
@@ -368,7 +368,7 @@ internal static class LobbyWardrobe
 
         foreach (var s in me.GetComponents<SkinSetter>())
         {
-            if (s == null || s.character != character || s.Skins == null || s.Skins.Count == 0) continue;
+            if (s == null || s.character != character || s.skins == null || s.skins.Count == 0) continue;
             setter = s;
             return true;
         }
@@ -378,8 +378,8 @@ internal static class LobbyWardrobe
     /// <summary>The set's name as the wardrobe shows it, between its gold bars. The mod's own words, so rich text.</summary>
     private static string Words(SkinSetter setter)
     {
-        int n = setter.Skins.Count;
-        int at = Wrap(setter.CurrentSkin, n);
+        int n = setter.skins.Count;
+        int at = Wrap(setter.currentSkin, n);
         int set = n == ShortSet.Length ? ShortSet[at] : at;
         string name = set < SetNames.Length ? SetNames[set] : $"SET {at + 1}";
         return $"<color=#FFEF83>I</color>  {name}  <color=#FFEF83>I</color>";

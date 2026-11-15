@@ -136,7 +136,7 @@ internal static partial class BotBrain
         {
             var gp = seat.Deck;
             var p = seat.Player;
-            var hand = Cards.Of(gp.Cards);
+            var hand = Cards.Of(gp.cards);
             int round = dm.RoundCard;
             bool devilTable = dm.DeckMode == DeckGamePlayManager.deckmode.Devil;
 
@@ -212,7 +212,7 @@ internal static partial class BotBrain
             {
                 if (q == null || q.Dead) continue;
                 var gp = q.GetComponent<DeckGameplay>();
-                if (gp != null) n += Cards.Count(gp.Cards);
+                if (gp != null) n += Cards.Count(gp.cards);
             }
             return n;
         }
@@ -259,7 +259,7 @@ internal static partial class BotBrain
         {
             if (pick.Count == 0) return;
             var gp = seat.Deck;
-            Cards.Select(gp.Cards, keptHands ? gp.selectedCards : null, pick);
+            Cards.Select(gp.cards, keptHands ? gp._selectedCards : null, pick);
             mind.Throw = new List<GameObject>();
             foreach (var c in pick) mind.Throw.Add(c.Go);
             mind.ThrowSince = Time.time;
@@ -314,19 +314,19 @@ internal static partial class BotBrain
                 types.Add(card.Devil ? DevilCard : card.cardtype);
                 thrown++;
             }
-            var places = Cards.Places(gp.Cards, mind.Throw);
+            var places = Cards.Places(gp.cards, mind.Throw);
             mind.Throw = null;
             mind.ThrewAt = 0f;
             if (thrown == 0) return;
 
-            int held = Cards.Count(gp.Cards);
+            int held = Cards.Count(gp.cards);
             bool emptied = held <= thrown;
             mind.LookUntil = now + HoldAfterThrow;
             mind.ThrowSetAt = now;
             gp.animator.SetBool("Throw", true);
             gp.RequestThrowCards(types, emptied);
             gp.ServerHideCards(places);
-            Dev.Log("bot", $"seat {seat.Player.Slot} threw {thrown} card(s) without the look: {held} in its hand, {Cards.Count(gp.Cards)} now");
+            Dev.Log("bot", $"seat {seat.Player.Slot} threw {thrown} card(s) without the look: {held} in its hand, {Cards.Count(gp.cards)} now");
         }
 
         /// <summary>The throw set without the look is let go of again once its animation has started.</summary>

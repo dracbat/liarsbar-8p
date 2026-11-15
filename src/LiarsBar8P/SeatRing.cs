@@ -574,7 +574,6 @@ internal static class SeatRing
         {
             if (Alive(m.DeckGamePlayManager)) return true;
             if (Alive(m.DiceGame)) return true;
-            if (Alive(m.PokerGame)) return true;
             if (Alive(m.TexasGame)) return true;
             if (Alive(m.ChaosGame)) return true;
             if (Alive(m.ChaosDeckGame)) return true;

@@ -404,13 +404,45 @@ internal static class BotManager
             // lobby can say LiarsDeck with the Chaos deck chosen too.
             case CustomNetworkManager.GameMode.LiarsDeck:
             case CustomNetworkManager.GameMode.LiarsChaos:
-                bool chaos = lobby.Mode == CustomNetworkManager.GameMode.LiarsChaos || lobby.DeckMode == 2;
+                bool chaos = lobby.Mode == CustomNetworkManager.GameMode.LiarsChaos || lobby.DeckMode == 2 || lobby.DeckMode == CustomNetworkManager.ChaosDeckMode;
                 if (BotSeats.ThrowsOn && (chaos ? BotSeats.GunDownOn : BotSeats.TriggerOn)) return null;
                 return chaos ? "the Chaos deck plays without bots in this version of the game"
                              : "Liar's Deck plays without bots in this version of the game";
-            case CustomNetworkManager.GameMode.LiarsTexas: return "Liar's Poker plays without bots for now";
-            case CustomNetworkManager.GameMode.LiarsSpin: return "Liar's Slots plays without bots for now";
+            case CustomNetworkManager.GameMode.LiarsTexas: return TestBotsAnyTable ? null : "Liar's Poker plays without bots for now";
+            case CustomNetworkManager.GameMode.LiarsSpin: return TestBotsAnyTable ? null : "Liar's Slots plays without bots for now";
             default: return $"{lobby.Mode} plays without bots";
+        }
+    }
+
+    private static bool _saidAnyTable;
+    private static bool? _anyTableAsked;
+
+    /// <summary>
+    /// The test harness's switch, LIARSBAR8P_BOTS_ANYTABLE=1, never a player's: bots sit at Liar's
+    /// Poker and Liar's Slots too, where they have no player of their own, and the harness plays
+    /// their seats from the host (<see cref="ModePlay"/>), so those tables can be tested at eight
+    /// seats with one copy of the game. Only with the harness's own developer switch in the
+    /// environment, never the config file's, and only inside the loopback harness, which has no
+    /// Steam lobby: nothing a player can reach turns it on.
+    /// </summary>
+    internal static bool TestBotsAnyTable
+    {
+        get
+        {
+            bool on = false;
+            try
+            {
+                _anyTableAsked ??= Environment.GetEnvironmentVariable("LIARSBAR8P_BOTS_ANYTABLE") == "1";
+                on = _anyTableAsked.Value && Dev.FromHarness && Loopback.Active;
+            }
+            catch { }
+            if (on && !_saidAnyTable)
+            {
+                _saidAnyTable = true;
+                Plugin.Log.LogWarning("[bot] test switch LIARSBAR8P_BOTS_ANYTABLE: bots at Liar's Poker and Liar's Slots, " +
+                                      "played by ModePlay - never in a player's game");
+            }
+            return on;
         }
     }
 

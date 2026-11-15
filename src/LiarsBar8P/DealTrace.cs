@@ -109,7 +109,7 @@ internal static class DealTrace
         {
             var stats = __instance.GetComponent<PlayerStats>();
             string who = stats != null ? $"seat {stats.Slot}" : "an unseated hand";
-            int objects = __instance.Cards != null ? __instance.Cards.Count : -1;
+            int objects = __instance.cards != null ? __instance.cards.Count : -1;
             Plugin.Log.LogInfo($"[dealtrace] {who} hand shown={value} ({objects} card objects)");
         }
         catch { }

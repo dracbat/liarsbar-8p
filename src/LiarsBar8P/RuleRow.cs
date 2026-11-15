@@ -212,16 +212,14 @@ internal static class RuleRow
         }
     }
 
+    /// <summary>
+    /// No sound of its own: since the game's 14 Nov 2026 update the arrows copied from the bar
+    /// picker click through the game's own button feel, as the picker's do, and a second sound
+    /// here doubled it.
+    /// </summary>
     private static void Pressed(int by)
     {
-        try
-        {
-            if (!HouseRules.Pick(HouseRules.Picked + by)) return;
-
-            // The sound the game makes when the bar picker moves.
-            var sound = UnityEngine.Object.FindObjectOfType<SkinChangerLobby>();
-            if (sound != null && sound.audioSource != null) sound.audioSource.Play();
-        }
+        try { HouseRules.Pick(HouseRules.Picked + by); }
         catch (Exception e) { Plugin.Log.LogWarning($"[rules] could not change the house rules: {e.Message}"); }
     }
 

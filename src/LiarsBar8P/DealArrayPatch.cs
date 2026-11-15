@@ -55,7 +55,6 @@ internal static class DealArrayPatch
     {
         (typeof(DeckGamePlayManager), "GiveCardsVisualRoutine"),
         (typeof(ChaosDeckGamePlayManager), "GiveCardsVisualRoutine"),
-        (typeof(PokerGamePlayManager), "GiveCardPlayer"),
         (typeof(TexasGamePlayManager), "GiveCardPlayer"),
         (typeof(ChaosGamePlayManager), "GiveCardPlayer"),
         (typeof(BlorfGamePlayManager), "GiveCardPlayer"),

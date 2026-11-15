@@ -164,7 +164,9 @@ internal static class Loopback
     /// </summary>
     private static void ChooseSubMode(LobbyController lobby)
     {
-        Step("LIARSBAR8P_DECKMODE", "deck", 4, () => lobby.DeckMode, () => lobby.ChangeGameModeDeckRight());
+        // Five deck tables since the game's 14 Nov 2026 update: 0 Basic, 1 Devil, 2 Chaos 2 (the new
+        // 16-card deck), 3 Deck 2, 4 Chaos (the 12-card deck v3.0.2 knew as mode 2).
+        Step("LIARSBAR8P_DECKMODE", "deck", DeckTables, () => lobby.DeckMode, () => lobby.ChangeGameModeDeckRight());
         Step("LIARSBAR8P_DICEMODE", "dice", 2, () => lobby.DiceMode, () => lobby.ChangeGameModeDiceRight());
 
         // The bar, from LIARSBAR8P_MAP. There are four of them and they are four different
@@ -178,12 +180,6 @@ internal static class Loopback
         // own arrow when it is up, as a host's click would.
         Step("LIARSBAR8P_RULES", "house rules", 3, () => HouseRules.Picked,
              () => { if (!RuleRow.Press(1)) HouseRules.Pick(HouseRules.Picked + 1); });
-
-        // The Poker tab's table, from LIARSBAR8P_TWOCARD (0 the released Liar's Poker, 1 Two-Card
-        // Poker), through the tab's own arrow when it is up, as a host's click would. Never through
-        // the game mode: that would write mode 3 into what the game remembers.
-        Step("LIARSBAR8P_TWOCARD", "Poker tab", 2, () => TwoCardPoker.Chosen ? 1 : 0,
-             () => { if (!TwoCardLobby.Press(1)) TwoCardPoker.Step("test driver"); });
     }
 
     private static void Step(string variable, string what, int count, Func<int> read, Action next)
@@ -669,10 +665,10 @@ internal static class Loopback
         bool deck = lobby.Mode == CustomNetworkManager.GameMode.LiarsDeck || lobby.Mode == CustomNetworkManager.GameMode.LiarsChaos;
         bool dice = lobby.Mode == CustomNetworkManager.GameMode.LiarsDice;
         bool stepped = false;
-        if (deck && Wanted("LIARSBAR8P_DECKMODE", 4, out int d) && lobby.DeckMode != d)
+        if (deck && Wanted("LIARSBAR8P_DECKMODE", DeckTables, out int d) && lobby.DeckMode != d)
         {
             Plugin.Log.LogWarning($"[loopback] the deck variant is back on {lobby.DeckMode}: picking {d} again before the start");
-            Step("LIARSBAR8P_DECKMODE", "deck", 4, () => lobby.DeckMode, () => lobby.ChangeGameModeDeckRight());
+            Step("LIARSBAR8P_DECKMODE", "deck", DeckTables, () => lobby.DeckMode, () => lobby.ChangeGameModeDeckRight());
             stepped = true;
         }
         if (dice && Wanted("LIARSBAR8P_DICEMODE", 2, out int v) && lobby.DiceMode != v)
@@ -683,6 +679,9 @@ internal static class Loopback
         }
         return stepped;
     }
+
+    /// <summary>The deck tables the lobby's arrows step through.</summary>
+    private const int DeckTables = 5;
 
     private static bool Wanted(string variable, int count, out int target)
     {

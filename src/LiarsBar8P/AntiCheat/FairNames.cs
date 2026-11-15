@@ -206,8 +206,10 @@ internal static class FairNames
 
     [HarmonyPrefix]
     [HarmonyPriority(Priority.High)]
-    [HarmonyPatch(typeof(ChatNetwork), nameof(ChatNetwork.UserCode_CmdSendMessage__String__String))]
-    private static bool ChatLine(ChatNetwork __instance, ref string playerName)
+    // Since the game's 14 Nov 2026 update the host fills in the sender's name itself, so only the
+    // pace is checked here.
+    [HarmonyPatch(typeof(ChatNetwork), nameof(ChatNetwork.UserCode_CmdSendMessage__String))]
+    private static bool ChatLine(ChatNetwork __instance)
     {
         try
         {
@@ -220,7 +222,6 @@ internal static class FairNames
                 Fair.Refused($"connection {conn.connectionId}: chat lines faster than anybody types");
                 return false;
             }
-            playerName = SenderName(__instance, conn);
             return true;
         }
         catch (Exception e)

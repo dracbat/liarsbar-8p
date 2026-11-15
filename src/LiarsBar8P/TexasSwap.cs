@@ -293,7 +293,7 @@ internal static class TexasSwap
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.UserCode_SwitchCmd__Int32__Int32))]
-    private static void AfterSwitch(TexasGamePlay __instance, int card, int selectedcard, Material[] __state)
+    private static void AfterSwitch(TexasGamePlay __instance, int card, int selectedCard, Material[] __state)
     {
         try
         {
@@ -307,7 +307,7 @@ internal static class TexasSwap
             // the game turned the swap down - and nothing will ever end it.
             int dealt = 0;
             try { var sc = __instance.SwitchCards; dealt = sc != null ? sc.Count : 0; } catch { }
-            End(__instance, $"its swap was refused (hand card {card}, option {selectedcard}; " +
+            End(__instance, $"its swap was refused (hand card {card}, option {selectedCard}; " +
                             $"{Offered(__instance)} offered this round, {dealt} dealt to it)");
         }
         catch (Exception e) { Plugin.Log.LogError($"[texasswap] swap check failed: {e.Message}"); }
@@ -819,7 +819,7 @@ internal static class TexasSwap
         {
             var events = tg._bulletevents;
             if (events == null && tg.animator != null) events = tg.animator.GetComponent<BulletEvents>();
-            if (events != null && events.HandCard != null) held = events.HandCard;
+            if (events != null && events.handCard != null) held = events.handCard;
         }
         catch { }
 

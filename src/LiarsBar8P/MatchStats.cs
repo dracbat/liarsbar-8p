@@ -78,9 +78,6 @@ internal static class MatchStats
     private const int Joker = 4;
     private const int DevilCard = -1;
 
-    /// <summary>The Chaos deck's own card. The round card there is only ever 1 or 2.</summary>
-    private const int ChaosCard = 3;
-
     // ------------------------------------------------------------------ the tally
 
     private enum Fact
@@ -566,8 +563,9 @@ internal static class MatchStats
         }
 
         /// <summary>
-        /// The end of a pull: false is survived. By then the game has already counted this pull,
-        /// so the pulls survived before it are one fewer, and the odds were 1 in six less those.
+        /// The end of a pull: false is survived. Since the game's 14 Nov 2026 update the host tells
+        /// the table before it counts the pull, so the pulls survived before it are the count as it
+        /// stands, and the odds were 1 in six less those.
         /// </summary>
         [HarmonyPrefix]
         [HarmonyPatch(typeof(DeckGameplay), nameof(DeckGameplay.RpcSetDeadState))]
@@ -577,7 +575,7 @@ internal static class MatchStats
             try
             {
                 int seat = SeatOf(__instance);
-                int before = Math.Max(0, __instance.CurrentRevolver - 1);
+                int before = Math.Max(0, __instance.CurrentRevolver);
                 Add(seat, Fact.Survived);
                 Raise(seat, Fact.Odds, Math.Min(before, 5) + 1);
             }
@@ -590,9 +588,9 @@ internal static class MatchStats
     internal static class ChaosHooks
     {
         /// <summary>
-        /// A throw with the chaos card in it is no claim: the game turns it face up for the table
-        /// and hands the thrower the gun, and nobody can call it. So it is never a lie, which would
-        /// stay "never caught" for good. Its chaos is counted when the gun is handed over.
+        /// Since the game's 14 Nov 2026 update a throw with the chaos card in it is a claim like any
+        /// other, face down until somebody calls it, and the chaos card is not the round's card: a
+        /// lie, as the game itself counts it. Its chaos is counted when a call turns it over.
         /// </summary>
         [HarmonyPrefix]
         [HarmonyPatch(typeof(ChaosDeckGameplay), nameof(ChaosDeckGameplay.ServerThrowCards))]
@@ -605,16 +603,15 @@ internal static class MatchStats
                 if (c == null) return;
 
                 int seat = SeatOf(__instance), round = c.RoundCard;
-                bool lied = false, chaos = false;
+                bool lied = false;
                 for (int i = 0; i < types.Count; i++)
                 {
                     int t = types[i];
-                    if (t == ChaosCard) chaos = true;
-                    else if (t != round && t != Joker) lied = true;
+                    if (t != round && t != Joker) lied = true;
                 }
 
                 Add(seat, Fact.Throws);
-                if (lied && !chaos) Add(seat, Fact.Lies);
+                if (lied) Add(seat, Fact.Lies);
             }
             catch (Exception e) { Fail("a Chaos deck throw", e); }
         }
@@ -675,14 +672,8 @@ internal static class MatchStats
             catch (Exception e) { Fail("a Chaos deck shot", e); }
         }
 
-        [HarmonyPrefix]
-        [HarmonyPatch(typeof(ChaosDeckGameplay), nameof(ChaosDeckGameplay.ServerBeDeadFromRevolver))]
-        private static void Died(ChaosDeckGameplay __instance)
-        {
-            if (!Live) return;
-            try { _shotWith.Remove(SeatOf(__instance)); }
-            catch (Exception e) { Fail("a Chaos deck death", e); }
-        }
+        // A seat its own pull kills needs no hook of its own: the game's 14 Nov 2026 update wrote
+        // that death into the pull itself, and SettleShots counts only the seats still alive.
 
         [HarmonyPostfix]
         [HarmonyPatch(typeof(ChaosDeckGameplay), nameof(ChaosDeckGameplay.ServerApplyShotToTarget))]
@@ -697,12 +688,24 @@ internal static class MatchStats
             catch (Exception e) { Fail("a Chaos deck kill", e); }
         }
 
+        /// <summary>
+        /// A liar call turned the chaos card over, and every seat takes aim at once: chaos, to the
+        /// seat that threw it, the one the call was made on. That call is settled by nobody, as no
+        /// one seat takes the gun for it, so it is dropped before the game hands every seat its
+        /// gun. Since the game's 14 Nov 2026 update this is the only way chaos starts: throwing
+        /// the card no longer does it.
+        /// </summary>
         [HarmonyPrefix]
-        [HarmonyPatch(typeof(ChaosDeckGamePlayManager), nameof(ChaosDeckGamePlayManager.BeginChaosFromThrow))]
-        private static void Chaos(GameObject thrower)
+        [HarmonyPatch(typeof(ChaosDeckGamePlayManager), nameof(ChaosDeckGamePlayManager.StartAllPlayersChaosAim))]
+        private static void Chaos(ChaosDeckGamePlayManager __instance)
         {
             if (!Live) return;
-            try { Add(SeatOf(thrower), Fact.Chaos); }
+            try
+            {
+                int thrower = _pending != null ? _pending.Accused : SeatOf(__instance.LastBetPlayer);
+                Add(thrower, Fact.Chaos);
+                _pending = null;
+            }
             catch (Exception e) { Fail("a chaos card", e); }
         }
     }
@@ -711,9 +714,13 @@ internal static class MatchStats
     [HarmonyPatch]
     internal static class DiceHooks
     {
-        /// <summary>Whether the bid is more than the table holds, decided before it lands.</summary>
+        /// <summary>
+        /// Whether the bid is more than the table holds, decided before it lands. At the body every
+        /// bid reaches: since the game's 14 Nov 2026 update a player's bid goes from Mirror's
+        /// handler straight to it, past the command's own body.
+        /// </summary>
         [HarmonyPrefix]
-        [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.UserCode_PlaceBet__Int32__Int32))]
+        [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.ApplyBid))]
         private static void Bidding(int count, int dice, out bool __state, bool __runOriginal)
         {
             __state = false;
@@ -728,7 +735,7 @@ internal static class MatchStats
 
         /// <summary>Counted only if it became the standing bid.</summary>
         [HarmonyPostfix]
-        [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.UserCode_PlaceBet__Int32__Int32))]
+        [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.ApplyBid))]
         private static void Bid(DiceGamePlay __instance, int count, int dice, bool __state, bool __runOriginal)
         {
             if (!__runOriginal || !Live) return;
@@ -766,10 +773,11 @@ internal static class MatchStats
         /// <summary>
         /// Somebody drinks. After a liar call it is the bidder if the bid was too high, else the
         /// caller. After a spot-on it is the caller if the count was off; anybody else drinking
-        /// means the count was exact.
+        /// means the count was exact. Since the game's 14 Nov 2026 update the host counts every
+        /// drink here and sends it on itself, without the call it used to go through.
         /// </summary>
         [HarmonyPrefix]
-        [HarmonyPatch(typeof(DiceGamePlayManager), nameof(DiceGamePlayManager.ReduceDice))]
+        [HarmonyPatch(typeof(DiceGamePlayManager), nameof(DiceGamePlayManager.ServerDrink))]
         private static void Drinks(PlayerStats player)
         {
             if (!Live || _pending == null || player == null) return;
@@ -795,10 +803,10 @@ internal static class MatchStats
     internal static class PokerHooks
     {
         [HarmonyPrefix]
-        [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.UserCode_CMDRised__Boolean))]
-        private static void Raised(TexasGamePlay __instance, bool AllInN, bool __runOriginal)
+        [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.UserCode_CmdRised__Boolean))]
+        private static void Raised(TexasGamePlay __instance, bool allIn, bool __runOriginal)
         {
-            if (!__runOriginal || !Live || !AllInN) return;
+            if (!__runOriginal || !Live || !allIn) return;
             try { Add(SeatOf(__instance), Fact.AllIns); }
             catch (Exception e) { Fail("a Liar's Poker all-in", e); }
         }
@@ -835,9 +843,13 @@ internal static class MatchStats
             catch (Exception e) { Fail("a Liar's Poker swap", e); }
         }
 
-        /// <summary>A showdown loser takes a shot. Whether it killed is known by the next showdown, or the end.</summary>
+        /// <summary>
+        /// A showdown loser takes a shot. Whether it killed is known by the next showdown, or the end.
+        /// Since the game's 14 Nov 2026 update the host fires it through ServerShoot, which sends the
+        /// shot without calling Revolver.
+        /// </summary>
         [HarmonyPrefix]
-        [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.Revolver))]
+        [HarmonyPatch(typeof(TexasGamePlay), nameof(TexasGamePlay.ServerShoot))]
         private static void Shot(TexasGamePlay __instance)
         {
             if (!Live) return;
@@ -863,17 +875,22 @@ internal static class MatchStats
             catch (Exception e) { Fail("a Liar's Poker showdown", e); }
         }
 
+        /// <summary>
+        /// A showdown's winner, and anybody who drew with them. Since the game's 14 Nov 2026 update
+        /// the host sends the winners' screen without the call it used to go through, and reports
+        /// the showdown here straight after, once per showdown.
+        /// </summary>
         [HarmonyPrefix]
-        [HarmonyPatch(typeof(TexasGamePlayManager), nameof(TexasGamePlayManager.SetWinnersMenu))]
-        private static void Won(PlayerStats winner, Il2CppSystem.Collections.Generic.List<PlayerStats> draws)
+        [HarmonyPatch(typeof(TexasGamePlayManager), nameof(TexasGamePlayManager.ServerReportShowdownAchievements))]
+        private static void Won(PlayerStats winner, Il2CppSystem.Collections.Generic.List<PlayerStats> drawplayers)
         {
             if (!Live) return;
             try
             {
                 if (winner != null) Add(winner.Slot, Fact.Won);
-                if (draws == null) return;
-                for (int i = 0; i < draws.Count; i++)
-                    if (draws[i] != null && (winner == null || draws[i].Slot != winner.Slot)) Add(draws[i].Slot, Fact.Won);
+                if (drawplayers == null) return;
+                for (int i = 0; i < drawplayers.Count; i++)
+                    if (drawplayers[i] != null && (winner == null || drawplayers[i].Slot != winner.Slot)) Add(drawplayers[i].Slot, Fact.Won);
             }
             catch (Exception e) { Fail("a Liar's Poker hand", e); }
         }

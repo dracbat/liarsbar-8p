@@ -165,7 +165,7 @@ internal static class HostCheckGuards
         }
 
         [HarmonyPrefix]
-        [HarmonyPatch(typeof(DeckGameplay), "set_NetworkcurrentRevolver")]
+        [HarmonyPatch(typeof(DeckGameplay), nameof(DeckGameplay.CurrentRevolver), MethodType.Setter)]
         private static void DeckPulls(ref int value)
         {
             try
@@ -397,9 +397,10 @@ internal static class HostCheckGuards
                     {
                         var deck = p.GetComponent<DeckGameplay>();
                         if (deck == null || p.Dead) continue;
-                        deck.NetworkcurrentRevolver = HostCheck.Chambers + 1;
-                        Fair.Result("hostcheat revolver", deck.NetworkcurrentRevolver == HostCheck.Chambers + 1,
-                                    $"seat {p.Slot} alive at {deck.NetworkcurrentRevolver} pulls; modded players should leave within {HostCheck.HeldFor + 1:0} s");
+                        // The network setter's name has angle brackets in it, so it is reached by name.
+                        HarmonyLib.AccessTools.PropertySetter(typeof(DeckGameplay), "Network<CurrentRevolver>k__BackingField")?.Invoke(deck, new object[] { HostCheck.Chambers + 1 });
+                        Fair.Result("hostcheat revolver", deck.CurrentRevolver == HostCheck.Chambers + 1,
+                                    $"seat {p.Slot} alive at {deck.CurrentRevolver} pulls; modded players should leave within {HostCheck.HeldFor + 1:0} s");
                         return;
                     }
                     case "bullets":

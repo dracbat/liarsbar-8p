@@ -73,11 +73,13 @@ internal static class FairBids
     }
 
     /// <summary>
-    /// Every bid a player's copy places reaches this handler on the host. The bots' bids and the
-    /// host's own come here too, with no sender, and are never checked.
+    /// Every bid a player's copy places reaches this body on the host. The bots' bids and the
+    /// host's own come here too, with no sender, and are never checked. Since the game's 14 Nov
+    /// 2026 update Mirror's handler for a player's bid goes straight to it, past the command's own
+    /// body, which only a call from the host's own code still goes through on its way here.
     /// </summary>
     [FairPatch("each Liar's Dice bid checked against the rules before the table sees it")]
-    [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.UserCode_PlaceBet__Int32__Int32))]
+    [HarmonyPatch(typeof(DiceGamePlay), nameof(DiceGamePlay.ApplyBid))]
     internal static class Bid
     {
         // Fair.Install calls Register only on a class marked FairPatch, which FairBids itself is not.
@@ -137,15 +139,23 @@ internal static class FairBids
     /// that seat had placed a bid the host makes up, and reads back what it decided. Nothing is
     /// sent on the seat's behalf; a bid that would be accepted is only ever asked of the decision.
     /// A test that expects a clear cheat removes that test seat, unless KickCheaters is off.
+    ///
+    /// "fair bid wire &lt;face7|count999|noraise|turn|legal&gt; [conn]" does the same through the
+    /// game's real handler for a bid that arrives from that seat's copy, reading the bid from a
+    /// message as Mirror would, so it fails if the check ever stops seeing a player's bid. Its
+    /// "legal" places a real bid for the seat, then hands the turn on as the seat's own game does.
     /// </summary>
     private static class Tests
     {
         internal static void Run(string rest)
         {
             var parts = rest.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            bool wire = parts.Length > 0 && parts[0] == "wire";
+            if (wire) parts = parts.Length > 1 ? parts[1..] : Array.Empty<string>();
             string what = parts.Length > 0 ? parts[0] : "";
-            if (what == "selftest") { SelfTest(); return; }
-            if (!Fair.Hosting) { Fair.Result($"bid {what}", false, $"not hosting ({Fair.Why})"); return; }
+            string name = wire ? $"bid wire {what}" : $"bid {what}";
+            if (what == "selftest" && !wire) { SelfTest(); return; }
+            if (!Fair.Hosting) { Fair.Result(name, false, $"not hosting ({Fair.Why})"); return; }
 
             var conn = Fair.TestConnection(parts.Length > 1 ? parts[1] : "");
             var m = Manager.Instance;
@@ -156,11 +166,15 @@ internal static class FairBids
                 foreach (var p in m.Players)
                     if (p != null && p.connectionToClient != null && p.connectionToClient.connectionId == conn.connectionId)
                     { seat = p; gp = p.GetComponent<DiceGamePlay>(); }
-            if (gp == null || d == null) { Fair.Result($"bid {what}", false, "no remote player at a Liar's Dice table"); return; }
+            if (gp == null || d == null) { Fair.Result(name, false, "no remote player at a Liar's Dice table"); return; }
 
             int caught0 = Fair.CaughtCount, refused0 = Fair.RefusedCount;
             Last = FairThrows.Verdict.Accept; LastWhy = ""; LastRan = false;
-            void Place(int count, int face) => Fair.AsSentBy(conn, () => gp.UserCode_PlaceBet__Int32__Int32(count, face));
+            void Place(int count, int face)
+            {
+                if (wire) Arrives(conn, gp, count, face);
+                else Fair.AsSentBy(conn, () => gp.UserCode_PlaceBet__Int32__Int32(count, face));
+            }
             void Expect(string test, FairThrows.Verdict want, string because = null)
             {
                 bool pass = Last == want && !LastRan && (because == null || LastWhy.Contains(because));
@@ -172,31 +186,83 @@ internal static class FairBids
 
             switch (what)
             {
-                case "face7": Place(1, 7); Expect("bid face7", FairThrows.Verdict.Caught); return;
-                case "count999": Place(999, 3); Expect("bid count999", FairThrows.Verdict.Caught); return;
-                case "dead": _testLongDead = true; Place(1, 3); Expect("bid dead", FairThrows.Verdict.Caught); return;
-                case "out": _testDead = true; Place(1, 3); Expect("bid out", FairThrows.Verdict.Refuse); return;
+                case "face7": Place(1, 7); Expect(name, FairThrows.Verdict.Caught); return;
+                case "count999": Place(999, 3); Expect(name, FairThrows.Verdict.Caught); return;
+                case "dead" when !wire: _testLongDead = true; Place(1, 3); Expect(name, FairThrows.Verdict.Caught); return;
+                case "out" when !wire: _testDead = true; Place(1, 3); Expect(name, FairThrows.Verdict.Refuse); return;
                 case "turn":
-                    if (seat.HaveTurn) { Fair.Result("bid turn", false, "that seat has the turn: try when it does not"); return; }
+                    if (seat.HaveTurn) { Fair.Result(name, false, "that seat has the turn: try when it does not"); return; }
                     Place(Math.Max(1, d.LastCount + 1), 3);
-                    Expect("bid turn", FairThrows.Verdict.Refuse);
+                    Expect(name, FairThrows.Verdict.Refuse);
                     return;
                 case "noraise":
                     if (!seat.HaveTurn || !d.BetPlaced || d.LastCount <= 0 || d.LastCount >= RaiseCap)
-                    { Fair.Result("bid noraise", false, "needs that seat's turn with a bid under the cap standing"); return; }
+                    { Fair.Result(name, false, "needs that seat's turn with a bid under the cap standing"); return; }
                     Place(d.LastCount, Math.Max(1, d.LastDice));
-                    Expect("bid noraise", FairThrows.Verdict.Refuse, "raise");
+                    Expect(name, FairThrows.Verdict.Refuse, "raise");
                     return;
+                case "legal" when wire:
+                {
+                    bool placed = d.BetPlaced && d.LastCount > 0;
+                    int count = placed ? d.LastCount + 1 : 1;
+                    if (!seat.HaveTurn || (placed && d.LastCount >= Math.Max(RaiseCap, d.MaxCount)))
+                    { Fair.Result(name, false, "needs that seat's turn with a bid under the cap standing, or none"); return; }
+                    Place(count, 3);
+                    bool moved = d.LastCount == count && d.LastDice == 3;
+                    Fair.Result(name, Last == FairThrows.Verdict.Accept && LastRan && moved &&
+                                      Fair.RefusedCount == refused0 && Fair.CaughtCount == caught0,
+                                $"decided {Last} ({LastWhy}), game handler ran={LastRan}, the table's bid is now " +
+                                $"{d.LastCount} x {d.LastDice} (wanted {count} x 3)");
+                    if (moved) HandOn(conn, gp);
+                    return;
+                }
                 case "legal":
                 {
                     bool placed = d.BetPlaced && d.LastCount > 0;
                     int count = placed ? d.LastCount + 1 : 1;
                     var v = JudgeBid(count, 3, false, false, true, placed, d.LastCount, d.LastDice, Math.Max(d.MaxCount, count), out string why);
-                    Fair.Result("bid legal", v == FairThrows.Verdict.Accept, $"decided {v} ({why})");
+                    Fair.Result(name, v == FairThrows.Verdict.Accept, $"decided {v} ({why})");
                     return;
                 }
             }
-            Plugin.Log.LogWarning($"{Fair.Tag} test: fair bid <face7|count999|dead|out|turn|noraise|legal|selftest> [connection]");
+            Plugin.Log.LogWarning($"{Fair.Tag} test: fair bid <face7|count999|dead|out|turn|noraise|legal|selftest> [connection], " +
+                                  "or fair bid wire <face7|count999|turn|noraise|legal> [connection]");
+        }
+
+        /// <summary>A bid as it arrives from that seat's copy: written as Mirror writes it, read by the game's own handler.</summary>
+        private static void Arrives(NetworkConnectionToClient conn, DiceGamePlay gp, int count, int face)
+        {
+            var writer = NetworkWriterPool.Get();
+            NetworkWriterExtensions.WriteInt(writer, count);
+            NetworkWriterExtensions.WriteInt(writer, face);
+            var reader = NetworkReaderPool.Get(writer.ToArray());
+            try { Fair.AsSentBy(conn, () => DiceGamePlay.InvokeUserCode_PlaceBet__Int32__Int32(gp, reader, conn)); }
+            finally
+            {
+                NetworkReaderPool.Return(reader);
+                NetworkWriterPool.Return(writer);
+            }
+        }
+
+        /// <summary>The two messages a seat's game sends after its bid, so the table goes on as after any bid.</summary>
+        private static void HandOn(NetworkConnectionToClient conn, DiceGamePlay gp)
+        {
+            var writer = NetworkWriterPool.Get();
+            var reader = NetworkReaderPool.Get(writer.ToArray());
+            try
+            {
+                Fair.AsSentBy(conn, () =>
+                {
+                    DiceGamePlay.InvokeUserCode_ResetTurn(gp, reader, conn);
+                    CharController.InvokeUserCode_GiveTurn(gp, reader, conn);
+                });
+            }
+            catch (Exception e) { Plugin.Log.LogWarning($"{Fair.Tag} test: the turn was not handed on after the bid: {e.Message}"); }
+            finally
+            {
+                NetworkReaderPool.Return(reader);
+                NetworkWriterPool.Return(writer);
+            }
         }
 
         private static void SelfTest()

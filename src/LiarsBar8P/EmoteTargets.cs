@@ -148,7 +148,7 @@ internal static class EmoteTargets
         if (self == null || !NetworkClient.active) return;
 
         // The game's own gate: a player who has switched emotes off sees nobody's.
-        var m = self.manager;
+        var m = self.Manager;
         if (m == null) m = Manager.Instance;
         if (m == null || !m.Emotes) return;
 
@@ -159,6 +159,20 @@ internal static class EmoteTargets
         int me = stats.Slot;
         int n = AimRing.Seats(m);
         if (n < 2 || me < 0 || me >= n || target >= n || target == me) return;
+
+        // The game's own rule since its 14 Nov 2026 update: a body that may not take a gesture
+        // right now (in Liar's Deck, through the revolver moment) plays neither clip nor sound, and
+        // this runs after the game's handler whether or not it played. Asked of the body that would
+        // play it, as the game asks it, so a seat-coded finger is held back exactly where the
+        // game's own three directions are.
+        bool busy;
+        try { busy = self.BlocksIncomingEmote(); }
+        catch { busy = false; }
+        if (busy)
+        {
+            Plugin.Log.LogInfo($"[emote] seat {me}'s gesture at seat {target} not shown - that body is busy (the game's own rule)");
+            return;
+        }
 
         int clip = Nearest(m, me, target, n, out float turn);
         anim.SetTrigger(Clip[clip]);

@@ -52,7 +52,8 @@ internal static class HideTheBullet
 
     /// <summary>The host loads a revolver again (a new match, a reload, a migration): the stand-in goes out fresh.</summary>
     [HarmonyPostfix]
-    [HarmonyPatch(typeof(DeckGameplay), "set_NetworkrevolverBullet")]
+    // The bullet's network property is named with angle brackets, so it is found by that name.
+    [HarmonyPatch(typeof(DeckGameplay), "Network<RevolverBullet>k__BackingField", MethodType.Setter)]
     private static void DeckLoaded(DeckGameplay __instance) => Loaded(__instance, false);
 
     [HarmonyPostfix]
@@ -150,13 +151,14 @@ internal static class HideTheBullet
         bool tail = true;
         if (!chaos)
         {
-            // The value as written, read back from the output.
+            // The value as written, read back from the output. Since the game's 14 Nov 2026 update
+            // the bullet is Liar's Deck's first value: the bullet, the chamber, then three flags.
             var bytes = writer.ToArray();
-            int n = bytes.Length;
-            if (n >= 4)
+            int n = bytes.Length, at = n - 11;
+            if (at >= 0)
             {
-                int last = bytes[n - 4] | (bytes[n - 3] << 8) | (bytes[n - 2] << 16) | (bytes[n - 1] << 24);
-                tail = last == want;
+                int bullet = bytes[at] | (bytes[at + 1] << 8) | (bytes[at + 2] << 16) | (bytes[at + 3] << 24);
+                tail = bullet == want;
             }
         }
         Fair.Result("bulletpeek", kept && wrote && tail,

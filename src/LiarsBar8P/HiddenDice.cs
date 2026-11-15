@@ -153,7 +153,7 @@ internal static class HiddenDice
     /// </summary>
     private static void Draw(Cup cup, bool show)
     {
-        var drawn = cup.Hand.dicerenders;
+        var drawn = cup.Hand.diceRenders;
         if (drawn == null) return;
         if (!SameCup(cup, drawn)) FindParts(cup, drawn);
         foreach (var r in cup.Parts)

@@ -28,7 +28,7 @@ internal static class VersionTag
     {
         "Dice/HelpDiceBasic", "Dice/HelpDiceTraditanial", "Poker/HelpPoker", "Slots/HelpSlot",
         "DeckGameModes/HelpDeckBasic", "DeckGameModes/HelpDeckDevil",
-        "DeckGameModes/HelpDeck2", "DeckGameModes/HelpDeckChaos",
+        "DeckGameModes/HelpDeck2", "DeckGameModes/HelpDeckChaos", "DeckGameModes/HelpDeckChaos2",
     };
 
     /// <summary>Clear space kept between the tag and a help button's own box, in screen pixels at 1080.</summary>

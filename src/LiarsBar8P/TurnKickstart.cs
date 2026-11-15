@@ -86,7 +86,7 @@ internal static class TurnKickstart
                 if (p.HaveTurn) anyoneHasTheTurn = true;
 
                 var gp = p.GetComponent<DeckGameplay>();
-                bool hasCards = gp != null && gp.cardTypes != null && gp.cardTypes.Count > 0;
+                bool hasCards = gp != null && gp._cardTypes != null && gp._cardTypes.Count > 0;
 
                 if (hasCards) _dealtThisRound.Add(p.Slot);
 
@@ -107,7 +107,7 @@ internal static class TurnKickstart
                 // card objects reach anybody's hands, and starting the turn in that gap gives
                 // a player their turn while their hand is still empty - which is exactly what
                 // was reported: bots taking turns before the cards were dealt.
-                if (!gp.HaveCards || !Holding(gp)) everyoneIsHolding = false;
+                if (!gp.haveCards || !Holding(gp)) everyoneIsHolding = false;
             }
 
             // The deal is still running: the first turn is its job, and it is about to give
@@ -229,11 +229,11 @@ internal static class TurnKickstart
     {
         try
         {
-            if (gp.Cards == null || gp.cardTypes == null) return false;
+            if (gp.cards == null || gp._cardTypes == null) return false;
             int on = 0;
-            foreach (var c in gp.Cards)
+            foreach (var c in gp.cards)
                 if (c != null && c.activeSelf) on++;
-            return on >= gp.cardTypes.Count;
+            return on >= gp._cardTypes.Count;
         }
         catch { return false; }
     }

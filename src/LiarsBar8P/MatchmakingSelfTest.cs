@@ -147,7 +147,7 @@ internal static class MatchmakingSelfTest
         "skin", "skinstate", "skinrace", "clonetest", "board", "boardstate", "boardpad", "awards",
         "endshot", "awardstate", "rules", "rulesstate", "quickrank", "block", "blockstate", "blockgeom",
         "blockhit", "blockedlist", "unblockrow", "blockedstate", "blockself", "blockclear", "lang",
-        "speccam", "twocard", "twostep", "twohelp", "uidump", "press", "prefs", "widepick", "widelist",
+        "speccam", "twocard", "twostep", "twohelp", "pokerplate", "uidump", "press", "prefs", "widepick", "widelist",
         "widekeep", "widestep", "wideapply", "widereset", "wideart", "switchto", "settingspage",
         "menupress", "menudump", "buttons", "rect", "animinfo", "partshot",
     };
@@ -639,9 +639,9 @@ internal static class MatchmakingSelfTest
                     if (own == null || !own.isOwned) continue;
                     if (word == "forcelook") { own.ForceLookForLiarAnim(); Plugin.Log.LogInfo("[matchmaking] drive: this copy's player looks at its cards"); break; }
                     var where = new System.Text.StringBuilder();
-                    for (int i = 0; own.Cards != null && i < own.Cards.Count; i++)
+                    for (int i = 0; own.cards != null && i < own.cards.Count; i++)
                     {
-                        var c = own.Cards[i];
+                        var c = own.cards[i];
                         if (c == null) continue;
                         var at = c.transform.localPosition;
                         where.Append($" [{i} {(c.activeInHierarchy ? "on" : "off")} p{at.x:0.000},{at.y:0.000},{at.z:0.000} r{c.transform.localEulerAngles.z:0}]");
@@ -656,7 +656,7 @@ internal static class MatchmakingSelfTest
                 {
                     var hand = seat.GetComponent<DeckGameplay>();
                     if (hand == null || (rest != "all" && seat.Slot.ToString(CultureInfo.InvariantCulture) != rest)) continue;
-                    hand.NetworkLooking = true;
+                    hand.Networklooking = true;
                     Plugin.Log.LogInfo($"[matchmaking] drive: seat {seat.Slot} raises its cards");
                 }
                 break;
@@ -924,16 +924,30 @@ internal static class MatchmakingSelfTest
                 Plugin.Log.LogInfo($"[matchmaking] drive: speccam: {SpectateState()}");
                 break;
             case "twocard":
-                Plugin.Log.LogInfo($"[matchmaking] drive: two-card: {TwoCardPoker.Describe()}; {TwoCardLobby.Describe()}");
+                Plugin.Log.LogInfo($"[matchmaking] drive: two-card: {TwoCardPoker.Describe()}; the Poker tab's {PokerPlate.Describe()}");
                 break;
-            case "twostep":
-                // Through the arrow's own Button, as a click would; "pad" steps as a controller's bumper does.
-                if (rest == "pad") LobbyController.Instance.ChangeNextDeckOrDiceMode();
-                else Plugin.Log.LogInfo($"[matchmaking] drive: two-card arrow {(TwoCardLobby.Press(rest == "left" ? -1 : 1) ? "pressed" : "not up")}");
-                Plugin.Log.LogInfo($"[matchmaking] drive: two-card: {TwoCardPoker.Describe()}");
+            case "pokerplate":
+                Plugin.Log.LogInfo($"[matchmaking] drive: the Poker tab's {PokerPlate.Describe()}");
                 break;
-            case "twohelp":
-                Plugin.Log.LogInfo($"[matchmaking] drive: two-card rules page {(TwoCardLobby.PressHelp(rest != "close") ? (rest == "close" ? "closed" : "opened") : "button not up")}");
+            case "emoteat":
+                // This copy's own seat gives the finger to one seat, sent the way a number key does it at five or more.
+                var emoter = DiceTable.Local;
+                if (emoter == null) { Plugin.Log.LogWarning("[matchmaking] drive: emoteat: this copy has no seat at a table"); break; }
+                int emoteAt = int.Parse(rest, CultureInfo.InvariantCulture);
+                emoter.PlayEmote1Sfx(100 + emoteAt);
+                Plugin.Log.LogInfo($"[matchmaking] drive: emoteat: seat {(emoter.playerStats != null ? emoter.playerStats.Slot : -1)} " +
+                                   $"sent the finger at seat {emoteAt}");
+                break;
+            case "skinhit":
+                // What clicking your character in a lobby of five or more makes of a point (x y in pixels, or the mouse).
+                var hitAt = rest.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                var hitSpot = hitAt.Length >= 2
+                    ? new Vector2(float.Parse(hitAt[0], CultureInfo.InvariantCulture), float.Parse(hitAt[1], CultureInfo.InvariantCulture))
+                    : (Vector2)Input.mousePosition;
+                Plugin.Log.LogInfo($"[matchmaking] drive: skinhit {LobbySkinClick.Probe(hitSpot)}");
+                break;
+            case "texasmove":
+                TexasMove(rest);
                 break;
             case "uidump":
                 DumpUi(rest);
@@ -1074,6 +1088,14 @@ internal static class MatchmakingSelfTest
                 SwitchTo(rest);
                 break;
             case "settingspage":
+                // The new settings screen's tabs since the game's 14 Nov 2026 update; the old pages if that is not up.
+                var tabs = UnityEngine.Object.FindObjectOfType<SettingsMenu>();
+                if (tabs != null)
+                {
+                    tabs.OpenTab(int.Parse(rest, CultureInfo.InvariantCulture));
+                    Plugin.Log.LogInfo($"[matchmaking] drive: settings tab {rest} opened (now on tab {tabs.CurrentTab})");
+                    break;
+                }
                 var pages = UnityEngine.Object.FindObjectOfType<SettingsUiManager>();
                 if (pages == null) { Plugin.Log.LogWarning("[matchmaking] drive: no settings pages on screen"); break; }
                 pages.OpenButton(int.Parse(rest, CultureInfo.InvariantCulture));
@@ -1191,7 +1213,7 @@ internal static class MatchmakingSelfTest
     {
         var deck = ps.GetComponent<DeckGameplay>();
         var chaos = deck == null ? ps.GetComponent<ChaosDeckGameplay>() : null;
-        var cards = deck != null ? deck.Cards : chaos != null ? chaos.Cards : null;
+        var cards = deck != null ? deck.cards : chaos != null ? chaos.Cards : null;
         var anim = deck != null ? deck.animator : chaos != null ? chaos.animator : null;
         if (cards == null || anim == null) return "";
         int held = 0;
@@ -1220,8 +1242,8 @@ internal static class MatchmakingSelfTest
         // Every seat but the host's own: a person's seat is the game as it ships, for comparison.
         if (!NetworkServer.active || ps.isOwned) return "";
         var gp = ps.GetComponent<DiceGamePlay>();
-        var held = gp != null ? gp.DiceValues : null;
-        var drawn = gp != null ? gp.dicerenders : null;
+        var held = gp != null ? gp.diceValues : null;
+        var drawn = gp != null ? gp.diceRenders : null;
         if (held == null || drawn == null) return "";
 
         int lit = 0, same = 0;
@@ -1286,7 +1308,7 @@ internal static class MatchmakingSelfTest
                 {
                     if (h == null) continue;
                     _watchSeats.Add(h);
-                    var cup = h.dicerenders;
+                    var cup = h.diceRenders;
                     foreach (var die in h.GetComponentsInChildren<Dice>(true))
                     {
                         bool inCup = false;
@@ -1303,7 +1325,7 @@ internal static class MatchmakingSelfTest
             {
                 var ps = hand != null ? hand.GetComponent<PlayerStats>() : null;
                 if (ps == null) continue;
-                var drawn = hand.dicerenders;
+                var drawn = hand.diceRenders;
                 if (drawn == null) continue;
 
                 // The row of face pictures over a seat as it shows, any seat's own included.
@@ -1378,8 +1400,8 @@ internal static class MatchmakingSelfTest
         {
             var ps = hand != null ? hand.GetComponent<PlayerStats>() : null;
             if (ps == null) continue;
-            var cup = hand.dicerenders;
-            sb.Append($" [seat {ps.Slot}{(ps.isOwned ? " mine" : "")}{(ps.Dead ? " out" : "")} holds {(hand.DiceValues != null ? hand.DiceValues.Count : -1)}, " +
+            var cup = hand.diceRenders;
+            sb.Append($" [seat {ps.Slot}{(ps.isOwned ? " mine" : "")}{(ps.Dead ? " out" : "")} holds {(hand.diceValues != null ? hand.diceValues.Count : -1)}, " +
                       $"cup {(cup != null ? cup.Count : -1)}:");
             foreach (var die in hand.GetComponentsInChildren<Dice>(true))
             {
@@ -1419,7 +1441,7 @@ internal static class MatchmakingSelfTest
         if (called && !_wasCalled)
             foreach (var seat in BotSeats.Seated())
             {
-                var own = seat.Dice != null ? seat.Dice.DiceValues : null;
+                var own = seat.Dice != null ? seat.Dice.diceValues : null;
                 if (own == null || seat.Player.Dead) continue;
                 var v = new List<string>();
                 foreach (int x in own) v.Add(x.ToString(CultureInfo.InvariantCulture));
@@ -1614,9 +1636,9 @@ internal static class MatchmakingSelfTest
             if (deck != null)
             {
                 int cards = 0;
-                if (deck.Cards != null) foreach (var c in deck.Cards) if (c != null && c.activeInHierarchy) cards++;
-                sb.Append($" cards {cards}, says '{(deck.RoundText != null ? deck.RoundText.text : "")}'");
-                if (NetworkServer.active) sb.Append(Fair.HideHands ? $", fired {deck.CurrentRevolver}" : $", bullet in {deck.NetworkrevolverBullet + 1}, fired {deck.CurrentRevolver}");
+                if (deck.cards != null) foreach (var c in deck.cards) if (c != null && c.activeInHierarchy) cards++;
+                sb.Append($" cards {cards}, says '{(deck.roundText != null ? deck.roundText.text : "")}'");
+                if (NetworkServer.active) sb.Append(Fair.HideHands ? $", fired {deck.CurrentRevolver}" : $", bullet in {deck.RevolverBullet + 1}, fired {deck.CurrentRevolver}");
             }
 
             var chaos = p.GetComponent<ChaosDeckGameplay>();
@@ -1890,7 +1912,8 @@ internal static class MatchmakingSelfTest
         var box = button.GetComponent<RectTransform>();
         var corners = new Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<Vector3>(4);
         box.GetWorldCorners(corners);
-        var text = button.GetComponent<TMPro.TextMeshProUGUI>();
+        // The new settings footer has the words on the button's child label.
+        var text = button.GetComponentInChildren<TMPro.TextMeshProUGUI>(true);
         Plugin.Log.LogInfo($"[matchmaking] drive: report button on screen: {button.gameObject.activeInHierarchy}, " +
                            $"x {corners[0].x:0}..{corners[2].x:0} y {corners[0].y:0}..{corners[2].y:0} of {Screen.width}x{Screen.height}, " +
                            $"says '{(text != null ? text.text : "?")}' at {(text != null ? text.fontSize : 0f):0.0}, " +
@@ -1901,12 +1924,58 @@ internal static class MatchmakingSelfTest
     }
 
     /// <summary>
-    /// Opens the settings the way their own button would: through the visible switcher that leads
-    /// to a settings screen. In a match, <c>pause</c> first. Every switcher on screen is named, to
-    /// find the way when it is not the expected one.
+    /// This copy's own Liar's Poker seat makes a move through the game's own methods, the ones its
+    /// keys call, so the host sees exactly the messages a player's game sends: "rise" (call),
+    /// "allin", "fold" or "coward" (a Coward's Fold). Only on the seat's own turn, as the keys are.
+    /// </summary>
+    private static void TexasMove(string move)
+    {
+        TexasGamePlay own = null;
+        foreach (var gp in UnityEngine.Object.FindObjectsOfType<TexasGamePlay>())
+            if (gp != null && gp.isOwned) { own = gp; break; }
+        var seat = own != null ? own.GetComponent<PlayerStats>() : null;
+        if (own == null || seat == null) { Plugin.Log.LogWarning("[matchmaking] drive: texasmove: this copy has no Liar's Poker seat"); return; }
+        if (!seat.HaveTurn || seat.Dead)
+        {
+            Plugin.Log.LogWarning($"[matchmaking] drive: texasmove {move}: seat {seat.Slot} does not hold the turn - nothing sent");
+            return;
+        }
+
+        switch (move)
+        {
+            case "rise": own.Rise(); break;
+            case "allin": own.AllInF(); break;
+            case "fold": own.Fold(false); break;
+            case "coward": own.Fold(true); break;
+            default:
+                Plugin.Log.LogWarning("[matchmaking] drive: texasmove <rise|allin|fold|coward>");
+                return;
+        }
+        Plugin.Log.LogInfo($"[matchmaking] drive: texasmove {move}: seat {seat.Slot} made the move through its own game " +
+                           $"(stake {own.Bullets}, coward folds {own.CowardFoldCount})");
+    }
+
+    /// <summary>
+    /// Opens the settings the way their own button would: in a match, <c>pause</c> first, then the
+    /// pause menu's own SETTINGS (since the game's 14 Nov 2026 update the pause menu is a new
+    /// screen with no switcher); in the menu, through the visible switcher that leads to a
+    /// settings screen. Every switcher on screen is named, to find the way when it is not the
+    /// expected one.
     /// </summary>
     private static void OpenSettings()
     {
+        if (Manager.Instance != null)
+        {
+            var pause = UnityEngine.Object.FindObjectOfType<PauseMenu>();
+            if (pause != null)
+            {
+                pause.ShowSettings();
+                Plugin.Log.LogInfo($"[matchmaking] drive: opening the settings through the pause menu (open {pause.IsOpen}, page {pause.CurrentPage})");
+                return;
+            }
+            Plugin.Log.LogWarning("[matchmaking] drive: no pause menu on screen - 'pause' first; looking for a switcher instead");
+        }
+
         StateSwitcher pick = null;
         foreach (var found in Resources.FindObjectsOfTypeAll(Il2CppInterop.Runtime.Il2CppType.Of<StateSwitcher>()))
         {
@@ -1937,7 +2006,7 @@ internal static class MatchmakingSelfTest
                 if (p == null) continue;
                 string outfit = "no setter";
                 foreach (var s in p.GetComponents<SkinSetter>())
-                    if (s != null && s.character == p.PlayerSkin) { outfit = s.CurrentSkin.ToString(CultureInfo.InvariantCulture); break; }
+                    if (s != null && s.character == p.PlayerSkin) { outfit = s.currentSkin.ToString(CultureInfo.InvariantCulture); break; }
                 Plugin.Log.LogInfo($"[matchmaking] drive: lobby connection {p.ConnectionID}{(p.isOwned ? " (this copy)" : "")} " +
                                    $"character {p.PlayerSkin} outfit {outfit}");
             }
@@ -1947,7 +2016,7 @@ internal static class MatchmakingSelfTest
             {
                 if (s == null) continue;
                 var seat = s.GetComponentInParent<PlayerStats>();
-                Plugin.Log.LogInfo($"[matchmaking] drive: match setter character {s.character} outfit {s.CurrentSkin} " +
+                Plugin.Log.LogInfo($"[matchmaking] drive: match setter character {s.character} outfit {s.currentSkin} " +
                                    $"seat {(seat != null ? seat.Slot.ToString(CultureInfo.InvariantCulture) : "-")}{(s.isOwned ? " (this copy)" : "")}");
             }
 
@@ -2541,6 +2610,15 @@ internal static class MatchmakingSelfTest
                                $"on screen={(room.lobbyvisible != null && room.lobbyvisible.gameObject.activeInHierarchy)} " +
                                $"name='{(room.LobbyNameText != null ? room.LobbyNameText.text : "")}' " +
                                $"startLit={(room.StartButtonActive != null && room.StartButtonActive.activeInHierarchy)}");
+
+        // The game's voice chat opens once it sees every player seated (or 15 s after the start).
+        if (Manager.Instance != null)
+        {
+            string voice;
+            try { voice = VoiceChat.LocalVoiceOpen.ToString(); }
+            catch (Exception e) { voice = $"unknown ({e.Message})"; }
+            Plugin.Log.LogInfo($"[matchmaking] state: in a match, this copy's voice chat open={voice}");
+        }
     }
 
     private static void ReportOwnLobby()
