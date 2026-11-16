@@ -185,7 +185,11 @@ internal static class LobbySkinClick
     /// screen, which is generous on purpose - it is the player's own character, and missing
     /// it was the complaint.
     /// </summary>
-    private static bool OnBody(Camera cam, Vector3 feet, Vector2 mouse)
+    private static bool OnBody(Camera cam, Vector3 feet, Vector2 mouse) =>
+        BodyBox(cam, feet, out var box) && box.Contains(mouse);
+
+    /// <summary>The character's box on screen, as <see cref="OnBody"/> reads it; false if none of it is in front of the camera.</summary>
+    private static bool BodyBox(Camera cam, Vector3 feet, out Rect box)
     {
         float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
         int seen = 0;
@@ -205,7 +209,8 @@ internal static class LobbySkinClick
             minY = Mathf.Min(minY, p.y); maxY = Mathf.Max(maxY, p.y);
         }
 
-        return seen > 0 && mouse.x >= minX && mouse.x <= maxX && mouse.y >= minY && mouse.y <= maxY;
+        box = seen > 0 ? Rect.MinMaxRect(minX, minY, maxX, maxY) : default;
+        return seen > 0;
     }
 
     /// <summary>The first thing the game's own pointer events would reach at this point, if any.</summary>
@@ -238,8 +243,44 @@ internal static class LobbySkinClick
         var local = _local != null ? _local : GameObject.Find(LocalPlayer);
         bool body = cam != null && local != null && OnBody(cam, local.transform.position, at);
         var top = TopHit(at);
+        bool drawer = OnDrawer(top);
+        // What Tick does with a click there while the wide shot is held: on the character, not on the
+        // drawer, and not on a control or the game's own target, which keep their own clicks.
+        bool changes = LobbyPodiums.PulledBack && body && !drawer && !IsSelectTarget(top) && !IsControl(top);
         return $"at {at.x:0},{at.y:0}: on the character {body}, the wide shot {(LobbyPodiums.PulledBack ? "held" : "off")}, " +
                $"top '{(top != null ? top.name : "nothing")}', select target {IsSelectTarget(top)}, control {IsControl(top)}, " +
-               $"the SKINS drawer {OnDrawer(top)}";
+               $"the SKINS drawer {drawer}, a click here changes the character {changes}";
+    }
+
+    /// <summary>
+    /// For the test driver: the game's SKINS drawer on screen, and what a click would be at its middle
+    /// and where it covers this copy's own character, if it does there. Open it first (the driver's
+    /// "skindrawer open"): shut, it is slid off the screen.
+    /// </summary>
+    internal static string ProbeDrawer(LobbySkinDrawer drawer)
+    {
+        var panel = drawer != null ? drawer.panel : null;
+        if (panel == null) return "the drawer has no panel";
+
+        var canvas = panel.GetComponentInParent<Canvas>();
+        Camera ui = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+        var corners = new Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<Vector3>(4);
+        panel.GetWorldCorners(corners);
+        Vector2 a = RectTransformUtility.WorldToScreenPoint(ui, corners[0]);
+        Vector2 b = RectTransformUtility.WorldToScreenPoint(ui, corners[2]);
+        var box = Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
+
+        string said = $"open {drawer.IsOpen}, on screen x {box.xMin:0}..{box.xMax:0} y {box.yMin:0}..{box.yMax:0} " +
+                      $"of {Screen.width}x{Screen.height}; middle {Probe(box.center)}";
+
+        var cam = LobbyPodiums.HeldCamera;
+        var local = _local != null ? _local : GameObject.Find(LocalPlayer);
+        if (cam == null || local == null || !BodyBox(cam, local.transform.position, out var body))
+            return said + "; this copy's character is not in the held shot";
+
+        float x0 = Mathf.Max(box.xMin, body.xMin), x1 = Mathf.Min(box.xMax, body.xMax);
+        float y0 = Mathf.Max(box.yMin, body.yMin), y1 = Mathf.Min(box.yMax, body.yMax);
+        if (x1 - x0 < 2f || y1 - y0 < 2f) return said + "; the drawer does not cover this copy's character";
+        return said + $"; over the character {Probe(new Vector2((x0 + x1) * 0.5f, (y0 + y1) * 0.5f))}";
     }
 }

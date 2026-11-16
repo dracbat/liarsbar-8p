@@ -168,6 +168,8 @@ internal static class FairTexas
         foreach (var p in m.Players)
             if (p != null) Look(p.GetComponent<TexasGamePlay>(), now);
 
+        if (_wireConn >= 0) WireTick(m);
+
         // A fold whose pull was never asked for, long past any honest game's time: rolled by the host.
         if (_owed.Count == 0) return;
         _late.Clear();
@@ -488,6 +490,153 @@ internal static class FairTexas
                     $"the fold went on: folded {gp.Folded}; its own request, when it comes, gets the same outcome");
     }
 
+    // ------------------------------------------------------------------ the wire tests
+
+    /// <summary>A "fair texas wire" test waiting for its seat's turn: the move, and whose connection.</summary>
+    private static string _wireMove;
+    private static int _wireConn = -1;
+
+    /// <summary>
+    /// For the harness's seat player: a seat a wire test is waiting on is not moved from the host,
+    /// so the turn the test needs is still the seat's when it comes.
+    /// </summary>
+    internal static bool WireArmedFor(PlayerStats p)
+    {
+        if (_wireConn < 0 || p == null) return false;
+        try
+        {
+            var conn = p.connectionToClient;
+            return conn != null && conn.connectionId == _wireConn;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// "fair texas wire call|call2|fold|foldend [conn]": at that seat's next turn, the host runs the
+    /// game's own handlers for the messages that seat's copy sends for the move, in the order its
+    /// game sends them, read from messages written as Mirror writes them and as sent by that
+    /// connection. So the checks see exactly what arrives over the wire, without the seat having to
+    /// live until it makes the move by itself. A call is AddBullet then CmdRised, and "call2" sends
+    /// the call again before the turn is handed on, which must be refused; a fold is PlayCmdSes,
+    /// then the request for its pull, then CmdFolded; "foldend" leaves the request out, as a copy
+    /// that skipped it would. Only at a table this copy hosts, inside the loopback harness.
+    /// </summary>
+    private static void ArmWire(List<string> words)
+    {
+        string move = words.Count > 1 ? words[1].ToLowerInvariant() : "";
+        string name = $"texas wire {move}";
+        if (move is not ("call" or "call2" or "fold" or "foldend"))
+        {
+            Plugin.Log.LogWarning($"{Fair.Tag} test: fair texas wire <call|call2|fold|foldend> [connection]");
+            return;
+        }
+        if (!Fair.Hosting) { Fair.Result(name, false, $"not hosting ({Fair.Why})"); return; }
+        var conn = Fair.TestConnection(FairLegalTest.ConnArg(words, 2));
+        var p = FairLegalTest.SeatOf(conn);
+        if (p == null || p.GetComponent<TexasGamePlay>() == null) { Fair.Result(name, false, "no remote player seated at a Liar's Poker table"); return; }
+        if (p.Dead) { Fair.Result(name, false, $"seat {p.Slot} is out of the match"); return; }
+
+        _wireMove = move;
+        _wireConn = conn.connectionId;
+        Plugin.Log.LogInfo($"{Fair.Tag} test: at connection {conn.connectionId}'s next turn (seat {p.Slot}), the host runs " +
+                           $"the messages its game sends for a {move}, as that seat's copy sends them; the harness leaves that turn alone");
+    }
+
+    private static void Disarm()
+    {
+        _wireMove = null;
+        _wireConn = -1;
+    }
+
+    /// <summary>From the record's tick: the armed seat's turn, once it is one the move can be made on.</summary>
+    private static void WireTick(Manager m)
+    {
+        string name = $"texas wire {_wireMove}";
+        PlayerStats seat = null;
+        TexasGamePlay gp = null;
+        NetworkConnectionToClient conn = null;
+        foreach (var p in m.Players)
+        {
+            var c = p != null ? p.connectionToClient : null;
+            if (c == null || c.connectionId != _wireConn) continue;
+            seat = p;
+            gp = p.GetComponent<TexasGamePlay>();
+            conn = c;
+            break;
+        }
+
+        if (seat == null || gp == null) { Disarm(); Fair.Result(name, false, "that connection has no Liar's Poker seat any more"); return; }
+        if (seat.Dead) { Disarm(); Fair.Result(name, false, $"seat {seat.Slot} went out before its turn came"); return; }
+
+        var table = m.TexasGame;
+        if (!seat.HaveTurn || gp.Folded || gp.Rised || (table != null && table.AllInMode)) return;   // not its move yet
+
+        string move = _wireMove;
+        Disarm();
+        try { Wire(move, gp, seat, conn); }
+        catch (Exception e) { Fair.Result(name, false, $"the test failed: {e.Message}"); }
+    }
+
+    private static void Wire(string move, TexasGamePlay gp, PlayerStats seat, NetworkConnectionToClient conn)
+    {
+        string name = $"texas wire {move}";
+        int refused = Fair.RefusedCount, caught = Fair.CaughtCount;
+        uint id = gp.netId;
+
+        if (move is "call" or "call2")
+        {
+            Arrives(conn, w => NetworkWriterExtensions.WriteBool(w, false), r => TexasGamePlay.InvokeUserCode_AddBullet__Boolean(gp, r, conn));
+            Arrives(conn, w => NetworkWriterExtensions.WriteBool(w, false), r => TexasGamePlay.InvokeUserCode_CmdRised__Boolean(gp, r, conn));
+            bool called = gp.Rised;
+            int once = Fair.RefusedCount - refused;
+
+            // "call2": the same call again before the game has handed the turn on, which no unchanged
+            // game sends. Refused, and only that one, if the check sees calls as they arrive.
+            if (move == "call2")
+                Arrives(conn, w => NetworkWriterExtensions.WriteBool(w, false), r => TexasGamePlay.InvokeUserCode_CmdRised__Boolean(gp, r, conn));
+            int want = move == "call2" ? 1 : 0;
+            Fair.Result(name, called && once == 0 && Fair.RefusedCount - refused == want && Fair.CaughtCount == caught,
+                        $"connection {conn.connectionId} seat {seat.Slot}: called {called}, stake {gp.Bullets}, " +
+                        $"refused +{Fair.RefusedCount - refused} (wanted +{want}), caught +{Fair.CaughtCount - caught}");
+            return;
+        }
+
+        // Every fold opens with this message, the seat's own (neither a showdown shot nor a Coward's Fold).
+        Arrives(conn, w => { NetworkWriterExtensions.WriteBool(w, false); NetworkWriterExtensions.WriteBool(w, false); },
+                r => TexasGamePlay.InvokeUserCode_PlayCmdSes__Boolean__Boolean(gp, r, conn));
+        bool begun = Of(_foldBegun, id) > 0;
+        bool owed = _owed.ContainsKey(id);
+
+        if (move == "foldend")
+        {
+            // The end without the request for the pull, as a copy that skipped it would send it.
+            FoldEndsNow(gp, conn);
+            return;
+        }
+
+        Arrives(conn, null, r => TexasGamePlay.InvokeUserCode_CmdRequestRevolverOutcome(gp, r, conn));
+        bool asked = !_owed.ContainsKey(id);
+        Arrives(conn, null, r => TexasGamePlay.InvokeUserCode_CmdFolded(gp, r, conn));
+        Fair.Result(name, begun && owed && asked && gp.Folded && Fair.RefusedCount == refused && Fair.CaughtCount == caught,
+                    $"connection {conn.connectionId} seat {seat.Slot}: the fold began {begun}, its pull owed {owed} then asked for {asked}, " +
+                    $"folded {gp.Folded} (the pull {(gp._shotWillDie ? "fired" : "was empty")}), " +
+                    $"refused +{Fair.RefusedCount - refused}, caught +{Fair.CaughtCount - caught}");
+    }
+
+    /// <summary>One message from the seat's copy: written as Mirror writes it, read by the game's own handler, as sent by that connection.</summary>
+    private static void Arrives(NetworkConnectionToClient conn, Action<NetworkWriter> write, Action<NetworkReader> handle)
+    {
+        var writer = NetworkWriterPool.Get();
+        write?.Invoke(writer);
+        var reader = NetworkReaderPool.Get(writer.ToArray());
+        try { Fair.AsSentBy(conn, () => handle(reader)); }
+        finally
+        {
+            NetworkReaderPool.Return(reader);
+            NetworkWriterPool.Return(writer);
+        }
+    }
+
     /// <summary>
     /// "fair texas": every rule against a table of cases, nothing at the table touched.
     /// "fair texas seat [conn] call|allin|fold|coward|end [turn=0|1] [raised=0|1] [asked=0|1]
@@ -495,12 +644,15 @@ internal static class FairTexas
     /// host would do right now with that message from that player's seat. Nothing runs for the seat.
     /// "fair texas foldend [conn]": at that seat's next fold, the host ends the fold as the seat's
     /// copy, before the seat asks for its pull, as a copy that skipped the request would.
+    /// "fair texas wire call|call2|fold|foldend [conn]": the same messages run at that seat's next
+    /// turn (see <see cref="ArmWire"/>), so no fold of the seat's own is needed.
     /// </summary>
     private static void Test(string rest)
     {
         var (words, pairs) = FairLegalTest.Parse(rest);
         if (words.Count > 0 && words[0].Equals("seat", StringComparison.OrdinalIgnoreCase)) { Seat(words, pairs); return; }
         if (words.Count > 0 && words[0].Equals("foldend", StringComparison.OrdinalIgnoreCase)) { ArmFoldEnd(words); return; }
+        if (words.Count > 0 && words[0].Equals("wire", StringComparison.OrdinalIgnoreCase)) { ArmWire(words); return; }
 
         int failed = 0;
         const string T = "texas";

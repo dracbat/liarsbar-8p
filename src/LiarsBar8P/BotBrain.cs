@@ -203,8 +203,11 @@ internal static partial class BotBrain
     /// <summary>
     /// Whether a bot holding the turn moves now. <paramref name="moment"/> names the state of the
     /// game it is looking at, so a bot moves once at each and thinks afresh when it changes.
+    /// <paramref name="holdBack"/> says the game would not yet take a person's move from that seat
+    /// (a Liar's Dice cup still being shaken): the bot goes on thinking, and moves once it may, or
+    /// at the last moment, as ever.
     /// </summary>
-    private static bool Ready(Mind mind, PlayerStats p, Manager m, string moment)
+    private static bool Ready(Mind mind, PlayerStats p, Manager m, string moment, bool holdBack = false)
     {
         // A new turn begins whenever the turn arrives, even at a moment that looks like the last.
         if (!mind.HadTurn) { mind.HadTurn = true; mind.Moved = null; mind.ClockSeen = false; }
@@ -227,7 +230,7 @@ internal static partial class BotBrain
         }
 
         bool late = mind.ClockSeen && clock < LastMoment;
-        if (now < mind.Due && !late) return false;
+        if ((now < mind.Due || holdBack) && !late) return false;
 
         mind.Due = -1f;
         mind.Moved = moment;

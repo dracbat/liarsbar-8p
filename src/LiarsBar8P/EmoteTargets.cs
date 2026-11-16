@@ -85,6 +85,15 @@ internal static class EmoteTargets
     /// <summary>Whether the keys are numbered by this class at a table of <paramref name="n"/>.</summary>
     private static bool Renumbered(int n) => n > Limits.VanillaPlayers && n <= MostSeats;
 
+    /// <summary>
+    /// The tables the game gives no emotes: Liar's Poker and Liar's Slots. Their characters carry no
+    /// emote sounds at all (every one of the eleven, read from the game's files), and the game never
+    /// reads the emote keys for them - its emote keys run only for the Deck, Chaos and Dice bodies -
+    /// so its panel stays hidden there. A finger sent at one of them anyway fails in the game's own
+    /// handler, which plays the first of a list of sounds that is empty.
+    /// </summary>
+    internal static bool NoEmotes(TableHand.Kind kind) => kind == TableHand.Kind.Texas || kind == TableHand.Kind.Spin;
+
     /// <summary>The number on the i-th key of the number row: 1 to 9, then 0.</summary>
     private static int Digit(int i) => i % 10;
 
@@ -509,8 +518,12 @@ internal static class EmoteTargets
         if (_panel == null || panel.Pointer != _panelKey) Adopt(panel);
         if (!_found) return;
 
+        // Decided once the seats say which table this is, so a table without emotes is never numbered.
+        var kind = TableHand.Playing();
+        if (kind == TableHand.Kind.None) return;
+
         int n = AimRing.Seats(m);
-        int want = Renumbered(n) ? n : 0;
+        int want = Renumbered(n) && !NoEmotes(kind) ? n : 0;
         if (want == _laidFor) return;
         if (want > 0 && !Ready()) return;
 

@@ -368,16 +368,28 @@ internal static class BlockButtons
             string colour = "";
             if (block != null && block.gameObject.activeSelf)
             {
-                // The colour asked for: the button's own tint while it has one, else the picture's.
+                // The colour asked for (the button's own tint while it has one, else the picture's),
+                // and the colour the picture is drawn in now, after the button's tint has redrawn it
+                // this frame: the second is what a player sees, the first only what was asked.
                 var image = block.GetComponent<UnityEngine.UI.Image>();
                 var tint = TintOf(block, image);
-                var shown = tint != null ? tint.authored : image != null ? image.color : default;
-                colour = shown == ModCanvas.Gold ? " gold" : " red";
+                var asked = tint != null ? tint.authored : image != null ? image.color : default;
+                var drawn = image != null ? image.color : default;
+                colour = $" {Named(asked)}, drawn {Named(drawn)} #{ColorUtility.ToHtmlStringRGB(drawn)}" +
+                         (tint != null ? "" : ", no tint");
             }
             sb.Append($" {i + 1}: {who}, block {(block != null && block.gameObject.activeSelf ? "on" + colour : "off")}" +
                       $"{(kick != null && kick.gameObject.activeSelf ? ", kick on" : "")};");
         }
         return sb.ToString();
+    }
+
+    /// <summary>A colour as the test driver names it: the block cross's two, near enough for hover shading, or neither.</summary>
+    private static string Named(Color c)
+    {
+        static bool Near(Color a, Color b) =>
+            Mathf.Abs(a.r - b.r) < 0.15f && Mathf.Abs(a.g - b.g) < 0.15f && Mathf.Abs(a.b - b.b) < 0.15f;
+        return Near(c, ModCanvas.Gold) ? "gold" : Near(c, ModCanvas.Warning) ? "red" : "neither red nor gold";
     }
 
     /// <summary>One plate's geometry in its own units and on screen: the name, its drawn text, the ready tick, the kick and the block cross.</summary>

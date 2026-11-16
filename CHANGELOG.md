@@ -16,6 +16,20 @@ Versions that were once numbered 1.x and 2.x were folded into the same 0.x line 
 room — `1.x.y` became `0.1x.y` and `2.x.y` became `0.2x.y`, so the order is unchanged: what
 was v2.1.0 is now v0.21.0. Nothing else about those releases changed.
 
+## v3.1.1 — Fixes at Liar's Slots, Liar's Dice and Liar's Poker
+
+- **Liar's Slots no longer logs an error every frame while someone plays Toar.** The game's Toar at
+  that table lists outfit pieces it doesn't have, and every copy at the table stopped on them every
+  frame, all match long. The mod leaves the missing pieces out.
+- **A bot's dice are there at the Liar's Dice reveal.** A bot with the first turn of a round could
+  bid while its cup was still being shaken, which cut the shake short and kept its dice hidden all
+  round, so the reveal showed none of them. Bots now wait for their cup to settle before they move,
+  as a person's keys do.
+- **No error after someone else's card swap in Liar's Poker.** The game only tells a swapped card
+  to the player who swapped it and to the host, but its swap animation looked the card up on every
+  copy at the table, so each other player's game logged an error at every swap. The mod skips that
+  step where the card isn't known; the swap looks just the same.
+
 ## v3.1.0 — Works with Liar's Bar's Season 6 update
 
 - **Works with the game's 14 November update (Season 6).** That update moved and renamed a large

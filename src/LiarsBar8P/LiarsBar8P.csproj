@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>LiarsBar8P</AssemblyName>
-    <Version>3.1.0</Version>
+    <Version>3.1.1</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -18,6 +18,17 @@
     <GameDir>C:\Program Files (x86)\Steam\steamapps\common\Liar's Bar</GameDir>
     <Interop>$(GameDir)\BepInEx\interop</Interop>
     <Core>$(GameDir)\BepInEx\core</Core>
+  </PropertyGroup>
+
+  <!--
+    The Nexus Mods build: dotnet build -c Release -p:NexusBuild=true. Nexus Mods does not allow a
+    mod to update itself, so NEXUS compiles out everything in AutoUpdate.cs that checks for,
+    downloads or installs an update; new versions reach those players from the mod's Nexus page.
+    Same version number, so Nexus and GitHub players share tables. Without the property this
+    build is unchanged.
+  -->
+  <PropertyGroup Condition="'$(NexusBuild)' == 'true'">
+    <DefineConstants>$(DefineConstants);NEXUS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

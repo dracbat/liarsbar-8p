@@ -64,7 +64,7 @@ internal static class LogScrub
         "seatmark", "arrow", "turnhud", "aimkeys", "version", "census", "mechanic", "table", "ranked",
         "modnet", "lobbyid", "lobbycount", "deck2", "aim", "aimring", "tablefill", "seatring",
         "dealcards", "dealtrace", "seatassign", "podium", "guard", "dicefix", "bugreport", "wardrobe",
-        "awards", "board", "bot",
+        "awards", "board", "bot", "skins", "swapanim",
     };
 
     /// <summary>Lines under an allowed tag that are a developer's, or that can hold typed text.</summary>

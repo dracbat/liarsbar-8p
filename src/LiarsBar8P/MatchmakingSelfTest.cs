@@ -378,7 +378,11 @@ internal static class MatchmakingSelfTest
             return;
         }
 
-        if (!Fair.TestsAllowed && !RealSteamCommands.Contains(word))
+        // "holdstart" is written for the host before it starts (launch-table's -HostDrive), so it runs
+        // at the main menu, before the harness has swapped its transport in and become Active. It only
+        // sets what the harness's own start reads, so a copy launched into the harness may set it then.
+        bool early = word == "holdstart" && Dev.Enabled && Loopback.Requested;
+        if (!Fair.TestsAllowed && !RealSteamCommands.Contains(word) && !early)
         {
             Plugin.Log.LogWarning($"[matchmaking] drive: '{word}' refused: it works only in the loopback test harness");
             return;
@@ -799,7 +803,23 @@ internal static class MatchmakingSelfTest
                 break;
             case "seatplay":
                 // "seatplay off": the harness plays nobody's seat, as in a bare copy; "seatplay on" undoes it.
-                ModePlay.OffForTest = rest == "off";
+                // "seatplay leave 2": connection 2's seat is left to its own copy, so a move made there
+                // (its driver's "texasmove", say) is what the host receives, over the wire.
+                if (rest.StartsWith("leave", StringComparison.Ordinal))
+                {
+                    var leave = rest.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (leave.Length < 2 || !int.TryParse(leave[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int left))
+                    {
+                        Plugin.Log.LogWarning("[matchmaking] drive: seatplay leave <connection>");
+                        break;
+                    }
+                    ModePlay.LeaveToOwnCopy(left);
+                    Plugin.Log.LogInfo($"[matchmaking] drive: the harness leaves connection {left}'s seat to its own copy " +
+                                       $"(left alone: {ModePlay.LeftToOwnCopy})");
+                    break;
+                }
+                if (rest == "off") ModePlay.OffForTest = true;
+                else ModePlay.PlayEverySeat();
                 Plugin.Log.LogInfo($"[matchmaking] drive: the harness {(ModePlay.OffForTest ? "plays no seat" : "plays the seats it drives")}");
                 break;
             case "threecups":
@@ -930,13 +950,17 @@ internal static class MatchmakingSelfTest
                 Plugin.Log.LogInfo($"[matchmaking] drive: the Poker tab's {PokerPlate.Describe()}");
                 break;
             case "emoteat":
-                // This copy's own seat gives the finger to one seat, sent the way a number key does it at five or more.
-                var emoter = DiceTable.Local;
-                if (emoter == null) { Plugin.Log.LogWarning("[matchmaking] drive: emoteat: this copy has no seat at a table"); break; }
-                int emoteAt = int.Parse(rest, CultureInfo.InvariantCulture);
-                emoter.PlayEmote1Sfx(100 + emoteAt);
-                Plugin.Log.LogInfo($"[matchmaking] drive: emoteat: seat {(emoter.playerStats != null ? emoter.playerStats.Slot : -1)} " +
-                                   $"sent the finger at seat {emoteAt}");
+                EmoteAt(rest);
+                break;
+            case "dicemove":
+                DiceMove(rest);
+                break;
+            case "dicelabel":
+                if (rest.Trim() == "all") Plugin.Log.LogInfo($"[matchmaking] drive: dice seats: {DiceSeats()}");
+                else Plugin.Log.LogInfo($"[matchmaking] drive: dice label: {DiceLabel()}");
+                break;
+            case "skindrawer":
+                SkinDrawer(rest);
                 break;
             case "skinhit":
                 // What clicking your character in a lobby of five or more makes of a point (x y in pixels, or the mouse).
@@ -1956,6 +1980,211 @@ internal static class MatchmakingSelfTest
     }
 
     /// <summary>
+    /// This copy's own seat at a table: the mod's record of it, or the seat this copy owns, which a
+    /// bare copy, keeping no such record, still has.
+    /// </summary>
+    private static CharController OwnSeat()
+    {
+        var local = DiceTable.Local;
+        if (local != null) return local;
+        foreach (var p in UnityEngine.Object.FindObjectsOfType<PlayerStats>())
+            if (p != null && p.isOwned) return p.GetComponent<CharController>();
+        return null;
+    }
+
+    /// <summary>
+    /// "emoteat 5": this copy's own seat gives seat 5 the finger, sent the way a number key does it at
+    /// five or more. "emoteat dir 2": the game's own direction instead (1 left, 2 ahead, 3 right), as
+    /// its own keys send it, which a bare copy sends unchanged. The game has no emotes at Liar's Poker
+    /// or Liar's Slots (<see cref="EmoteTargets.NoEmotes"/>), so both are refused there; "force" sends
+    /// one anyway, to watch what the game's own handler does with it.
+    /// </summary>
+    private static void EmoteAt(string rest)
+    {
+        var words = rest.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        bool force = Array.IndexOf(words, "force") >= 0;
+        bool dir = words.Length > 0 && words[0] == "dir";
+        int pos = dir ? 1 : 0;
+        if (words.Length <= pos || !int.TryParse(words[pos], NumberStyles.Integer, CultureInfo.InvariantCulture, out int at))
+        {
+            Plugin.Log.LogWarning("[matchmaking] drive: emoteat <seat> [force], or emoteat dir <1|2|3> [force]");
+            return;
+        }
+
+        var emoter = OwnSeat();
+        if (emoter == null) { Plugin.Log.LogWarning("[matchmaking] drive: emoteat: this copy has no seat at a table"); return; }
+
+        var kind = TableHand.Playing();
+        if (EmoteTargets.NoEmotes(kind) && !force)
+        {
+            Plugin.Log.LogWarning($"[matchmaking] drive: emoteat: nothing sent at {kind}: the game has no emotes at Liar's Poker or " +
+                                  "Liar's Slots (no emote keys there, and no emote sounds on any of their characters); 'force' sends it anyway");
+            return;
+        }
+
+        emoter.PlayEmote1Sfx(dir ? at : 100 + at);
+        int me = emoter.playerStats != null ? emoter.playerStats.Slot : -1;
+        Plugin.Log.LogInfo(dir ? $"[matchmaking] drive: emoteat: seat {me} sent the game's own direction {at} at {kind}"
+                               : $"[matchmaking] drive: emoteat: seat {me} sent the finger at seat {at} at {kind}");
+    }
+
+    /// <summary>This copy's own Liar's Dice seat, or null.</summary>
+    private static DiceGamePlay OwnDice()
+    {
+        foreach (var gp in UnityEngine.Object.FindObjectsOfType<DiceGamePlay>())
+            if (gp != null && gp.isOwned) return gp;
+        return null;
+    }
+
+    /// <summary>
+    /// This copy's own Liar's Dice seat makes a move through the game's own methods, in the order its
+    /// keys send them, so the host receives exactly what a player's game sends: "bid 3 5" (three
+    /// fives: the bid, its voice, the end of the turn and the hand-over), "liar" or "spoton". Only on
+    /// the seat's own turn. A bare copy plays no seat by itself, so this is how two bare copies reach
+    /// a reveal to compare with a modded one.
+    ///
+    /// Like the keys, it sends nothing while the seat's own cup is still being shaken
+    /// (<c>isShakeMoment</c>, which the shake's own animation raises and lowers): a move sent then
+    /// cuts the shake short before the dice are shown again, which no player can do, and leaves the
+    /// seat's dice hidden through the reveal. "force" at the end sends it anyway.
+    /// </summary>
+    private static void DiceMove(string rest)
+    {
+        var words = rest.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        string move = words.Length > 0 ? words[0] : "";
+        bool force = words.Length > 1 && words[words.Length - 1] == "force";
+        var own = OwnDice();
+        var seat = own != null ? own.GetComponent<PlayerStats>() : null;
+        if (own == null || seat == null) { Plugin.Log.LogWarning("[matchmaking] drive: dicemove: this copy has no Liar's Dice seat"); return; }
+        if (!seat.HaveTurn || seat.Dead)
+        {
+            Plugin.Log.LogWarning($"[matchmaking] drive: dicemove {move}: seat {seat.Slot} does not hold the turn - nothing sent");
+            return;
+        }
+        if (own.isShakeMoment && !force)
+        {
+            Plugin.Log.LogWarning($"[matchmaking] drive: dicemove {move}: seat {seat.Slot}'s cup is still being shaken - " +
+                                  "its keys send nothing yet; 'force' sends it anyway");
+            return;
+        }
+
+        switch (move)
+        {
+            case "bid":
+                if (words.Length < 3 ||
+                    !int.TryParse(words[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int count) ||
+                    !int.TryParse(words[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out int face))
+                {
+                    Plugin.Log.LogWarning("[matchmaking] drive: dicemove bid <count> <face>");
+                    return;
+                }
+                own.PlaceBet(count, face);
+                own.PlayOnRiseCMD();
+                own.ResetTurn();
+                own.GiveTurn();
+                break;
+            case "liar":
+                own.PlayLiarCMD();
+                own.CallLier();
+                break;
+            case "spoton":
+                own.PlaySpotOnCMD();
+                own.CallSpotOn();
+                break;
+            default:
+                Plugin.Log.LogWarning("[matchmaking] drive: dicemove <bid count face|liar|spoton>");
+                return;
+        }
+        Plugin.Log.LogInfo($"[matchmaking] drive: dicemove {rest}: seat {seat.Slot} made the move through its own game");
+    }
+
+    /// <summary>
+    /// This copy's own Liar's Dice seat's show label (the dice it shows at a reveal) and the flip-book
+    /// on it, as the game's own code finds them: the label on or off and live in the scene, the
+    /// flip-book's object live, whether the flip-book has found its picture (which it does once, the
+    /// first time that object is live), and its state. Read before and after the seat first shows its
+    /// dice, in a modded copy and a bare one, to see where the reveal's one error comes from.
+    /// </summary>
+    private static string DiceLabel()
+    {
+        var own = OwnDice();
+        var seat = own != null ? own.GetComponent<PlayerStats>() : null;
+        if (own == null || seat == null) return "this copy has no Liar's Dice seat";
+
+        var label = own.showText;
+        if (label == null) return $"seat {seat.Slot}: no show label";
+        var anim = label.transform.childCount > 0 ? label.transform.GetChild(0) : null;
+        var book = anim != null ? anim.GetComponent<SpriteFlipbook>() : null;
+        string flip = book == null
+            ? "no flip-book on it"
+            : $"flip-book {book.State}, its object live {anim.gameObject.activeInHierarchy}, its picture found {book._sr != null}";
+        return $"seat {seat.Slot}: label on {label.activeSelf}, live {label.activeInHierarchy}, showing {seat.Show}, " +
+               $"may open {own.canOpenShowUi}; {flip}; the cup's flip-book {(own.flipBook != null ? own.flipBook.State.ToString() : "none")}";
+    }
+
+    /// <summary>
+    /// "dicelabel all": every Liar's Dice seat as this copy has it, in seat order: whether its dice
+    /// holder is on (the dice and the show label hang under it; the cup's shake hides it and shows it
+    /// again), whether its cup is being shaken, and whether its show label's flip-book has found its
+    /// picture yet. A holder left off by a shake cut short is what made a seat's label throw as the
+    /// reveal opened it, so read between rolls every seat still in should have its holder on.
+    /// </summary>
+    private static string DiceSeats()
+    {
+        var seats = new List<(int Slot, string Line)>();
+        foreach (var gp in UnityEngine.Object.FindObjectsOfType<DiceGamePlay>())
+        {
+            if (gp == null) continue;
+            var p = gp.GetComponent<PlayerStats>();
+            int slot = p != null ? p.Slot : -1;
+            var holder = gp.dices;
+            var label = gp.showText;
+            var anim = label != null && label.transform.childCount > 0 ? label.transform.GetChild(0) : null;
+            var book = anim != null ? anim.GetComponent<SpriteFlipbook>() : null;
+            seats.Add((slot, $"seat {slot}{(p != null && p.Dead ? " (out)" : "")}: holder on " +
+                             $"{(holder != null ? holder.activeSelf.ToString() : "none")}, shaking {gp.isShakeMoment}, " +
+                             $"label picture found {(book != null ? (book._sr != null).ToString() : "no flip-book")}"));
+        }
+        if (seats.Count == 0) return "no Liar's Dice seat here";
+        seats.Sort((a, b) => a.Slot.CompareTo(b.Slot));
+        var all = new System.Text.StringBuilder();
+        foreach (var s in seats)
+        {
+            if (all.Length > 0) all.Append("; ");
+            all.Append(s.Line);
+        }
+        return all.ToString();
+    }
+
+    /// <summary>
+    /// "skindrawer open|close": the game's SKINS drawer in the lobby, through its own tab's toggle.
+    /// "skindrawer probe": where it is on screen, and what a click at its middle and where it covers
+    /// this copy's character would be (<see cref="LobbySkinClick.ProbeDrawer"/>).
+    /// </summary>
+    private static void SkinDrawer(string rest)
+    {
+        var drawer = UnityEngine.Object.FindObjectOfType<LobbySkinDrawer>();
+        if (drawer == null) { Plugin.Log.LogWarning("[matchmaking] drive: skindrawer: no SKINS drawer on this screen"); return; }
+
+        switch (rest)
+        {
+            case "open":
+                if (!drawer.IsOpen) drawer.Toggle();
+                break;
+            case "close":
+                if (drawer.IsOpen) drawer.Close();
+                break;
+            case "probe":
+                Plugin.Log.LogInfo($"[matchmaking] drive: skindrawer probe: {LobbySkinClick.ProbeDrawer(drawer)}");
+                return;
+            default:
+                Plugin.Log.LogWarning("[matchmaking] drive: skindrawer <open|close|probe>");
+                return;
+        }
+        Plugin.Log.LogInfo($"[matchmaking] drive: skindrawer {rest}: open {drawer.IsOpen}");
+    }
+
+    /// <summary>
     /// Opens the settings the way their own button would: in a match, <c>pause</c> first, then the
     /// pause menu's own SETTINGS (since the game's 14 Nov 2026 update the pause menu is a new
     /// screen with no switcher); in the menu, through the visible switcher that leads to a
@@ -1974,6 +2203,15 @@ internal static class MatchmakingSelfTest
                 return;
             }
             Plugin.Log.LogWarning("[matchmaking] drive: no pause menu on screen - 'pause' first; looking for a switcher instead");
+        }
+        else if (LobbyController.Instance != null)
+        {
+            // Read from the game's files: since its 14 Nov 2026 update the lobby's scene holds no
+            // settings screen, pause menu or switcher at all, so there is no report button to find
+            // there. The menu's and a match's settings have it, and F11 saves a report in the lobby.
+            Plugin.Log.LogInfo("[matchmaking] drive: the lobby has no settings screen in this game build - " +
+                               "the report button is in the menu's and a match's settings, and F11 saves one here");
+            return;
         }
 
         StateSwitcher pick = null;

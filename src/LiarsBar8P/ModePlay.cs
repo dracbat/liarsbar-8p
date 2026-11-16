@@ -31,11 +31,15 @@ internal static class ModePlay
     private const float MinThink = 0.8f;
     private const float MaxThink = 2.2f;
 
+    /// <summary>Under this many seconds on the turn's clock a seat held back for its cup moves anyway.</summary>
+    private const float ClockNearlyOut = 3f;
+
     private static readonly Dictionary<int, float> _actAt = new();
     private static readonly Dictionary<int, int> _actedOn = new();
     private static int _turnNo;
     private static int _lastActive = -1;
     private static int _moves;
+    private static bool _saidSettle;
 
     internal static void RoundStarting()
     {
@@ -49,6 +53,35 @@ internal static class ModePlay
     /// copy, which has none of this, so the two hold the same table when their memory is compared.
     /// </summary>
     internal static bool OffForTest { get; set; }
+
+    /// <summary>
+    /// The test driver's "seatplay leave N": the seat of connection N is left to its own copy, so a
+    /// move its own game makes (the driver's "texasmove" on that copy, say) is the one the host
+    /// receives, over the wire, instead of the harness moving the seat first from the host.
+    /// "seatplay on" hands every seat back.
+    /// </summary>
+    private static readonly HashSet<int> _leftToOwnCopy = new();
+
+    internal static void LeaveToOwnCopy(int connection) => _leftToOwnCopy.Add(connection);
+
+    internal static void PlayEverySeat()
+    {
+        OffForTest = false;
+        _leftToOwnCopy.Clear();
+    }
+
+    internal static string LeftToOwnCopy => _leftToOwnCopy.Count == 0 ? "none" : string.Join(", ", _leftToOwnCopy);
+
+    private static bool LeftAlone(PlayerStats p)
+    {
+        if (_leftToOwnCopy.Count == 0) return false;
+        try
+        {
+            var conn = p.connectionToClient;
+            return conn != null && _leftToOwnCopy.Contains(conn.connectionId);
+        }
+        catch { return false; }
+    }
 
     internal static void Tick()
     {
@@ -72,11 +105,24 @@ internal static class ModePlay
         int active = m.ActivePlayerSlot;
         if (active != _lastActive) { _lastActive = active; _turnNo++; }
 
-        if (player.Resolving()) { _actAt.Clear(); return; }
-
         // Under the harness's own switch, bots sit at the two tables BotBrain has no player for,
         // and their seats are played from here; BotBrain then only passes a turn left to run out.
         bool botsHere = BotManager.TestBotsAnyTable && (kind == TableHand.Kind.Texas || kind == TableHand.Kind.Spin);
+
+        // Nobody takes a turn while a call is settled, but a step of the settling that only the
+        // seat's own copy takes is still taken here for a bot, which has no copy: Liar's Slots'
+        // dead spin waits for the loser's copy, and waited for good when the loser was a bot.
+        if (botsHere)
+        {
+            try { player.Settle(m); }
+            catch (Exception e)
+            {
+                if (!_saidSettle) Dev.Warn("play", $"a bot's step of the settling in {kind} failed: {e.Message}");
+                _saidSettle = true;
+            }
+        }
+
+        if (player.Resolving()) { _actAt.Clear(); return; }
 
         foreach (var p in m.Players)
         {
@@ -85,6 +131,12 @@ internal static class ModePlay
             // Outside the loopback test harness, the host's own seat and nobody else's.
             if (p != null && !Fair.TestsAllowed && !p.isLocalPlayer) continue;
             if (p == null || p.Dead || !p.HaveTurn) { if (p != null) _actAt.Remove(p.Slot); continue; }
+            // Left to its own copy by the driver, or waiting for a fair-play test the host is about to
+            // send for it (FairTexas's "fair texas wire"), which needs the seat's turn untouched.
+            if (LeftAlone(p) || FairTexas.WireArmedFor(p)) { _actAt.Remove(p.Slot); continue; }
+            // Not this seat's moment yet (a Liar's Slots seat before its reveal, a Liar's Dice seat
+            // whose cup is still being shaken): asked again next tick.
+            if (!player.Ready(p)) { _actAt.Remove(p.Slot); continue; }
             if (_actedOn.TryGetValue(p.Slot, out int on) && on == _turnNo) continue;
 
             if (!_actAt.TryGetValue(p.Slot, out float due))
@@ -126,7 +178,17 @@ internal static class ModePlay
         /// <summary>True while the round is settling something and nobody should act.</summary>
         bool Resolving();
 
+        /// <summary>Whether this seat, holding the turn, may move now; false asks again on the next tick.</summary>
+        bool Ready(PlayerStats p);
+
         void Act(PlayerStats p, int moveNo);
+
+        /// <summary>
+        /// Every tick, before <see cref="Resolving"/> is asked, and only under the harness's own bot
+        /// switch: a step of the settling that only a seat's own copy takes, taken here for a bot's
+        /// seat, which has no copy to take it.
+        /// </summary>
+        void Settle(Manager m);
     }
 
     /// <summary>
@@ -176,6 +238,29 @@ internal static class ModePlay
             if (d == null) return false;
             try { return d.CalledLiar || d.CalledSpotOn || d.DrinkPhaseActive; } catch { return false; }
         }
+
+        /// <summary>
+        /// Not while the seat's own cup is still being shaken. A person's keys send no bid or call
+        /// then: the game's input waits for <c>isShakeMoment</c>, which the shake's own animation
+        /// raises at its start and lowers at its end, just after it shows the dice again (it hides
+        /// them while the cup moves). A move made sooner from here cut the shake short on every
+        /// screen before that, the dice stayed hidden all round, and at the reveal the seat's dice
+        /// were missing and its label threw as it opened. Asked of the host's copy of the seat;
+        /// with the clock nearly out the seat moves anyway, rather than let its turn run out.
+        /// </summary>
+        public bool Ready(PlayerStats p)
+        {
+            var gp = p.GetComponent<DiceGamePlay>();
+            bool shaking = false;
+            try { shaking = gp != null && gp.isShakeMoment; } catch { }
+            if (!shaking) return true;
+
+            float clock = 0f;
+            try { clock = Manager.Instance.CountDown; } catch { }
+            return clock > 0f && clock < ClockNearlyOut;
+        }
+
+        public void Settle(Manager m) { }
 
         public void Act(PlayerStats p, int moveNo)
         {
@@ -315,6 +400,13 @@ internal static class ModePlay
         private float _openedAt, _chosenAt;
 
         /// <summary>
+        /// Whether the host's answer to the choice has been read and said. A choice made through the
+        /// seat's own menu is the seat's own command, which the host runs a frame or two later, so it
+        /// is read then; read at once it was reported as refused while the swap went through.
+        /// </summary>
+        private bool _choiceJudged;
+
+        /// <summary>
         /// The all-in question is answered by everyone at once rather than in turn, so it is
         /// not a turn to take - it is a state where taking one would be wrong.
         /// </summary>
@@ -324,6 +416,10 @@ internal static class ModePlay
             if (t == null) return false;
             try { return t.AllInMode; } catch { return false; }
         }
+
+        public bool Ready(PlayerStats p) => true;
+
+        public void Settle(Manager m) { }
 
         public void Act(PlayerStats p, int moveNo)
         {
@@ -525,14 +621,28 @@ internal static class ModePlay
                 if (!viaMenu) gp.UserCode_SwitchCmd__Int32__Int32(_swapIdx, opt);
                 _chosenAt = now;
 
+                // The server's own handler has run by now; the seat's own menu has only sent its
+                // command, which the host takes on a later frame.
+                _choiceJudged = !viaMenu;
                 Dev.Log("play", $"seat {_swapSlot} swaps card {_swapIdx} ({_swapOld}) for option " +
-                                $"{opt} of {choices} ({incoming}) - {(gp.Switched ? "accepted" : "NOT accepted")}");
+                                $"{opt} of {choices} ({incoming}) - " +
+                                (viaMenu ? "sent through its own menu" : gp.Switched ? "accepted" : "NOT accepted"));
                 return;
+            }
+
+            float waited = now - _chosenAt;
+
+            // A choice sent through the seat's own menu is judged once the host has run it, or once
+            // it has had a second to arrive.
+            if (!_choiceJudged && (gp.Switched || waited >= 1f))
+            {
+                _choiceJudged = true;
+                Dev.Log("play", $"seat {_swapSlot}'s swap through its own menu was " +
+                                $"{(gp.Switched ? "accepted" : "NOT accepted")} by the host, {waited:0.00} s after it was sent");
             }
 
             // Bet once the animation has ended the swap, as a person would - or, if it has not,
             // after a few seconds, leaving the stuck flag for the watchdog to find.
-            float waited = now - _chosenAt;
             if (gp.isSwitching && waited < SwapSettle) return;
 
             if (gp.isSwitching)
@@ -570,6 +680,12 @@ internal static class ModePlay
     /// The turn is passed by the player, not by the table. <c>Manager.GiveTurnSpin</c> is
     /// reached only through <c>CmdGiveTurnSpin</c>, which the seat that bid sends itself, so a
     /// bid without that second call leaves the table stopped on the seat that made it.
+    ///
+    /// The loser of a liar call then takes the dead spin, and the host waits for it
+    /// (<c>CoDoSpinRoulette</c> holds on <c>isButtonClicked</c>): the loser's own copy plays the
+    /// dead-spin animation and, at its <c>DeadSpin</c> event, sends <c>ButtonClicked</c>, which
+    /// only the seat's own copy may send. A bot's seat has no copy, so for a bot that step is
+    /// taken here (<see cref="Settle"/>), or the table stops for good at the first call a bot loses.
     /// </summary>
     private sealed class SpinPlayer : IModePlayer
     {
@@ -578,11 +694,72 @@ internal static class ModePlay
             get { try { return Manager.Instance != null ? Manager.Instance.SpinGame : null; } catch { return null; } }
         }
 
+        /// <summary>The seat whose dead spin was taken here, until its dead-spin moment is over; -1 for none.</summary>
+        private int _deadSpinTaken = -1;
+
+        /// <summary>
+        /// A bot that lost a liar call takes its dead spin. The host marks the loser's moment
+        /// (<c>isDeadSpinMoment</c>) about 1.3 s after it starts the dead-spin animation, and a
+        /// person's copy sends its <c>ButtonClicked</c> from that animation 0.8 to 1.4 s in, so the
+        /// bot's is sent once its moment is seen: the server's own handler, as the command runs on
+        /// arrival. Once per dead spin. A seat already out is passed over, in case its moment is
+        /// still marked from the spin that put it out.
+        /// </summary>
+        public void Settle(Manager m)
+        {
+            var s = Mgr;
+            if (s == null || m == null || m.Players == null) return;
+
+            PlayerStats loser = null;
+            SpinGamePlay loserGp = null;
+            bool anyMoment = false;
+            foreach (var p in m.Players)
+            {
+                if (p == null || p.Dead) continue;
+                var gp = p.GetComponent<SpinGamePlay>();
+                bool moment = false;
+                try { moment = gp != null && gp.isDeadSpinMoment; } catch { }
+                if (!moment) continue;
+                anyMoment = true;
+                if (p.Slot == _deadSpinTaken) continue;
+                loser = p;
+                loserGp = gp;
+                break;
+            }
+
+            if (!anyMoment) { _deadSpinTaken = -1; return; }
+            if (loser == null || !BotManager.IsBot(loser)) return;
+
+            bool clicked;
+            try { clicked = s.isButtonClicked; } catch { return; }
+            if (clicked) return;
+
+            _deadSpinTaken = loser.Slot;
+            Dev.Log("play", $"seat {loser.Slot} takes its dead spin: a bot has no copy to send it, so the host runs it");
+            try { loserGp.UserCode_ButtonClicked(); }
+            catch (Exception e) { Dev.Warn("play", $"seat {loser.Slot}'s dead spin did not go through: {e.Message}"); }
+        }
+
+        /// <summary>A liar call or the penalty spin is being settled: nobody moves.</summary>
         public bool Resolving()
         {
             var s = Mgr;
             if (s == null) return false;
-            try { return s.CalledLiar || s.isCallingLiar || !s.CanGiveBid; } catch { return false; }
+            try { return s.CalledLiar || s.isCallingLiar || s.isDeadSpin; } catch { return false; }
+        }
+
+        /// <summary>
+        /// A person's seat claims only once the game lets it bid, which it does after that seat's own
+        /// copy has played the reveal of its spin. A bot's seat (the harness's own switch) has no copy
+        /// to play one, so the game never lets it bid that way, and waiting for it left every bot's
+        /// turn to run out on its clock: 38 seconds a turn, eleven turns in six minutes. The claim
+        /// itself (the server's RiseCmd) does not ask, so a bot moves as soon as it holds the turn.
+        /// </summary>
+        public bool Ready(PlayerStats p)
+        {
+            if (BotManager.IsBot(p)) return true;
+            var s = Mgr;
+            try { return s != null && s.CanGiveBid; } catch { return false; }
         }
 
         public void Act(PlayerStats p, int moveNo)
@@ -590,16 +767,17 @@ internal static class ModePlay
             var s = Mgr;
             var gp = p.GetComponent<SpinGamePlay>();
             if (s == null || gp == null) return;
+            bool bot = BotManager.IsBot(p);
 
             // Bidding without having spun is a move the game offers only when it says so, and
             // it is not the one being tested. Spin first, then bid on the next tick - the reels
             // take a moment and a claim made before they stop is a claim about nothing.
-            // A bot's seat (the harness's own switch) claims or calls without spinning: only the
-            // seat's own copy marks a spin as seen, which a bot has none of, so a bot that spun
-            // would spin every turn and never claim. The claim marks the seat as spun itself.
+            // A bot's seat spins with its claim instead (below): only the seat's own copy marks a
+            // spin as seen, which a bot has none of, so a bot that spun here would spin every turn
+            // and never claim.
             try
             {
-                if (!BotManager.IsBot(p) && !gp.hasSpinThisRound && !gp.CanBidWithoutSpin)
+                if (!bot && !gp.hasSpinThisRound && !gp.CanBidWithoutSpin)
                 {
                     Dev.Log("play", $"seat {p.Slot} spins the machine");
                     gp.UserCode_Cmd_RequestSecretSpin();
@@ -637,10 +815,15 @@ internal static class ModePlay
             if (ceiling > 0 && count > ceiling) count = 0;
 
             Dev.Log("play", $"seat {p.Slot} claims {count}" +
-                            (ceiling > 0 ? $" (the highest allowed is {ceiling})" : ""));
+                            (ceiling > 0 ? $" (the highest allowed is {ceiling})" : "") +
+                            (bot ? ", its reels spun on the host first" : ""));
 
             try
             {
+                // The server's half of a spin, as any seat's spin starts: its four reels are rolled on
+                // the host, which is where a call on the claim is judged, so a call on a bot's claim
+                // is judged on reels it really spun. Its copy's half, the reveal, it has none of.
+                if (bot) gp.UserCode_Cmd_RequestSecretSpin();
                 gp.UserCode_RiseCmd__Int32(count);
                 gp.UserCode_CmdGiveTurnSpin();
             }

@@ -23,7 +23,8 @@ internal static partial class BotBrain
     /// than the game's own bid arrows let a person bid.
     ///
     /// Its moves go to the same server-side bodies a person's keys reach: the bid, then the end of
-    /// its turn, then handing the turn on, which is the order the game's own input uses. The voice
+    /// its turn, then handing the turn on, which is the order the game's own input uses, and like a
+    /// person's keys it waits while its own cup is still being shaken. The voice
     /// lines that go with them are sent the way a person's copy sends them, as commands, which
     /// <see cref="BotSeats"/> runs on the host, each on its own so that a line that fails never
     /// stops the move it goes with.
@@ -89,7 +90,7 @@ internal static partial class BotBrain
                 if (own == null || own.Count == 0) continue;   // not rolled yet
 
                 string moment = $"{_round}:{bet}:{d.LastCount}:{d.LastDice}";
-                if (!Ready(mind, p, m, moment)) continue;
+                if (!Ready(mind, p, m, moment, Shaking(gp))) continue;
 
                 // A move that throws is not tried again at this moment: BotTurnGuard passes the turn on.
                 try
@@ -103,6 +104,21 @@ internal static partial class BotBrain
                     BotTurnGuard.Trip($"a bot's move in Liar's Dice failed ({e.Message})");
                 }
             }
+        }
+
+        /// <summary>
+        /// Whether the bot's own cup is still being shaken. A person's keys send no bid or call until
+        /// the shake's own animation lowers <c>isShakeMoment</c> at its end, just after it shows the
+        /// dice again (the shake hides them while the cup moves). A bot that bid sooner, as one with
+        /// the first turn of a round often did, cut its shake short on every screen before that: its
+        /// dice stayed hidden all round, so they were missing at the reveal, and its label threw on
+        /// every copy as the reveal opened it. The bot's animation runs on the host whatever the
+        /// camera sees (<see cref="BotPuppet"/>), so the host's copy of the flag is the seat's own.
+        /// </summary>
+        private static bool Shaking(DiceGamePlay gp)
+        {
+            try { return gp != null && gp.isShakeMoment; }
+            catch { return false; }
         }
 
         /// <summary>What a chair can see: its own dice, and how many dice everybody else holds.</summary>

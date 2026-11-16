@@ -10,7 +10,7 @@ namespace LiarsBar8P;
 public class Plugin : BasePlugin
 {
     public const string Guid = "liarsbar.eightplayers";
-    public const string Version = "3.1.0";
+    public const string Version = "3.1.1";
 
     /// <summary>
     /// The mod's name as players see it, and the one place it is written. Only words on screen
@@ -109,9 +109,14 @@ public class Plugin : BasePlugin
             "They can still un-ready with the game's own button, and being ready locks nothing in the lobby. " +
             "Never applies to you, the host. Only the host's setting matters.");
         Updates = Config.Bind("General", "Updates", UpdateMode.Ask,
+#if NEXUS
+            "Not used by the Nexus Mods build, which never checks for updates: new versions are on the mod's " +
+            "Nexus Mods page. Everyone at a table must run the same version.");
+#else
             "What to do when a newer version of this mod is out, checked each time the game starts. Ask: a " +
             "window in the game asks whether to install it. Automatic: install it without asking. Off: never " +
             "check. Either way it loads the next time the game starts. Everyone at a table must run the same version.");
+#endif
         EmoteCooldownSeconds = Config.Bind("General", "EmoteCooldownSeconds", 10f,
             new ConfigDescription("Seconds between your emotes - the game's own wait is 12. It is counted on " +
                 "your own machine, as the game counts it, and applies at every table size, but only at a " +
@@ -245,6 +250,7 @@ public class Plugin : BasePlugin
         Apply(harmony, typeof(AimKeys),        "aim keys reaching every seat in the Chaos deck");
         Apply(harmony, typeof(EmoteTargets),   "middle finger at every seat, not three directions");
         Apply(harmony, typeof(TexasSwap),      "Liar's Texas card swaps and the deck at eight");
+        Apply(harmony, typeof(SwapAnimGuard),  "Liar's Poker: another player's card swap, on a copy never told the card");
         Apply(harmony, typeof(DiceRevealRows), "Liar's Dice reveals of more than twenty dice");
         Apply(harmony, typeof(DiceRowOrder),   "Liar's Dice reveal rows lit in reading order");
         Apply(harmony, typeof(MechanicsTrace),  "devil and chaos mechanics trace");

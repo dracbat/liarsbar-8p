@@ -123,6 +123,9 @@ internal sealed class ModTicker : MonoBehaviour
         try { HiddenDice.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[hiddendice] tick failed: {e.Message}"); }
 
+        try { SkinGaps.Tick(); }
+        catch (Exception e) { Plugin.Log.LogError($"[skins] tick failed: {e.Message}"); }
+
         try { SeatLists.Tick(); }
         catch (Exception e) { Plugin.Log.LogError($"[seatlists] tick failed: {e.Message}"); }
 

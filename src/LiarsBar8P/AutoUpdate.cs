@@ -54,11 +54,18 @@ public enum UpdateMode
 /// </summary>
 internal static class AutoUpdate
 {
+    // The Nexus Mods build (built with -p:NexusBuild=true, which defines NEXUS) leaves out
+    // everything below that looks for, downloads or installs an update: Nexus Mods does not allow
+    // a mod to update itself, and new versions reach its players from its page there. What stays
+    // is the rest of Start - the What's New window after a version change - and the members the
+    // update window and the FULLY LOADED switch read, which never leave their "nothing to do" values.
+#if !NEXUS
     private const string Repo = "dracbat/liarsbar-8p";
     private const string Latest = "https://api.github.com/repos/" + Repo + "/releases/latest";
     private const string DownloadPrefix = "https://github.com/" + Repo + "/releases/download/";
     private const string ZipName = "LiarsBar-8P.zip";
     private const string PluginEntry = "BepInEx/plugins/LiarsBar8P.dll";
+#endif
 
     // The line under the tag, in one place for the word table: {0} the mod's name, {1} the version.
     private const string DownloadingWords = "Downloading {0} v{1}...";
@@ -71,8 +78,10 @@ internal static class AutoUpdate
     private const string FailedTryAgain = "{0} v{1} could not be installed ({2}) - it is tried again the next time the game starts";
     private const string FailedAskAgain = "{0} v{1} could not be installed ({2}) - you will be asked again the next time the game starts";
 
+#if !NEXUS
     /// <summary>The release zip carries the whole loader as well; anything far past that is not it.</summary>
     private const long MostZipBytes = 200L * 1024 * 1024;
+#endif
 
     /// <summary>Shown under the version line once an update is in place. Set from a worker thread.</summary>
     internal static volatile string Note;
@@ -100,8 +109,10 @@ internal static class AutoUpdate
     /// <summary>Whether the player said yes in the window - only then does the game restart by itself.</summary>
     internal static volatile bool AcceptedByPlayer;
 
+#if !NEXUS
     private static string _offeredUrl;
     private static string _here;
+#endif
     private static string _pending;   // new plugin waiting to be moved in when the game closes
 
     /// <summary>Whether a downloaded update is waiting for the game to close before it goes in (<see cref="OnQuit"/>).</summary>
@@ -116,7 +127,9 @@ internal static class AutoUpdate
         {
             string here = typeof(Plugin).Assembly.Location;
             if (string.IsNullOrEmpty(here)) return;
+#if !NEXUS
             _here = here;
+#endif
 
             string before = Environment.GetEnvironmentVariable("LIARSBAR8P_RESTARTED");
             WhatsNew.Decide(before, File.Exists(here + ".old"));
@@ -127,6 +140,9 @@ internal static class AutoUpdate
             if (!string.IsNullOrEmpty(before))
                 Plugin.Log.LogInfo($"[update] started again by the update from v{before} - running v{Plugin.Version} now");
 
+#if NEXUS
+            Plugin.Log.LogInfo("[update] the Nexus Mods build does not check for updates - new versions are on its Nexus Mods page");
+#else
             var mode = Plugin.Updates != null ? Plugin.Updates.Value : UpdateMode.Off;
             if (mode == UpdateMode.Off)
             {
@@ -136,10 +152,12 @@ internal static class AutoUpdate
             if (Dev.Enabled || Loopback.Active) return;   // a test run must keep the build it was given
 
             Task.Run(() => Check(here, mode));
+#endif
         }
         catch (Exception e) { Plugin.Log.LogWarning($"[update] could not start the update check: {e.Message}"); }
     }
 
+#if !NEXUS
     private static async Task Check(string here, UpdateMode mode)
     {
         try
@@ -183,6 +201,7 @@ internal static class AutoUpdate
             Plugin.Log.LogInfo($"[update] could not check for an update this time ({e.GetType().Name}: {e.Message})");
         }
     }
+#endif
 
     /// <summary>
     /// "Yes" in the window: install the release on offer. <paramref name="fromNow"/> is what the
@@ -192,7 +211,7 @@ internal static class AutoUpdate
     {
         if (_stage != Stage.Asking) return;
         Remember(fromNow);
-
+#if !NEXUS
         var newest = Offered;
         string url = _offeredUrl, here = _here;
         Problem = null;
@@ -206,14 +225,17 @@ internal static class AutoUpdate
             bool ok = await Install(here, newest, url).ConfigureAwait(false);
             _stage = ok ? Stage.Installed : Stage.Failed;
         });
+#endif
     }
 
     /// <summary>For the self test: the window, with nothing behind it.</summary>
     internal static void Pretend(Stage stage)
     {
+#if !NEXUS   // no update window in this build, not even a pretend one
         Offered = new Version(9, 9, 9);
         AcceptedByPlayer = true;
         _stage = stage;
+#endif
     }
 
     /// <summary>"Restart later" after a yes: the update stays installed and loads at the next start.</summary>
@@ -251,6 +273,7 @@ internal static class AutoUpdate
         catch (Exception e) { Plugin.Log.LogWarning($"[update] could not save the update setting: {e.Message}"); }
     }
 
+#if !NEXUS
     private static HttpClient Client(TimeSpan timeout)
     {
         var http = new HttpClient { Timeout = timeout };
@@ -365,8 +388,12 @@ internal static class AutoUpdate
         }
     }
 
+#endif
+
+#if !NEXUS
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr GetCommandLineW();
+#endif
 
     /// <summary>
     /// Start the game again with the update in it - a fresh copy of the game with exactly the
@@ -381,6 +408,9 @@ internal static class AutoUpdate
     /// </summary>
     internal static bool Restart()
     {
+#if NEXUS
+        return false;   // nothing is ever installed in this build, so there is nothing to restart into
+#else
         if (!InPlace) return false;
         try
         {
@@ -424,7 +454,10 @@ internal static class AutoUpdate
             Plugin.Log.LogWarning($"[update] could not restart the game ({e.Message}) - restart it by hand");
             return false;
         }
+#endif
     }
+
+#if !NEXUS
 
     /// <summary>A command line without its first word - the program's own path, quoted or not.</summary>
     private static string Arguments(string line)
@@ -442,6 +475,7 @@ internal static class AutoUpdate
         }
         return line.Substring(i).Trim();
     }
+#endif
 
     /// <summary>
     /// When the game closes, move a waiting update in. The file is still held open at this point,
@@ -449,6 +483,7 @@ internal static class AutoUpdate
     /// </summary>
     internal static void OnQuit()
     {
+#if !NEXUS
         try
         {
             string fresh = _pending;
@@ -460,6 +495,7 @@ internal static class AutoUpdate
             System.Diagnostics.Process.Start(psi);
         }
         catch { }
+#endif
     }
 
     private static void TryDelete(string path)
